@@ -1,6 +1,6 @@
 # Controle de Pagamentos
 
-App estático para GitHub Pages que guarda pessoas e pagamentos mensais no navegador e pode sincronizar tudo no Gist privado global do OfficeJur.
+App estático para GitHub Pages que guarda pessoas e pagamentos mensais no navegador e pode sincronizar tudo no Gist secreto global do OfficeJur.
 
 ## Execução
 

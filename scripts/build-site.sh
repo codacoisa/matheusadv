@@ -18,7 +18,7 @@ mkdir -p "$SITE_DIR/assets"
 copy_static_app() {
   local source="$1"
   local destination="$2"
-  cp "$source/index.html" "$destination/index.html"
+  cp "$source/"*.html "$destination/"
   cp -R "$source/assets" "$destination/assets"
 }
 
@@ -59,6 +59,9 @@ copy_static_app "$ROOT_DIR/apps/validador-projudi" "$SITE_DIR/validador-projudi"
 cp "$ROOT_DIR/apps/financeiro/"*.html "$SITE_DIR/financeiro/"
 cp -R "$ROOT_DIR/apps/financeiro/assets" "$SITE_DIR/financeiro/assets"
 cp "$ROOT_DIR/apps/financeiro/worker/src/index.js" "$SITE_DIR/financeiro/worker/src/index.js"
+cp "$ROOT_DIR/packages/ui/help.css" "$SITE_DIR/configuracoes/assets/help.css"
+cp "$ROOT_DIR/packages/ui/help.css" "$SITE_DIR/financeiro/assets/help.css"
+cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/configuracoes/assets/fontawesome-7.3.0.min.js"
 
 inject_shared_ui() {
   local assets="$1"

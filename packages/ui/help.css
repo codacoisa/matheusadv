@@ -1,3 +1,4 @@
+/* Layout compartilhado pelas centrais de ajuda do OfficeJur. */
 .help-page{background:var(--bg);color:var(--text)}
 .help-topbar{padding-inline:max(24px,calc((100vw - 1260px)/2))}
 .help-back{display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}

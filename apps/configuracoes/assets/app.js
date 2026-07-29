@@ -92,7 +92,7 @@
       return;
     }
     setBusy(true);
-    setStatus('Criando Gist privado...');
+    setStatus('Criando Gist secreto...');
     try {
       const gist = await githubRequest('/gists', settings, {
         method: 'POST',
@@ -104,7 +104,7 @@
               content: JSON.stringify({
                 schema: 'officejur-gist-v1',
                 createdAt: new Date().toISOString(),
-                description: 'Gist privado compartilhado pelos módulos do OfficeJur.'
+                description: 'Gist secreto compartilhado pelos módulos do OfficeJur.'
               }, null, 2)
             }
           }
@@ -112,7 +112,7 @@
       });
       const saved = gistSettings.save({ ...settings, gistId: gist.id });
       render(saved);
-      setStatus('Gist privado criado e definido como configuração global.', 'ok');
+      setStatus('Gist secreto criado e definido como configuração global.', 'ok');
     } catch (error) {
       setStatus(error.message || 'Não foi possível criar o Gist.', 'error');
     } finally {

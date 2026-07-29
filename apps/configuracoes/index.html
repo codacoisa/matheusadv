@@ -15,9 +15,9 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=2">
+    <link rel="stylesheet" href="./assets/styles.css?v=3">
     <script src="./assets/gist-settings.js?v=2" defer></script>
-    <script src="./assets/app.js?v=2" defer></script>
+    <script src="./assets/app.js?v=3" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -34,7 +34,7 @@
     <main>
       <header class="page-head">
         <p class="eyebrow">CONFIGURAÇÃO CENTRAL</p>
-        <h1>Gist privado do OfficeJur</h1>
+        <h1>Gist secreto do OfficeJur</h1>
         <p>Configure uma vez neste navegador. Todo módulo sincronizável atual ou futuro poderá usar a mesma conexão e manter seu próprio arquivo dentro do Gist.</p>
       </header>
 
@@ -64,7 +64,7 @@
             <p class="field-note">A credencial permanece somente no armazenamento local deste navegador e nunca é enviada ao repositório do OfficeJur.</p>
             <div class="actions">
               <button id="save-test" class="button primary" type="submit">Salvar e testar</button>
-              <button id="create-gist" class="button secondary" type="button">Criar novo Gist privado</button>
+              <button id="create-gist" class="button secondary" type="button">Criar novo Gist secreto</button>
               <button id="clear-gist" class="button danger" type="button">Remover configuração</button>
             </div>
           </form>
@@ -84,7 +84,8 @@
           <section class="info-card security">
             <p class="eyebrow">SEGURANÇA</p>
             <h2>Permissão mínima</h2>
-            <p>Use um token dedicado com acesso somente a Gists, preferencialmente com prazo de validade. O Gist deve permanecer privado.</p>
+            <p>Use um token dedicado com acesso somente a Gists e prazo de validade. Um Gist secreto não aparece em buscas, mas qualquer pessoa que obtenha sua URL pode visualizá-lo.</p>
+            <a class="guide-link" href="./ajuda.html">Abrir guia completo de sincronização <span aria-hidden="true">→</span></a>
           </section>
         </aside>
       </div>

@@ -2205,12 +2205,6 @@ textarea {
     width: 100%;
   }
 }
-.top-help-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-}
 .head-actions {
   flex-wrap: wrap;
   justify-content: flex-end;

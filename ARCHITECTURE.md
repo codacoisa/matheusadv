@@ -36,7 +36,7 @@ As ferramentas do Lab podem consumir os componentes e imagens institucionais de 
 
 ## Dados
 
-Os módulos iniciam sem dados operacionais versionados. Informações jurídicas e financeiras são mantidas no navegador e, quando configurado pelo usuário em `apps/configuracoes`, sincronizadas com um Gist privado global do OfficeJur. A biblioteca `packages/ui/gist-settings.js` é a única interface de persistência do Gist ID, do token e da opção de sincronização automática no navegador. Cada módulo apenas consome essa configuração, usa um nome de arquivo fixo dentro do Gist e aplica sua própria estratégia de mesclagem, sem expor engrenagem ou ajustes locais de Gist. Módulos sincronizáveis baixam, mesclam e publicam seu arquivo ao serem abertos.
+Os módulos iniciam sem dados operacionais versionados. Informações jurídicas e financeiras são mantidas no navegador e, quando configurado pelo usuário em `apps/configuracoes`, sincronizadas com um Gist secreto global do OfficeJur. A biblioteca `packages/ui/gist-settings.js` é a única interface de persistência do Gist ID, do token e da opção de sincronização automática no navegador. Cada módulo apenas consome essa configuração, usa um nome de arquivo fixo dentro do Gist e aplica sua própria estratégia de mesclagem, sem expor engrenagem ou ajustes locais de Gist. Módulos sincronizáveis baixam, mesclam e publicam seu arquivo ao serem abertos. Um Gist secreto não é privado: qualquer pessoa que obtenha sua URL poderá visualizar o conteúdo.
 
 ## Geradores de documentos
 

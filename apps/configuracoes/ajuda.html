@@ -10,14 +10,13 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Ajuda de sincronização | Financeiro Jurídico</title>
+  <title>Ajuda de sincronização | Configurações do OfficeJur</title>
   <link rel="icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" type="image/png">
   <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
   <script src="../assets/office-config.js"></script>
   <script src="../assets/office-context.js" defer></script>
-  <link rel="stylesheet" href="./assets/styles.css?v=15">
-  <link rel="stylesheet" href="./assets/help.css?v=1">
-  <link rel="stylesheet" href="./assets/system.css?v=1">
+  <link rel="stylesheet" href="./assets/styles.css?v=3">
+  <link rel="stylesheet" href="./assets/help.css?v=2">
   <script src="./assets/fontawesome-7.3.0.min.js" data-auto-replace-svg="nest" data-observe-mutations="true" defer></script>
 <script src="./assets/app-switcher.js?v=5" defer></script>
   <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
@@ -25,10 +24,10 @@
 </head>
 <body class="help-page">
   <header class="topbar help-topbar">
-    <a class="brand" href="./index.html"><img src="../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt=""><span><strong>Financeiro Jurídico</strong><small>Central de ajuda</small></span></a>
+    <a class="brand" href="./index.html"><img src="../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt=""><span><strong>Configurações</strong><small>Ajuda de sincronização</small></span></a>
     <div class="top-actions">
       <a class="btn ghost light help-back" href="./index.html"><i class="fa-solid fa-arrow-left"></i><span> Voltar ao sistema</span></a>
-      <office-app-switcher current="financeiro"></office-app-switcher>
+      <office-app-switcher current="configuracoes"></office-app-switcher>
     </div>
   </header>
 
@@ -50,13 +49,13 @@
         <div><p class="eyebrow">SINCRONIZAÇÃO COM GITHUB GIST</p><h1>Configure seus computadores com segurança</h1><p>Este guia explica todo o processo: criar a credencial no GitHub, conectar o primeiro navegador, adicionar outros computadores e entender como o sistema protege as alterações de cada pessoa.</p></div>
       </header>
 
-      <div class="help-alert important"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Antes de começar</strong><p>Escolha uma pessoa responsável pela conta do GitHub e pelo Gist. O Gist deve permanecer privado, e o token nunca deve ser enviado por e-mail, WhatsApp ou captura de tela.</p></div></div>
+      <div class="help-alert important"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Antes de começar</strong><p>Escolha uma pessoa responsável pela conta do GitHub e pelo Gist. Use um Gist secreto e nunca envie o token por e-mail, WhatsApp ou captura de tela. Atenção: “secreto” significa apenas que o Gist não aparece em buscas; quem obtiver sua URL poderá visualizá-lo.</p></div></div>
 
       <section id="entenda" class="help-section">
         <p class="eyebrow">VISÃO GERAL</p><h2>Como a sincronização funciona</h2>
-        <p>O sistema mantém uma cópia dos dados neste navegador e usa um <strong>Gist privado global do OfficeJur</strong> como ponto central para compartilhar as informações entre computadores. O Gist contém um arquivo separado para cada módulo, e o Financeiro usa <code>financeiro-juridico.json</code>.</p>
+        <p>O sistema mantém uma cópia dos dados neste navegador e usa um <strong>Gist secreto global do OfficeJur</strong> como ponto central para compartilhar as informações entre computadores. O Gist contém um arquivo separado para cada módulo, como <code>financeiro-juridico.json</code> e <code>controle-pagamentos.json</code>.</p>
         <div class="help-flow">
-          <div><i class="fa-solid fa-laptop"></i><strong>Computador A</strong><small>Dados locais</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div class="central"><i class="fa-brands fa-github"></i><strong>Gist privado</strong><small>Cópia central</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div><i class="fa-solid fa-computer"></i><strong>Computador B</strong><small>Dados locais</small></div>
+          <div><i class="fa-solid fa-laptop"></i><strong>Computador A</strong><small>Dados locais</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div class="central"><i class="fa-brands fa-github"></i><strong>Gist secreto</strong><small>Cópia central</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div><i class="fa-solid fa-computer"></i><strong>Computador B</strong><small>Dados locais</small></div>
         </div>
         <ul class="help-checks">
           <li><i class="fa-solid fa-check"></i><span>Ao sincronizar, o sistema primeiro lê o conteúdo atual do Gist.</span></li>
@@ -87,8 +86,8 @@
         <ol class="help-steps">
           <li><span>1</span><div><strong>Abra a área central</strong><p>No portal ou no seletor de apps, abra <strong>Configurações</strong>. Gist ID e token são administrados somente nessa área.</p></div></li>
           <li><span>2</span><div><strong>Cole o token</strong><p>No campo “Token do GitHub”, cole a credencial criada na etapa anterior.</p></div></li>
-          <li><span>3</span><div><strong>Conecte um Gist existente</strong><p>Se já houver um Gist privado, informe seu ID ou endereço e clique em <strong>Salvar e testar</strong>.</p></div></li>
-          <li><span>4</span><div><strong>Ou crie um novo Gist</strong><p>Com o token informado, clique em <strong>Criar novo Gist privado</strong>. O sistema criará a estrutura global e preencherá o ID automaticamente.</p></div></li>
+          <li><span>3</span><div><strong>Conecte um Gist existente</strong><p>Se já houver um Gist secreto, informe seu ID ou endereço e clique em <strong>Salvar e testar</strong>.</p></div></li>
+          <li><span>4</span><div><strong>Ou crie um novo Gist</strong><p>Com o token informado, clique em <strong>Criar novo Gist secreto</strong>. O sistema criará a estrutura global e preencherá o ID automaticamente.</p></div></li>
           <li><span>5</span><div><strong>Guarde o Gist ID</strong><p>O ID é a sequência final do endereço do Gist. Exemplo: em <code>gist.github.com/usuario/abc123</code>, o ID é <code>abc123</code>. Ele será usado nos outros computadores.</p></div></li>
         </ol>
         <div class="help-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Configuração concluída</strong><p>Quando o topo mostrar “Gist configurado”, use o botão “Sincronizar” para confirmar que os dados já estão atualizados.</p></div></div>
@@ -125,12 +124,12 @@
       <section id="seguranca" class="help-section">
         <p class="eyebrow">SEGURANÇA</p><h2>Proteja os dados e as credenciais</h2>
         <ul class="help-checks security">
-          <li><i class="fa-solid fa-shield"></i><span>Use um Gist <strong>privado</strong>. Nunca transforme o arquivo financeiro em Gist público.</span></li>
+          <li><i class="fa-solid fa-shield"></i><span>Use um Gist <strong>secreto</strong> e proteja sua URL. Nunca o transforme em Gist público.</span></li>
           <li><i class="fa-solid fa-key"></i><span>Crie tokens com somente a permissão de Gists e, sempre que possível, um token por equipamento.</span></li>
           <li><i class="fa-solid fa-clock"></i><span>Defina validade e renove o token quando o GitHub indicar expiração.</span></li>
           <li><i class="fa-solid fa-ban"></i><span>Não compartilhe tokens em mensagens, documentos, capturas de tela ou gerenciadores não autorizados.</span></li>
           <li><i class="fa-solid fa-laptop-file"></i><span>O token fica no armazenamento local do navegador. Limpar os dados do navegador remove a configuração daquele equipamento.</span></li>
-          <li><i class="fa-solid fa-lock"></i><span>Um Gist privado controla acesso, mas não é criptografia ponta a ponta. A conta do GitHub deve usar senha forte e autenticação em dois fatores.</span></li>
+          <li><i class="fa-solid fa-lock"></i><span>Um Gist secreto não é privado nem usa criptografia ponta a ponta: qualquer pessoa com a URL pode visualizar seu conteúdo. Não armazene documentos sigilosos nele. A conta do GitHub deve usar senha forte e autenticação em dois fatores.</span></li>
         </ul>
       </section>
 
@@ -139,15 +138,15 @@
         <div class="help-faq">
           <details open><summary>“Bad credentials” ou status 401</summary><div>O token está incorreto, expirou ou foi revogado. Gere um novo token, substitua-o na área central <strong>Configurações</strong> e teste novamente.</div></details>
           <details><summary>Status 403 ou “Resource not accessible”</summary><div>O token não possui permissão de gravação em Gists. Em um token refinado, confirme <strong>Account permissions → Gists → Read and write</strong>. Em um token clássico, confirme o escopo <code>gist</code>.</div></details>
-          <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID ou endereço foi copiado integralmente e se o token pertence a uma conta com acesso ao Gist privado.</div></details>
-          <details><summary>Arquivo JSON não encontrado</summary><div>Confirme que todos os computadores usam o mesmo nome: <code>financeiro-juridico.json</code>. Evite renomear ou excluir o arquivo diretamente no GitHub.</div></details>
+          <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID ou endereço foi copiado integralmente e se o token pertence à conta proprietária do Gist secreto.</div></details>
+          <details><summary>Arquivo JSON não encontrado</summary><div>Cada módulo usa um nome de arquivo fixo dentro do Gist. Evite renomear ou excluir esses arquivos diretamente no GitHub; abra o módulo correspondente para que ele tente sincronizar novamente.</div></details>
           <details><summary>As alterações não apareceram no outro computador</summary><div>No computador que fez a alteração, clique em “Sincronizar” e aguarde a confirmação. Depois, sincronize o segundo computador. Verifique também se ambos usam a mesma configuração global.</div></details>
           <details><summary>O token sumiu após limpar o navegador</summary><div>Isso é esperado: a credencial fica somente no armazenamento local. Reconfigure o equipamento na área central com o Gist ID e um token autorizado; ao abrir o Financeiro, ele fará a mesclagem automaticamente.</div></details>
           <details><summary>Preciso recuperar uma versão anterior</summary><div>Não edite o JSON manualmente. Abra o Gist no GitHub e consulte o histórico de revisões. Antes de restaurar qualquer versão, preserve uma cópia do estado atual e confirme a operação com a pessoa responsável pelo sistema.</div></details>
         </div>
       </section>
 
-      <footer class="help-footer"><i class="fa-solid fa-circle-info"></i><p>Se o problema persistir, anote a mensagem exibida pelo sistema, o navegador utilizado e a etapa em que ocorreu. Nunca inclua o token na captura de tela.</p><a class="btn primary" href="./index.html"><i class="fa-solid fa-arrow-left"></i> Voltar ao Financeiro</a></footer>
+      <footer class="help-footer"><i class="fa-solid fa-circle-info"></i><p>Se o problema persistir, anote a mensagem exibida pelo sistema, o navegador utilizado e a etapa em que ocorreu. Nunca inclua o token na captura de tela.</p><a class="btn primary" href="./index.html"><i class="fa-solid fa-arrow-left"></i> Voltar às Configurações</a></footer>
     </article>
   </main>
   <office-site-footer repository="officejur"></office-site-footer>
