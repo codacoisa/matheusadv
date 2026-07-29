@@ -97,7 +97,9 @@ O workflow `Publicar OfficeJur` monta todas as aplicações em um único artefat
 - `/officejur/lab/controle-pagamentos/` — controle simplificado em avaliação;
 - `/officejur/lab/central-guias/` — leitura de backups e consulta de guias.
 
-Não há etapa de compilação das aplicações. O workflow apenas organiza os arquivos e injeta os componentes compartilhados no artefato publicado.
+O site é majoritariamente estático, mas o Validador Projudi é compilado com
+esbuild antes da publicação. O workflow valida, monta e injeta os componentes
+compartilhados no artefato publicado.
 
 ## Dados e credenciais
 

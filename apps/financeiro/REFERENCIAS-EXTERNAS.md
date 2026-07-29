@@ -41,8 +41,8 @@ incorporado.
 ### GitHub
 
 - **GitHub Pages:** hospedagem estática do sistema.
-- **GitHub Gist:** armazenamento privado usado pela sincronização entre
-  navegadores.
+- **GitHub Gist:** armazenamento secreto por URL usado pela sincronização entre
+  navegadores; não é um cofre privado nem substitui criptografia.
 - **GitHub REST API:** leitura, criação e atualização do Gist por meio de
   `https://api.github.com`.
 - **Autenticação:** token pessoal com a menor permissão necessária para Gists;
@@ -58,6 +58,8 @@ incorporado.
   `worker/src/index.js`, por meio de `https://api.mercadopago.com`.
 - **Credencial privada:** `MP_ACCESS_TOKEN`, armazenada como segredo no serviço
   protegido e nunca na página estática.
+- **Chave do serviço:** `OFFICEJUR_API_KEY`, também armazenada como segredo no
+  Worker e informada somente na sessão ativa do navegador.
 - **Referências:** [Visão geral do Checkout Pro](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/overview),
   [criação da aplicação](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/create-application),
   [testes da integração](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/integration-test)
@@ -69,6 +71,8 @@ incorporado.
   sistema estático e a API do Mercado Pago.
 - **Código do serviço:** `worker/src/index.js`.
 - **Configuração:** `worker/wrangler.toml`.
+- **Proteção de tráfego:** binding `RATE_LIMITER` do Cloudflare Workers,
+  configurado para limitar chamadas ao serviço por origem e rota.
 - **Segredos:** o Access Token do Mercado Pago deve ser cadastrado como segredo
   do Worker.
 - **Referências:** [Cloudflare Workers](https://developers.cloudflare.com/workers/)

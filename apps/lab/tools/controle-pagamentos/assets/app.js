@@ -9,6 +9,7 @@
   const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const COLORS = ['#b38731', '#17213a', '#667085', '#d9bd7a', '#067647', '#9e3b2f', '#46627f', '#8c6f2f'];
   const gistSettings = window.OfficeJurGistSettings;
+  const gistClient = window.OfficeJurGistClient;
 
   const state = {
     data: loadData(),
@@ -861,49 +862,23 @@
     persist();
   }
 
-  async function githubRequest(path, options) {
-    const response = await fetch(`https://api.github.com${path}`, {
-      method: options.method || 'GET',
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${state.settings.token}`
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined
-    });
-    if (!response.ok) {
-      let message = `GitHub respondeu com status ${response.status}.`;
-      try {
-        const parsed = await response.json();
-        if (parsed && parsed.message) message = parsed.message;
-      } catch (_) {}
-      throw new Error(message);
-    }
-    return response.json();
-  }
-
   async function fetchGistFile() {
     refreshGistCredentials();
     if (!state.settings.gistId || !state.settings.token) {
       throw new Error('Configure o Gist nas Configurações do OfficeJur.');
     }
-    const gist = await githubRequest(`/gists/${encodeURIComponent(state.settings.gistId)}`, { method: 'GET' });
+    const snapshot = await gistClient.gistSnapshot(
+      state.settings.gistId,
+      state.settings.token
+    );
+    const gist = snapshot.gist;
     const file = gist.files ? gist.files[FILE_NAME] : null;
-    return { gist, file };
+    return { gist, file, revision: snapshot.etag };
   }
 
   async function readGistFilePayload(file) {
     if (!file) throw new Error('Arquivo não encontrado no Gist.');
-    if (file.content) return JSON.parse(file.content);
-    if (!file.raw_url) throw new Error('Conteúdo do arquivo não retornado pelo Gist.');
-    const response = await fetch(file.raw_url, {
-      cache: 'no-store',
-      headers: {
-        Authorization: `Bearer ${state.settings.token}`
-      }
-    });
-    if (!response.ok) throw new Error('Não foi possível ler o conteúdo completo do Gist.');
-    return JSON.parse(await response.text());
+    return JSON.parse(await gistClient.text(file));
   }
 
   function gistPayload(data) {
@@ -927,7 +902,7 @@
     }
 
     syncInFlight = (async () => {
-      const { file } = await fetchGistFile();
+      const { file, revision } = await fetchGistFile();
       let remoteData = normalizeData({});
       let remoteSignature = '';
       if (file) {
@@ -950,16 +925,16 @@
         return;
       }
 
-      await githubRequest(`/gists/${encodeURIComponent(state.settings.gistId)}`, {
-        method: 'PATCH',
-        body: {
-          files: {
-            [FILE_NAME]: {
-              content: JSON.stringify(gistPayload(mergedData), null, 2)
-            }
+      await gistClient.patch(
+        state.settings.gistId,
+        state.settings.token,
+        {
+          [FILE_NAME]: {
+            content: JSON.stringify(gistPayload(mergedData), null, 2)
           }
-        }
-      });
+        },
+        { etag: revision }
+      );
       state.settings.lastSyncAt = nowISO();
       state.settings.lastSyncSignature = mergedSignature;
       saveSyncState();

@@ -42,12 +42,6 @@ test("calcular realização parcial e saldo sem ultrapassar o total", () => {
   assert.equal(statusOf(settled, "2026-07-22"), "paid");
 });
 
-test("manter compatibilidade com lançamentos realizados antigos", () => {
-  const legacy = { amount: 480, status: "paid", dueDate: "2026-06-01" };
-  assert.equal(realizedAmountOf(legacy), 480);
-  assert.equal(statusOf(legacy, "2026-07-22"), "paid");
-});
-
 test("distribuir excedente nas parcelas seguintes em ordem", () => {
   const entries = [
     {

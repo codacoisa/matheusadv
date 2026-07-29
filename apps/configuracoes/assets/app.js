@@ -2,6 +2,7 @@
   'use strict';
 
   const gistSettings = window.OfficeJurGistSettings;
+  const gistClient = window.OfficeJurGistClient;
   const officeName = window.OFFICEJUR_CONFIG?.office?.name || 'OfficeJur';
   const form = document.querySelector('#gist-form');
   const gistIdInput = document.querySelector('#gist-id');
@@ -46,23 +47,6 @@
     });
   }
 
-  async function githubRequest(path, settings, options = {}) {
-    const response = await fetch(`https://api.github.com${path}`, {
-      ...options,
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.token}`,
-        ...options.headers
-      }
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.message || `GitHub respondeu com status ${response.status}.`);
-    }
-    return response.json();
-  }
-
   async function saveAndTest(event) {
     event.preventDefault();
     const settings = currentFormSettings();
@@ -73,7 +57,7 @@
     setBusy(true);
     setStatus('Verificando acesso ao Gist...');
     try {
-      await githubRequest(`/gists/${encodeURIComponent(settings.gistId)}`, settings);
+      await gistClient.gist(settings.gistId, settings.token);
       gistSettings.save(settings);
       render(settings);
       setStatus('Configuração global salva e acesso confirmado.', 'ok');
@@ -94,7 +78,7 @@
     setBusy(true);
     setStatus('Criando Gist secreto...');
     try {
-      const gist = await githubRequest('/gists', settings, {
+      const gist = await gistClient.json('/gists', settings.token, {
         method: 'POST',
         body: JSON.stringify({
           description: `OfficeJur — ${officeName}`,

@@ -5,14 +5,11 @@ const {
   countPdfPages,
   emptyData,
   fromBase64,
-  isLegacyData,
   mergeData,
   needsPayloadUpload,
   normalizeData,
-  normalizeLegacyData,
   payloadFileName,
   signature,
-  shouldMigrateLegacy,
   toBase64,
   validatePdf,
 } = require("../assets/files.js");
@@ -122,42 +119,11 @@ test("manter no índice apenas metadados e mesclar por atualização", () => {
   assert.equal(signature(merged), signature(mergeData(remote, base)));
 });
 
-test("identificar e preparar o formato legado sem incluí-lo no índice", () => {
-  const legacy = {
-    schema: "gm-financeiro-arquivos-v1",
-    files: [
-      {
-        id: "arquivo-1",
-        clientId: "cliente-1",
-        name: "antigo.pdf",
-        size: 10,
-        pageCount: 1,
-        base64: "YW50aWdv",
-      },
-    ],
-  };
-  assert.equal(isLegacyData(legacy), true);
-  assert.equal(normalizeLegacyData(legacy).files[0].base64, "YW50aWdv");
-  const normalized = normalizeData({
-    ...emptyData(),
-    files: [normalizeLegacyData(legacy).files[0]],
-  });
-  assert.equal(normalized.files[0].base64, undefined);
-  assert.equal(normalized.files[0].payloadFile, "financeiro-pdf-arquivo-1.b64");
-});
-
-test("não reativar o legado quando já existe um índice atual vazio", () => {
-  const legacy = { files: [{ id: "arquivo-1" }] };
-  assert.equal(shouldMigrateLegacy(false, legacy), true);
-  assert.equal(shouldMigrateLegacy(true, legacy), false);
-});
-
-test("publicar payloads durante a migração mesmo com metadados equivalentes", () => {
+test("publicar payloads apenas quando os metadados divergirem", () => {
   const local = {
     sha256: "abc123",
     payloadFile: "financeiro-pdf-arquivo-1.b64",
   };
-  assert.equal(needsPayloadUpload(local, { ...local }, false), false);
-  assert.equal(needsPayloadUpload(local, { ...local }, true), true);
-  assert.equal(needsPayloadUpload(local, null, false), true);
+  assert.equal(needsPayloadUpload(local, { ...local }), false);
+  assert.equal(needsPayloadUpload(local, null), true);
 });

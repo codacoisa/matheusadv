@@ -11,8 +11,6 @@
     <meta name="msapplication-TileColor" content="#17213a" />
     <meta name="application-name" content="OfficeJur" />
     <meta name="apple-mobile-web-app-title" content="OfficeJur" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
@@ -32,11 +30,12 @@
     ></script>
     <script src="./assets/libphonenumber-max.js" defer></script>
     <script src="./assets/contracts.js?v=1" defer></script>
-    <script src="./assets/ledger.js?v=1" defer></script>
+    <script src="./assets/ledger.js?v=2" defer></script>
     <script src="./assets/metrics.js?v=3" defer></script>
-    <script src="./assets/files.js?v=2" defer></script>
-    <script src="./assets/gist-settings.js?v=2" defer></script>
-    <script src="./assets/app.js?v=27" defer></script>
+    <script src="./assets/files.js?v=3" defer></script>
+    <script src="./assets/gist-settings.js?v=3" defer></script>
+    <script src="./assets/gist-client.js?v=1" defer></script>
+    <script src="./assets/app.js?v=28" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -979,6 +978,12 @@
               type="url"
               placeholder="https://seu-dominio.example/officejur/financeiro/" /></label
           ><label class="span-2"
+            >Chave de acesso do serviço<input
+              name="apiKey"
+              type="password"
+              autocomplete="off"
+              placeholder="Configurada como OFFICEJUR_API_KEY no Worker" /></label
+          ><label class="span-2"
             >Identificação no extrato<input
               name="statementDescriptor"
               maxlength="22"
@@ -995,7 +1000,8 @@
             <strong>Credencial privada protegida</strong>
             <p>
               Cadastre <code>MP_ACCESS_TOKEN</code> como segredo no serviço.
-              Este painel nunca solicita nem salva o Access Token.
+              Este painel nunca solicita nem salva o Access Token. A chave de
+              acesso do serviço fica apenas nesta sessão do navegador.
             </p>
           </div>
         </div>
@@ -1075,6 +1081,32 @@
           <span id="detail-links"></span
           ><button class="btn primary" type="button" id="detail-edit">
             <i class="fa-solid fa-pen"></i> Editar
+          </button>
+        </div>
+      </section>
+    </dialog>
+    <dialog id="storage-error-dialog">
+      <section class="detail-card">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow">RECUPERAÇÃO DE DADOS</p>
+            <h2>Os dados locais não puderam ser lidos</h2>
+            <p id="storage-error-message"></p>
+          </div>
+        </div>
+        <div class="alert warning">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span
+            >O Financeiro foi bloqueado para impedir que um estado vazio
+            sobrescreva os dados existentes. Baixe a cópia bruta antes de
+            limpar ou restaurar o armazenamento do navegador.</span
+          >
+        </div>
+        <div class="modal-actions split">
+          <a class="btn ghost anchor-btn" href="../configuracoes/"
+            >Abrir configurações</a
+          ><button class="btn primary" type="button" id="download-raw-storage">
+            <i class="fa-solid fa-download"></i> Baixar cópia bruta
           </button>
         </div>
       </section>

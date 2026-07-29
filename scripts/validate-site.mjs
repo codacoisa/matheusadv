@@ -38,8 +38,6 @@ for (const htmlFile of htmlFiles) {
     ["msapplication-TileColor", "#17213a"],
     ["application-name", "OfficeJur"],
     ["apple-mobile-web-app-title", "OfficeJur"],
-    ["mobile-web-app-capable", "yes"],
-    ["apple-mobile-web-app-capable", "yes"],
     ["apple-mobile-web-app-status-bar-style", "black-translucent"],
   ];
   const hasStandardMetadata =

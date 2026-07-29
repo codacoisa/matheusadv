@@ -3,15 +3,15 @@ name: Publicar OfficeJur
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -36,7 +36,12 @@ jobs:
         working-directory: apps/financeiro
         run: npm test
 
+      - name: Testar integração com Mercado Pago
+        working-directory: apps/financeiro/worker
+        run: npm test
+
       - name: Configurar GitHub Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
 
       - name: Montar site estático
@@ -45,12 +50,20 @@ jobs:
       - name: Validar site publicado
         run: node ./scripts/validate-site.mjs
 
+      - name: Confirmar bundles rastreados
+        run: git diff --exit-code -- apps/validador-projudi/assets
+
       - name: Enviar artefato do site
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

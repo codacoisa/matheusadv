@@ -2,7 +2,6 @@
   "use strict";
 
   const SCHEMA = "gm-financeiro-arquivos-v2";
-  const LEGACY_SCHEMA = "gm-financeiro-arquivos-v1";
   const MAX_FILE_SIZE = 3 * 1024 * 1024;
   const MAX_AVERAGE_PAGE_SIZE = 250 * 1024;
 
@@ -70,40 +69,12 @@
     };
   }
 
-  function isLegacyData(raw) {
+  function needsPayloadUpload(local, remote) {
     return (
-      raw?.schema === LEGACY_SCHEMA ||
-      (!raw?.schema &&
-        Array.isArray(raw?.files) &&
-        raw.files.some((item) => item?.base64))
-    );
-  }
-
-  function shouldMigrateLegacy(hasCurrentData, legacy) {
-    return !hasCurrentData && Boolean(legacy?.files?.length);
-  }
-
-  function needsPayloadUpload(local, remote, legacyMigration = false) {
-    return (
-      legacyMigration ||
       !remote ||
       remote.sha256 !== local.sha256 ||
       remote.payloadFile !== local.payloadFile
     );
-  }
-
-  function normalizeLegacyData(raw) {
-    if (!isLegacyData(raw)) return null;
-    return {
-      updatedAt: String(raw.updatedAt || ""),
-      files: (raw.files || [])
-        .map((item) => ({
-          ...normalizeFile(item),
-          base64: String(item.base64 || ""),
-        }))
-        .filter((item) => item.id && item.clientId && item.base64),
-      deletedFiles: normalizeDeleted(raw.deletedFiles),
-    };
   }
 
   function mergeData(leftRaw, rightRaw) {
@@ -214,14 +185,10 @@
 
   const api = {
     SCHEMA,
-    LEGACY_SCHEMA,
     MAX_FILE_SIZE,
     MAX_AVERAGE_PAGE_SIZE,
     emptyData,
     normalizeData,
-    normalizeLegacyData,
-    isLegacyData,
-    shouldMigrateLegacy,
     needsPayloadUpload,
     mergeData,
     signature,

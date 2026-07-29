@@ -3,18 +3,19 @@
   const officeConfig = window.OFFICEJUR_CONFIG?.office || {};
   const statementDescriptor = officeConfig.statementDescriptor || "OFFICEJUR";
   const gistSettings = window.OfficeJurGistSettings;
+  const gistClient = window.OfficeJurGistClient;
   const financeFiles = window.FinanceFiles;
   const SCHEMA = "gm-financeiro-v6";
   const DATA_KEY = "gm-financeiro-data-v2",
     SYNC_STATE_KEY = "gm-financeiro-sync-state-v1",
     MP_KEY = "gm-financeiro-mp-v2",
+    MP_SESSION_KEY = "gm-financeiro-mp-session-key-v1",
+    MP_REQUEST_PREFIX = "gm-financeiro-mp-request-v1:",
     FILE = "financeiro-juridico.json",
     FILES_FILE = "financeiro-arquivos.json",
-    LEGACY_FILES_BACKUP = "financeiro-arquivos-legado-v1.json",
     FILES_DB = "gm-financeiro-arquivos-db-v1",
     FILES_STORE = "state",
     FILES_CONTENT_STORE = "content",
-    FILES_RECORD = "financeiro-arquivos",
     FILES_META_RECORD = "financeiro-arquivos-v2",
     GIST_RAW_MAX_SIZE = 10 * 1024 * 1024;
   const DOCUMENT_HANDOFF_PREFIX = "gm-document-handoff-v1:",
@@ -89,6 +90,44 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  const safeUrl = (value, protocols = ["https:"]) => {
+    try {
+      const url = new URL(String(value || ""), location.href);
+      return protocols.includes(url.protocol) ? url.href : "";
+    } catch {
+      return "";
+    }
+  };
+  const sanitizeDetailHtml = (markup) => {
+    const template = document.createElement("template");
+    template.innerHTML = String(markup || "");
+    template.content
+      .querySelectorAll("script,style,iframe,object,embed,link,meta,base,form")
+      .forEach((element) => element.remove());
+    template.content.querySelectorAll("*").forEach((element) => {
+      [...element.attributes].forEach((attribute) => {
+        const name = attribute.name.toLowerCase();
+        if (
+          name.startsWith("on") ||
+          name === "srcdoc" ||
+          name === "src" ||
+          name === "style"
+        ) {
+          element.removeAttribute(attribute.name);
+          return;
+        }
+        if (name === "href") {
+          const href = attribute.value;
+          if (
+            !href.startsWith("#") &&
+            !safeUrl(href, ["https:", "mailto:", "tel:"])
+          )
+            element.removeAttribute(attribute.name);
+        }
+      });
+    });
+    return template.innerHTML;
+  };
   const fileSize = (value) =>
     Number(value || 0) < 1024 * 1024
       ? `${Math.max(1, Math.round(Number(value || 0) / 1024))} KB`
@@ -464,12 +503,9 @@
     return raw;
   }
   function load() {
-    try {
-      const saved = localStorage.getItem(DATA_KEY);
-      return saved ? normalize(currentData(JSON.parse(saved))) : emptyData();
-    } catch {
-      return emptyData();
-    }
+    const saved = localStorage.getItem(DATA_KEY);
+    if (!saved) return emptyData();
+    return normalize(currentData(JSON.parse(saved)));
   }
   function openFilesDatabase() {
     return new Promise((resolve, reject) => {
@@ -505,23 +541,17 @@
       const result = await new Promise((resolve, reject) => {
         const transaction = database.transaction(FILES_STORE, "readonly"),
           store = transaction.objectStore(FILES_STORE),
-          metaRequest = store.get(FILES_META_RECORD),
-          legacyRequest = store.get(FILES_RECORD);
+          metaRequest = store.get(FILES_META_RECORD);
         transaction.oncomplete = () =>
-          resolve({
-            data: metaRequest.result
-              ? financeFiles.normalizeData(metaRequest.result)
-              : financeFiles.emptyData(),
-            hasCurrentData: Boolean(metaRequest.result),
-            legacy: financeFiles.normalizeLegacyData(legacyRequest.result),
-          });
+          resolve(metaRequest.result
+            ? financeFiles.normalizeData(metaRequest.result)
+            : financeFiles.emptyData());
         metaRequest.onerror = () => reject(metaRequest.error);
-        legacyRequest.onerror = () => reject(legacyRequest.error);
       });
       database.close();
       return result;
-    } catch {
-      return { data: financeFiles.emptyData(), legacy: null };
+    } catch (error) {
+      throw new Error(`Não foi possível abrir os arquivos locais: ${error?.message || "erro desconhecido"}`);
     }
   }
   async function saveFilesData(nextData) {
@@ -571,35 +601,6 @@
       database.close();
     }
   }
-  async function prepareLegacyFiles(legacy) {
-    if (!legacy?.files?.length)
-      return { data: financeFiles.emptyData(), contents: new Map() };
-    const migrated = financeFiles.emptyData(legacy.updatedAt || now());
-    migrated.deletedFiles = legacy.deletedFiles || [];
-    const contents = new Map();
-    for (const legacyFile of legacy.files) {
-      const blob = new Blob([financeFiles.fromBase64(legacyFile.base64)], {
-          type: "application/pdf",
-        });
-      const item = {
-        ...legacyFile,
-        sha256: legacyFile.sha256 || (await financeFiles.sha256(blob)),
-        payloadFile: legacyFile.payloadFile || financeFiles.payloadFileName(legacyFile.id),
-      };
-      delete item.base64;
-      migrated.files.push(item);
-      contents.set(item.id, { item, blob });
-    }
-    return { data: financeFiles.normalizeData(migrated), contents };
-  }
-  async function migrateLegacyFiles(legacy) {
-    const prepared = await prepareLegacyFiles(legacy);
-    if (!prepared?.data) return financeFiles.emptyData();
-    for (const { item, blob } of prepared.contents.values())
-      await saveFileContent(item, blob);
-    const migrated = prepared.data;
-    return saveFilesData(migrated);
-  }
   function loadSettings() {
     const defaults = {
       gistId: "",
@@ -620,6 +621,8 @@
   }
   function loadMp() {
     try {
+      const persisted = JSON.parse(localStorage.getItem(MP_KEY) || "{}");
+      delete persisted.apiKey;
       return {
         environment: "test",
         publicKey: "",
@@ -627,7 +630,8 @@
         returnUrl: location.href.split("#")[0],
         statementDescriptor,
         autoReturn: true,
-        ...JSON.parse(localStorage.getItem(MP_KEY) || "{}"),
+        ...persisted,
+        apiKey: sessionStorage.getItem(MP_SESSION_KEY) || "",
       };
     } catch {
       return {
@@ -637,6 +641,7 @@
         returnUrl: location.href.split("#")[0],
         statementDescriptor,
         autoReturn: true,
+        apiKey: sessionStorage.getItem(MP_SESSION_KEY) || "",
       };
     }
   }
@@ -711,9 +716,16 @@
         : "Contrato aberto com os dados do cliente.",
     );
   }
-  let data = load(),
-    filesData = financeFiles.emptyData(),
-    legacyFilesData = null,
+  let dataLoadFailure = null,
+    filesLoadFailure = null,
+    data;
+  try {
+    data = load();
+  } catch (error) {
+    dataLoadFailure = error;
+    data = emptyData();
+  }
+  let filesData = financeFiles.emptyData(),
     settings = loadSettings(),
     mp = loadMp(),
     syncTimer = 0,
@@ -722,15 +734,18 @@
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "";
-  const filesReady = loadFilesState().then(async (loaded) => {
-    legacyFilesData = loaded.legacy;
-    filesData = loaded.data;
-    if (financeFiles.shouldMigrateLegacy(loaded.hasCurrentData, legacyFilesData))
-      filesData = await migrateLegacyFiles(legacyFilesData);
-    renderClients();
-    if (currentFilesClientId) renderClientFiles();
-    return loaded;
-  });
+  const filesReady = loadFilesState()
+    .then((loaded) => {
+      filesData = loaded;
+      renderClients();
+      if (currentFilesClientId) renderClientFiles();
+      return loaded;
+    })
+    .catch((error) => {
+      filesLoadFailure = error;
+      showStorageFailure(error);
+      throw error;
+    });
   setupPhoneCountries();
   setupAgreementEditor($("#case-agreement-editor"));
   setupAgreementEditor($("#package-agreement-editor"));
@@ -762,11 +777,38 @@
     });
   }
   function persist(skipSync = false) {
+    if (dataLoadFailure)
+      throw new Error(
+        "Os dados locais estão bloqueados para recuperação e não podem ser sobrescritos.",
+      );
     captureMissingDeletions();
     data.updatedAt = now();
     localStorage.setItem(DATA_KEY, JSON.stringify(data));
     render();
     if (!skipSync) scheduleAutoSync();
+  }
+  function showStorageFailure(error) {
+    const dialog = $("#storage-error-dialog");
+    $("#storage-error-message").textContent =
+      error?.message || "O armazenamento local retornou um conteúdo inválido.";
+    if (!dialog.open) dialog.showModal();
+  }
+  function downloadRawStorage() {
+    const payload = {
+        exportedAt: now(),
+        dataKey: DATA_KEY,
+        rawData: localStorage.getItem(DATA_KEY),
+        dataError: dataLoadFailure?.message || "",
+        filesError: filesLoadFailure?.message || "",
+      },
+      blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      }),
+      link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `officejur-recuperacao-${iso()}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
   }
   function scheduleAutoSync() {
     if (!settings.autoSync || !settings.gistId || !settings.token) return;
@@ -888,7 +930,7 @@
         .sort((a, b) => b[1] - a[1])
         .map(
           ([k, v]) =>
-            `<div class="break-row"><span>${k}</span><span class="progress"><i style="width:${(v / max) * 100}%"></i></span><strong>${money(v)}</strong></div>`,
+            `<div class="break-row"><span>${escapeHtml(k)}</span><span class="progress"><i style="width:${(v / max) * 100}%"></i></span><strong>${money(v)}</strong></div>`,
         )
         .join("") || '<div class="empty">Sem receitas nesta competência.</div>';
     const cs = data.clients
@@ -917,7 +959,7 @@
     $("#case-summary").innerHTML = cs
       .map(
         (x) =>
-          `<div class="row-item"><div><strong>${x.c.name}</strong><small>${x.cases.length} ${x.cases.length === 1 ? "caso" : "casos"}</small></div><div class="amount">${money(x.balance)}<small>a receber</small></div></div>`,
+          `<div class="row-item"><div><strong>${escapeHtml(x.c.name)}</strong><small>${x.cases.length} ${x.cases.length === 1 ? "caso" : "casos"}</small></div><div class="amount">${money(x.balance)}<small>a receber</small></div></div>`,
       )
       .join("");
   }
@@ -1028,7 +1070,7 @@
     }
     if (packageId) {
       const item = findPackage(clientId, packageId);
-      box.innerHTML = `<span><i class="fa-solid fa-layer-group"></i> Receita vinculada ao pacote <strong>${item?.name || "não encontrado"}</strong>, compartilhada por seus casos.</span>`;
+      box.innerHTML = `<span><i class="fa-solid fa-layer-group"></i> Receita vinculada ao pacote <strong>${escapeHtml(item?.name || "não encontrado")}</strong>, compartilhada por seus casos.</span>`;
       return;
     }
     if (!caseId) {
@@ -1039,7 +1081,7 @@
     const allocations = buildAllocations(caseId, amount),
       total = allocations.reduce((s, a) => s + a.percent, 0);
     box.innerHTML = allocations.length
-      ? `<header><strong>Distribuição registrada no lançamento</strong><span>${total}% distribuído · ${100 - total}% escritório</span></header>${allocations.map((a) => `<div><span>${a.personName}${a.isLead ? " · Responsável" : ""}</span><strong>${a.percent}% · ${money(a.amount)}</strong></div>`).join("")}`
+      ? `<header><strong>Distribuição registrada no lançamento</strong><span>${total}% distribuído · ${100 - total}% escritório</span></header>${allocations.map((a) => `<div><span>${escapeHtml(a.personName)}${a.isLead ? " · Responsável" : ""}</span><strong>${a.percent}% · ${money(a.amount)}</strong></div>`).join("")}`
       : '<span class="warn"><i class="fa-solid fa-user-group"></i> Este caso não possui percentuais de equipe. A receita ficará 100% atribuída ao escritório.</span>';
   }
   function rowEntry(e) {
@@ -1051,7 +1093,7 @@
         overdue: "Em atraso",
       },
       balance = remainingAmountOf(e);
-    return `<div class="row-item"><div><strong>${e.description}</strong><small>${clientName(e.clientId)} · ${date(e.dueDate)}${st === "partial" ? ` · saldo ${money(balance)}` : ""}</small></div><div><span class="badge ${st}">${labels[st]}</span><span class="amount ${e.kind}"> ${money(e.amount)}</span></div></div>`;
+    return `<div class="row-item"><div><strong>${escapeHtml(e.description)}</strong><small>${escapeHtml(clientName(e.clientId))} · ${date(e.dueDate)}${st === "partial" ? ` · saldo ${money(balance)}` : ""}</small></div><div><span class="badge ${st}">${labels[st]}</span><span class="amount ${e.kind}"> ${money(e.amount)}</span></div></div>`;
   }
   function getEntryFilters() {
     return {
@@ -1084,7 +1126,7 @@
       ? rows
           .map(
             (e) =>
-              `<tr><td>${date(e.dueDate)}</td><td><strong>${e.description}</strong><br><small>${e.category}${e.allocations?.length ? ` · ${e.allocations.length} participações` : ""}${statusOf(e) === "partial" ? ` · ${money(realizedAmountOf(e))} realizado · saldo ${money(remainingAmountOf(e))}` : ""}</small></td><td>${clientName(e.clientId)}<br><small>${caseName(e)}</small></td><td>${e.account}</td><td class="status-column"><span class="badge ${statusOf(e)}">${{ paid: "Realizado", partial: "Parcial", pending: "Pendente", overdue: "Em atraso" }[statusOf(e)]}</span></td><td class="money amount ${e.kind}">${e.kind === "expense" ? "−" : ""}${money(e.amount)}</td><td class="table-actions"><button title="Visualizar" data-view-entry="${e.id}"><i class="fa-solid fa-eye"></i></button><button title="Editar" data-edit-entry="${e.id}"><i class="fa-solid fa-pen"></i></button><button title="Excluir" data-delete-entry="${e.id}"><i class="fa-solid fa-trash"></i></button></td></tr>`,
+              `<tr><td>${date(e.dueDate)}</td><td><strong>${escapeHtml(e.description)}</strong><br><small>${escapeHtml(e.category)}${e.allocations?.length ? ` · ${e.allocations.length} participações` : ""}${statusOf(e) === "partial" ? ` · ${money(realizedAmountOf(e))} realizado · saldo ${money(remainingAmountOf(e))}` : ""}</small></td><td>${escapeHtml(clientName(e.clientId))}<br><small>${escapeHtml(caseName(e))}</small></td><td>${escapeHtml(e.account)}</td><td class="status-column"><span class="badge ${statusOf(e)}">${{ paid: "Realizado", partial: "Parcial", pending: "Pendente", overdue: "Em atraso" }[statusOf(e)]}</span></td><td class="money amount ${e.kind}">${e.kind === "expense" ? "−" : ""}${money(e.amount)}</td><td class="table-actions"><button title="Visualizar" data-view-entry="${e.id}"><i class="fa-solid fa-eye"></i></button><button title="Editar" data-edit-entry="${e.id}"><i class="fa-solid fa-pen"></i></button><button title="Excluir" data-delete-entry="${e.id}"><i class="fa-solid fa-trash"></i></button></td></tr>`,
           )
           .join("")
       : '<tr><td colspan="7" class="empty">Nenhum lançamento encontrado.</td></tr>';
@@ -1111,12 +1153,12 @@
               rec = es
                 .filter((e) => e.kind === "income")
                 .reduce((s, e) => s + realizedAmountOf(e), 0);
-            return `<article class="client-card contact-card"><header><span class="avatar">${c.name
+            return `<article class="client-card contact-card"><header><span class="avatar">${escapeHtml(c.name
               .split(/\s+/)
               .slice(0, 2)
               .map((x) => x[0])
               .join("")
-              .toUpperCase()}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${c.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${c.name}</h3><p>${c.document || "CPF não informado"}${c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${displayPhone(c)}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${c.email}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${c.city}${c.state ? `/${c.state}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
+              .toUpperCase())}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${c.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.document || "CPF não informado")}${c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(c))}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(c.email)}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(c.city)}${c.state ? `/${escapeHtml(c.state)}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum cliente encontrado.</div>';
@@ -1321,7 +1363,7 @@
               cases = data.cases.filter(
                 (caseItem) => caseItem.packageId === item.id,
               );
-            return `<article class="package-card"><header><div><h3>${item.name}</h3><p>${clientName(item.clientId)} · ${agreementLabel(item.agreement)}</p></div><span><button class="link-btn" data-view-package="${item.id}" title="Visualizar pacote"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-package="${item.id}" title="Editar pacote"><i class="fa-solid fa-pen"></i></button></span></header><div class="package-values"><span><small>Contratado</small><strong>${money(stats.contracted)}</strong></span><span><small>Recebido</small><strong>${money(stats.received)}</strong></span><span class="balance"><small>Saldo</small><strong>${money(stats.balance)}</strong></span></div><div class="package-cases"><i class="fa-solid fa-folder-tree"></i>${cases.length} ${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</div></article>`;
+            return `<article class="package-card"><header><div><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(clientName(item.clientId))} · ${agreementLabel(item.agreement)}</p></div><span><button class="link-btn" data-view-package="${item.id}" title="Visualizar pacote"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-package="${item.id}" title="Editar pacote"><i class="fa-solid fa-pen"></i></button></span></header><div class="package-values"><span><small>Contratado</small><strong>${money(stats.contracted)}</strong></span><span><small>Recebido</small><strong>${money(stats.received)}</strong></span><span class="balance"><small>Saldo</small><strong>${money(stats.balance)}</strong></span></div><div class="package-cases"><i class="fa-solid fa-folder-tree"></i>${cases.length} ${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</div></article>`;
           })
           .join("")
       : '<p class="detail-empty">Nenhum pacote cadastrado. Crie um pacote para compartilhar a mesma contratação entre vários casos.</p>';
@@ -1334,7 +1376,7 @@
     if (caseTeamFilterId && !filterPerson) caseTeamFilterId = "";
     filterBox.hidden = !filterPerson;
     filterBox.innerHTML = filterPerson
-      ? `<span><i class="fa-solid fa-user-tie"></i> Exibindo apenas os casos de <strong>${filterPerson.name}</strong></span><button type="button" data-clear-team-cases><i class="fa-solid fa-xmark"></i> Limpar filtro</button>`
+      ? `<span><i class="fa-solid fa-user-tie"></i> Exibindo apenas os casos de <strong>${escapeHtml(filterPerson.name)}</strong></span><button type="button" data-clear-team-cases><i class="fa-solid fa-xmark"></i> Limpar filtro</button>`
       : "";
     const cases = data.cases.filter(
       (item) =>
@@ -1402,7 +1444,7 @@
                 : contracted
                   ? `${money(received)} de ${money(contracted)} recebidos · saldo ${money(balance)}${success ? ` · êxito de ${successAgreement.successRate}% à parte` : ""}`
                   : `${money(ownReceived)} recebido neste caso`;
-            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${item.area}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${item.title}</h3><p>${item.number}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${client?.name || "Cliente não encontrado"}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${statusTitle}</strong><small>${statusText}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${lead ? teamName(lead.personId) : "Sem responsável principal"}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
+            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client?.name || "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum caso encontrado para os filtros selecionados.</div>';
@@ -1480,16 +1522,16 @@
                   0,
                 ),
               leadCount = cases.filter((x) => x.assignment.isLead).length;
-            return `<article class="client-card team-card"><header><span class="avatar"><i class="fa-solid ${p.role === "lawyer" || p.role === "partner" || p.role === "associate" ? "fa-scale-balanced" : "fa-user"}"></i></span><span><button class="link-btn" data-view-team="${p.id}" title="Visualizar pessoa"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-team="${p.id}" title="Editar pessoa"><i class="fa-solid fa-pen"></i></button></span></header><h3>${p.name}</h3><p>${roleLabel(p.role)}${p.registration ? ` · ${p.registration}` : ""}</p><div class="team-stats"><span><strong>${cases.length}</strong><small>casos</small></span><span><strong>${leadCount}</strong><small>responsável</small></span><span><strong>${money(expected)}</strong><small>participação registrada</small></span></div><button class="team-cases-btn" type="button" ${cases.length ? `data-show-team-cases="${p.id}"` : "disabled"}><i class="fa-solid ${cases.length ? "fa-folder-open" : "fa-folder"}"></i><span><strong>${cases.length ? "Ver casos e processos" : "Nenhum caso atribuído"}</strong><small>${cases.length ? `${cases.length} ${cases.length === 1 ? "vínculo" : "vínculos"} · ${leadCount} como responsável` : "Cadastre a pessoa na equipe de um caso"}</small></span>${cases.length ? '<i class="fa-solid fa-chevron-right"></i>' : ""}</button></article>`;
+            return `<article class="client-card team-card"><header><span class="avatar"><i class="fa-solid ${p.role === "lawyer" || p.role === "partner" || p.role === "associate" ? "fa-scale-balanced" : "fa-user"}"></i></span><span><button class="link-btn" data-view-team="${p.id}" title="Visualizar pessoa"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-team="${p.id}" title="Editar pessoa"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(p.name)}</h3><p>${escapeHtml(roleLabel(p.role))}${p.registration ? ` · ${escapeHtml(p.registration)}` : ""}</p><div class="team-stats"><span><strong>${cases.length}</strong><small>casos</small></span><span><strong>${leadCount}</strong><small>responsável</small></span><span><strong>${money(expected)}</strong><small>participação registrada</small></span></div><button class="team-cases-btn" type="button" ${cases.length ? `data-show-team-cases="${p.id}"` : "disabled"}><i class="fa-solid ${cases.length ? "fa-folder-open" : "fa-folder"}"></i><span><strong>${cases.length ? "Ver casos e processos" : "Nenhum caso atribuído"}</strong><small>${cases.length ? `${cases.length} ${cases.length === 1 ? "vínculo" : "vínculos"} · ${leadCount} como responsável` : "Cadastre a pessoa na equipe de um caso"}</small></span>${cases.length ? '<i class="fa-solid fa-chevron-right"></i>' : ""}</button></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhuma pessoa encontrada.</div>';
   }
   function renderCharges() {
-    const configured = Boolean(mp.apiUrl);
+    const configured = Boolean(mp.apiUrl && mp.apiKey);
     $("#mp-alert").innerHTML = configured
       ? `<div class="integration-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Integração configurada em ${mp.environment === "production" ? "produção" : "testes"}</strong><p>As preferências são criadas pelo serviço seguro, sem expor o Access Token.</p></div></div>`
-      : `<div class="integration-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Configure o serviço seguro antes de cobrar</strong><p>Informe a URL do backend e as opções públicas no painel “Configurar conta”.</p></div></div>`;
+      : `<div class="integration-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Configure o serviço seguro antes de cobrar</strong><p>Informe a URL do backend e a chave desta sessão no painel “Configurar conta”.</p></div></div>`;
     const charges = data.charges || [],
       paid = charges
         .filter((c) => c.status === "approved")
@@ -1534,7 +1576,7 @@
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
           .map(
             (c) =>
-              `<tr><td>${date(c.createdAt.slice(0, 10))}</td><td><strong>${c.description}</strong><br><small>${c.preferenceId || c.externalReference}</small></td><td>${clientName(c.clientId)}</td><td><span class="badge ${c.status === "approved" ? "paid" : "pending"}">${labels[c.status] || c.status}</span></td><td class="money amount income">${money(c.amount)}</td><td class="charge-actions">${c.checkoutUrl ? `<a href="${c.checkoutUrl}" target="_blank" rel="noopener" title="Abrir cobrança"><i class="fa-solid fa-arrow-up-right-from-square"></i></a><button data-copy-charge="${c.id}" title="Copiar link"><i class="fa-solid fa-copy"></i></button>` : ""}<button data-refresh-charge="${c.id}" title="Consultar status"><i class="fa-solid fa-rotate"></i></button><button data-delete-charge="${c.id}" title="Remover"><i class="fa-solid fa-trash"></i></button></td></tr>`,
+              `<tr><td>${date(c.createdAt.slice(0, 10))}</td><td><strong>${escapeHtml(c.description)}</strong><br><small>${escapeHtml(c.preferenceId || c.externalReference)}</small></td><td>${escapeHtml(clientName(c.clientId))}</td><td><span class="badge ${c.status === "approved" ? "paid" : "pending"}">${escapeHtml(labels[c.status] || c.status)}</span></td><td class="money amount income">${money(c.amount)}</td><td class="charge-actions">${safeUrl(c.checkoutUrl) ? `<a href="${escapeHtml(safeUrl(c.checkoutUrl))}" target="_blank" rel="noopener" title="Abrir cobrança"><i class="fa-solid fa-arrow-up-right-from-square"></i></a><button data-copy-charge="${c.id}" title="Copiar link"><i class="fa-solid fa-copy"></i></button>` : ""}<button data-refresh-charge="${c.id}" title="Consultar status"><i class="fa-solid fa-rotate"></i></button><button data-delete-charge="${c.id}" title="Remover"><i class="fa-solid fa-trash"></i></button></td></tr>`,
           )
           .join("")
       : '<tr><td colspan="6" class="empty">Nenhuma cobrança gerada.</td></tr>';
@@ -1562,7 +1604,7 @@
       ? pending
           .map(
             (e) =>
-              `<option value="${e.id}">${clientName(e.clientId)} — ${e.description} (saldo ${money(remainingAmountOf(e))})</option>`,
+              `<option value="${e.id}">${escapeHtml(clientName(e.clientId))} — ${escapeHtml(e.description)} (saldo ${money(remainingAmountOf(e))})</option>`,
           )
           .join("")
       : '<option value="">Nenhum recebível pendente</option>';
@@ -1583,9 +1625,15 @@
   }
   async function mpRequest(path, options = {}) {
     const base = mp.apiUrl.replace(/\/$/, "");
+    if (!mp.apiKey)
+      throw new Error("Informe a chave de acesso do serviço nesta sessão.");
     const r = await fetch(`${base}${path}`, {
       ...options,
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + mp.apiKey,
+        ...options.headers,
+      },
     });
     const body = await r.json().catch(() => ({}));
     if (!r.ok)
@@ -1596,9 +1644,10 @@
       );
     return body;
   }
-  async function createCharge(payload) {
+  async function createCharge(payload, idempotencyKey) {
     return mpRequest("/preferences", {
       method: "POST",
+      headers: { "X-Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
         ...payload,
         returnUrl: mp.returnUrl,
@@ -1681,7 +1730,7 @@
       Object.entries(accounts)
         .map(
           ([k, v]) =>
-            `<div class="row-item"><strong>${k}</strong><span class="amount ${v >= 0 ? "income" : "expense"}">${money(v)}</span></div>`,
+            `<div class="row-item"><strong>${escapeHtml(k)}</strong><span class="amount ${v >= 0 ? "income" : "expense"}">${money(v)}</span></div>`,
         )
         .join("") || '<div class="empty">Sem movimentação.</div>';
     const debts = {};
@@ -1702,7 +1751,7 @@
         .sort((a, b) => b[1] - a[1])
         .map(
           ([id, v]) =>
-            `<div class="row-item"><strong>${clientName(id)}</strong><span class="amount expense">${money(v)}</span></div>`,
+            `<div class="row-item"><strong>${escapeHtml(clientName(id))}</strong><span class="amount expense">${money(v)}</span></div>`,
         )
         .join("") || '<div class="empty">Nenhuma inadimplência.</div>';
   }
@@ -1742,7 +1791,7 @@
     const row = document.createElement("div");
     row.className = "stage-row";
     row.dataset.stageId = stage.id || uid();
-    row.innerHTML = `<input data-stage-field="description" value="${stage.description || ""}" placeholder="Descrição da etapa"><input data-stage-field="amount" value="${stage.amount || ""}" inputmode="decimal" placeholder="Valor (R$)"><input data-stage-field="dueDate" value="${stage.dueDate || ""}" type="date"><button class="icon-btn dark" type="button" data-remove-stage title="Remover etapa"><i class="fa-solid fa-trash"></i></button>`;
+    row.innerHTML = `<input data-stage-field="description" value="${escapeHtml(stage.description || "")}" placeholder="Descrição da etapa"><input data-stage-field="amount" value="${escapeHtml(stage.amount || "")}" inputmode="decimal" placeholder="Valor (R$)"><input data-stage-field="dueDate" value="${escapeHtml(stage.dueDate || "")}" type="date"><button class="icon-btn dark" type="button" data-remove-stage title="Remover etapa"><i class="fa-solid fa-trash"></i></button>`;
     root.querySelector("[data-stage-list]").appendChild(row);
   }
   function readAgreementEditor(root) {
@@ -1915,7 +1964,7 @@
       data.clients
         .map(
           (c) =>
-            `<option value="${c.id}" ${c.id === selected ? "selected" : ""}>${c.name}</option>`,
+            `<option value="${c.id}" ${c.id === selected ? "selected" : ""}>${escapeHtml(c.name)}</option>`,
         )
         .join("");
     $("#entry-form [name=clientId]").innerHTML = opts;
@@ -1930,7 +1979,7 @@
         .filter((x) => x.clientId === clientId)
         .map(
           (x) =>
-            `<option value="${x.id}" ${x.id === selected ? "selected" : ""}>${x.number} — ${x.title}</option>`,
+            `<option value="${x.id}" ${x.id === selected ? "selected" : ""}>${escapeHtml(x.number)} — ${escapeHtml(x.title)}</option>`,
         )
         .join("");
     s.disabled = !clientId;
@@ -1947,7 +1996,7 @@
         .filter((item) => item.clientId === clientId)
         .map(
           (item) =>
-            `<option value="${item.id}" ${item.id === selected ? "selected" : ""}>${item.name}</option>`,
+            `<option value="${item.id}" ${item.id === selected ? "selected" : ""}>${escapeHtml(item.name)}</option>`,
         )
         .join("");
     s.disabled = !clientId;
@@ -2041,7 +2090,7 @@
       data.clients
         .map(
           (c) =>
-            `<option value="${c.id}">${c.name} — ${c.document || "sem CPF"}</option>`,
+            `<option value="${c.id}">${escapeHtml(c.name)} — ${escapeHtml(c.document || "sem CPF")}</option>`,
         )
         .join("");
     const item = data.cases.find((x) => x.id === caseId);
@@ -2092,7 +2141,7 @@
       data.clients
         .map(
           (client) =>
-            `<option value="${client.id}">${client.name} — ${client.document || "sem CPF"}</option>`,
+            `<option value="${client.id}">${escapeHtml(client.name)} — ${escapeHtml(client.document || "sem CPF")}</option>`,
         )
         .join("");
     if (item) {
@@ -2156,11 +2205,11 @@
       .filter((p) => p.status === "active" || p.id === value.personId)
       .map(
         (p) =>
-          `<option value="${p.id}" ${p.id === value.personId ? "selected" : ""}>${p.name} — ${roleLabel(p.role)}</option>`,
+          `<option value="${p.id}" ${p.id === value.personId ? "selected" : ""}>${escapeHtml(p.name)} — ${escapeHtml(roleLabel(p.role))}</option>`,
       )
       .join(
         "",
-      )}</select></label><label>Atuação<select name="assignmentRole"><option value="lead">Responsável principal</option><option value="lawyer">Advogado no caso</option><option value="support">Apoio jurídico</option><option value="hearing">Audiências</option><option value="correspondent">Correspondente</option><option value="administrative">Apoio administrativo</option><option value="other">Outra</option></select></label><label>Participação (%)<input name="sharePercent" inputmode="decimal" value="${value.sharePercent ?? 0}"></label><label class="lead-check"><input name="isLead" type="checkbox" ${value.isLead ? "checked" : ""}> Responsável</label><label class="assignment-notes">Observação<input name="notes" value="${value.notes || ""}" placeholder="Atuação ou regra de divisão"></label><button class="remove-assignment" type="button" title="Remover"><i class="fa-solid fa-trash"></i></button>`;
+      )}</select></label><label>Atuação<select name="assignmentRole"><option value="lead">Responsável principal</option><option value="lawyer">Advogado no caso</option><option value="support">Apoio jurídico</option><option value="hearing">Audiências</option><option value="correspondent">Correspondente</option><option value="administrative">Apoio administrativo</option><option value="other">Outra</option></select></label><label>Participação (%)<input name="sharePercent" inputmode="decimal" value="${value.sharePercent ?? 0}"></label><label class="lead-check"><input name="isLead" type="checkbox" ${value.isLead ? "checked" : ""}> Responsável</label><label class="assignment-notes">Observação<input name="notes" value="${escapeHtml(value.notes || "")}" placeholder="Atuação ou regra de divisão"></label><button class="remove-assignment" type="button" title="Remover"><i class="fa-solid fa-trash"></i></button>`;
     const role = row.querySelector("[name=assignmentRole]"),
       lead = row.querySelector("[name=isLead]");
     role.value = value.assignmentRole || "lawyer";
@@ -2210,15 +2259,15 @@
       `<span><i class="fa-solid fa-chart-pie"></i> Participação distribuída</span><strong>${total.toFixed(2).replace(".", ",")}%</strong><small>${leads ? `${leads} responsável(is) principal(is)` : "Nenhum responsável principal definido"}${total > 100 ? " · Reduza para no máximo 100%" : ""}</small>`;
   }
   function detailField(label, value, icon = "fa-circle-info") {
-    return `<div class="detail-field"><i class="fa-solid ${icon}"></i><span><small>${label}</small><strong>${value || "Não informado"}</strong></span></div>`;
+    return `<div class="detail-field"><i class="fa-solid ${icon}"></i><span><small>${escapeHtml(label)}</small><strong>${escapeHtml(value || "Não informado")}</strong></span></div>`;
   }
   function showDetail({ eyebrow, title, subtitle, body, links = "", onEdit }) {
     const dialog = $("#detail-dialog");
     $("#detail-eyebrow").textContent = eyebrow;
     $("#detail-title").textContent = title;
     $("#detail-subtitle").textContent = subtitle || "";
-    $("#detail-body").innerHTML = body;
-    $("#detail-links").innerHTML = links;
+    $("#detail-body").innerHTML = sanitizeDetailHtml(body);
+    $("#detail-links").innerHTML = sanitizeDetailHtml(links);
     $("#detail-edit").onclick = () => {
       dialog.close();
       onEdit?.();
@@ -2414,62 +2463,29 @@
     confirmResolver = null;
     resolve(e.currentTarget.returnValue === "confirm");
   });
-  async function api(path, opts = {}) {
-    const r = await fetch(`https://api.github.com${path}`, {
-      ...opts,
-      headers: {
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.token}`,
-        ...opts.headers,
-      },
-    });
-    if (!r.ok)
-      throw new Error(
-        (await r.json().catch(() => ({}))).message ||
-          `Falha no GitHub (${r.status})`,
-      );
-    return r.json();
-  }
   async function fetchGistFiles() {
     refreshGistCredentials();
     if (!settings.gistId || !settings.token)
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
-    const gist = await api(`/gists/${encodeURIComponent(settings.gistId)}`);
+    const snapshot = await gistClient.gistSnapshot(
+        settings.gistId,
+        settings.token,
+      ),
+      gist = snapshot.gist;
     return {
       gist,
+      revision: snapshot.etag,
       dataFile: gist.files?.[FILE],
       filesFile: gist.files?.[FILES_FILE],
-      legacyFilesFile: gist.files?.[LEGACY_FILES_BACKUP],
     };
   }
   async function readGistText(file, missingMessage) {
     if (!file) throw new Error("Arquivo JSON não encontrado.");
-    let content;
-    if (!file.truncated && typeof file.content === "string")
-      content = file.content;
-    else {
-      if (Number(file.size || 0) > GIST_RAW_MAX_SIZE)
-        throw new Error(
-          missingMessage ||
-            "Este arquivo excede o limite de leitura pela API do Gist.",
-        );
-      if (!file.raw_url)
-        throw new Error(
-          missingMessage ||
-            "O GitHub não retornou o conteúdo completo do arquivo.",
-        );
-      const response = await fetch(file.raw_url, {
-        cache: "no-store",
-      });
-      if (!response.ok)
-        throw new Error(
-          missingMessage ||
-            "Não foi possível ler o conteúdo completo do Gist.",
-        );
-      content = await response.text();
+    try {
+      return await gistClient.text(file, { maxBytes: GIST_RAW_MAX_SIZE });
+    } catch (error) {
+      throw new Error(missingMessage || error.message);
     }
-    return content;
   }
   async function readGistFile(file, parser, missingMessage) {
     return parser(JSON.parse(await readGistText(file, missingMessage)));
@@ -2587,7 +2603,9 @@
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
       await filesReady;
-      const { dataFile, filesFile, legacyFilesFile } = await fetchGistFiles();
+      const { dataFile, filesFile, revision: initialRevision } =
+        await fetchGistFiles();
+      let revision = initialRevision;
       let remote = emptyData(),
         remoteFiles = financeFiles.emptyData();
       if (dataFile)
@@ -2598,52 +2616,18 @@
             "Não foi possível ler os dados financeiros completos.",
           ),
         );
-      let legacyRemote = null;
-      let legacyRemoteContents = new Map();
       if (filesFile) {
-        if (Number(filesFile.size || 0) > GIST_RAW_MAX_SIZE) {
-          if (!legacyFilesData?.files?.length && !filesData.files.length)
-            throw new Error(
-              "O arquivo antigo de PDFs no Gist excede 10 MB e não há cópia local para migrá-lo. Restaure-o em um navegador que tenha os PDFs ou faça um backup pelo Git antes de sincronizar.",
-            );
-          legacyRemote = { tooLarge: true };
-        } else {
-          const rawFiles = JSON.parse(
+        remoteFiles = financeFiles.normalizeData(
+          JSON.parse(
             await readGistText(
               filesFile,
               "Não foi possível ler o índice de arquivos do Gist.",
             ),
-          );
-          if (financeFiles.isLegacyData(rawFiles)) legacyRemote = rawFiles;
-          else remoteFiles = financeFiles.normalizeData(rawFiles);
-        }
-      }
-      if (legacyRemote && !legacyRemote.tooLarge) {
-        legacyFilesData = financeFiles.normalizeLegacyData(legacyRemote);
-        const prepared = await prepareLegacyFiles(legacyFilesData);
-        remoteFiles = prepared.data;
-        legacyRemoteContents = prepared.contents;
-      }
-      if (legacyRemote) {
-        if (legacyFilesFile)
-          throw new Error(
-            "Foi encontrado um índice legado e também um backup legado no Gist. Nenhum arquivo foi alterado para evitar sobrescrever a recuperação existente.",
-          );
-        await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            files: { [FILES_FILE]: { filename: LEGACY_FILES_BACKUP } },
-          }),
-        });
+          ),
+        );
       }
       data = mergeData(data, remote);
       filesData = financeFiles.mergeData(filesData, remoteFiles);
-      for (const remoteItem of remoteFiles.files) {
-        const selected = filesData.files.find((item) => item.id === remoteItem.id),
-          content = legacyRemoteContents.get(remoteItem.id);
-        if (selected?.sha256 === remoteItem.sha256 && content)
-          await saveFileContent(selected, content.blob);
-      }
       localStorage.setItem(DATA_KEY, JSON.stringify(data));
       await saveFilesData(filesData);
       render();
@@ -2654,7 +2638,7 @@
           !filesFile ||
           financeFiles.signature(filesData) !==
             financeFiles.signature(remoteFiles);
-      if (!dataChanged && !filesChanged && !legacyRemote) {
+      if (!dataChanged && !filesChanged) {
         saveSyncState();
         toast("Dados e arquivos já estavam atualizados no Gist.");
         return;
@@ -2667,7 +2651,7 @@
       const remoteById = new Map(remoteFiles.files.map((item) => [item.id, item]));
       for (const item of filesData.files) {
         const remoteItem = remoteById.get(item.id);
-        if (!financeFiles.needsPayloadUpload(item, remoteItem, Boolean(legacyRemote)))
+        if (!financeFiles.needsPayloadUpload(item, remoteItem))
           continue;
         const content = await getFileContent(item.id);
         if (!content?.blob)
@@ -2675,22 +2659,25 @@
             `O PDF “${item.name}” não está disponível neste navegador para concluir a sincronização. Abra ou baixe o arquivo antes de sincronizar.`,
           );
         const encoded = financeFiles.toBase64(await content.blob.arrayBuffer());
-        await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            files: { [item.payloadFile]: { content: encoded } },
-          }),
-        });
+        const patched = await gistClient.patch(
+          settings.gistId,
+          settings.token,
+          { [item.payloadFile]: { content: encoded } },
+          { etag: revision },
+        );
+        revision = patched.etag || revision;
       }
-      if (filesChanged || legacyRemote)
+      if (filesChanged)
         changedFiles[FILES_FILE] = {
           content: JSON.stringify(filesData, null, 2),
         };
       if (Object.keys(changedFiles).length)
-        await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({ files: changedFiles }),
-        });
+        await gistClient.patch(
+          settings.gistId,
+          settings.token,
+          changedFiles,
+          { etag: revision },
+        );
       saveSyncState();
       toast("Dados e arquivos sincronizados.");
       renderGistStatus();
@@ -3643,8 +3630,11 @@
       returnUrl: f.returnUrl.value.trim(),
       statementDescriptor: f.statementDescriptor.value.trim().toUpperCase(),
       autoReturn: f.autoReturn.checked,
+      apiKey: f.apiKey.value.trim(),
     };
-    localStorage.setItem(MP_KEY, JSON.stringify(mp));
+    const { apiKey, ...persistedMp } = mp;
+    sessionStorage.setItem(MP_SESSION_KEY, apiKey);
+    localStorage.setItem(MP_KEY, JSON.stringify(persistedMp));
     $("#mp-settings-dialog").close();
     renderCharges();
     toast("Configuração do Mercado Pago salva.");
@@ -3679,7 +3669,11 @@
           clientId: entry.clientId,
           clientDocument: client?.document || "",
         },
-        result = await createCharge(payload);
+        requestKey = MP_REQUEST_PREFIX + payload.externalReference,
+        idempotencyKey =
+          sessionStorage.getItem(requestKey) || crypto.randomUUID();
+      sessionStorage.setItem(requestKey, idempotencyKey);
+      const result = await createCharge(payload, idempotencyKey);
       data.charges.push({
         id: uid(),
         entryId: entry.id,
@@ -3697,6 +3691,7 @@
         updatedAt: now(),
       });
       $("#charge-dialog").close();
+      sessionStorage.removeItem(requestKey);
       persist();
       toast("Link de pagamento criado.");
     } catch (err) {
@@ -3860,6 +3855,7 @@
       }
   });
   $("#sync-now").onclick = () => pushGist().catch((e) => toast(e.message));
+  $("#download-raw-storage").onclick = downloadRawStorage;
   document.addEventListener("click", (e) => {
     const action = e.target.closest("[data-client-document]"),
       currentMenu = e.target.closest(".document-menu");
@@ -3879,7 +3875,8 @@
   });
   showView((location.hash || "#dashboard").slice(1));
   render();
-  if (settings.gistId && settings.token)
+  if (dataLoadFailure) showStorageFailure(dataLoadFailure);
+  if (!dataLoadFailure && settings.gistId && settings.token)
     filesReady
       .then(() => pushGist())
       .catch((error) =>

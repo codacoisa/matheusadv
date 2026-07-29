@@ -22,53 +22,14 @@ function memoryStorage(initial = {}) {
   };
 }
 
-test('migra a configuração antiga para a chave global', () => {
+test('lê exclusivamente a configuração global do Gist', () => {
   const storage = memoryStorage({
-    legacy: JSON.stringify({ gistId: ' antigo ', token: ' segredo ', autoSync: true })
-  });
-
-  const loaded = gistSettings.load({ storage, legacyKey: 'legacy' });
-
-  assert.deepEqual(loaded, {
-    gistId: 'antigo',
-    token: 'segredo',
-    autoSync: true
-  });
-  assert.deepEqual(
-    JSON.parse(storage.getItem(gistSettings.STORAGE_KEY)),
-    loaded
-  );
-  assert.equal(storage.getItem('legacy'), null);
-});
-
-test('a configuração global prevalece sobre configurações antigas de módulos', () => {
-  const storage = memoryStorage({
-    [gistSettings.STORAGE_KEY]: JSON.stringify({ gistId: 'global', token: 'token-global' }),
-    legacy: JSON.stringify({ gistId: 'local', token: 'token-local' })
-  });
-
-  assert.deepEqual(gistSettings.load({ storage, legacyKey: 'legacy' }), {
-    gistId: 'global',
-    token: 'token-global',
-    autoSync: false
-  });
-});
-
-test('a migração padrão prioriza o Financeiro independentemente do módulo aberto', () => {
-  const storage = memoryStorage({
-    'gm-financeiro-gist-v2': JSON.stringify({
-      gistId: 'financeiro',
-      token: 'token-financeiro'
-    }),
-    'gm-payments-gist-settings-v1': JSON.stringify({
-      gistId: 'pagamentos',
-      token: 'token-pagamentos'
-    })
+    [gistSettings.STORAGE_KEY]: JSON.stringify({ gistId: 'global', token: 'token-global' })
   });
 
   assert.deepEqual(gistSettings.load({ storage }), {
-    gistId: 'financeiro',
-    token: 'token-financeiro',
+    gistId: 'global',
+    token: 'token-global',
     autoSync: false
   });
 });
@@ -108,18 +69,4 @@ test('aceita o endereço completo de um Gist na configuração central', () => {
     }),
     { gistId: 'abcdef123456', token: 'token', autoSync: false }
   );
-});
-
-test('não restaura uma configuração antiga depois de limpar a global', () => {
-  const storage = memoryStorage({
-    legacy: JSON.stringify({ gistId: 'antigo', token: 'segredo' })
-  });
-  gistSettings.load({ storage, legacyKey: 'legacy' });
-  gistSettings.clear({ storage });
-
-  assert.deepEqual(gistSettings.load({ storage, legacyKey: 'legacy' }), {
-    gistId: '',
-    token: '',
-    autoSync: false
-  });
 });

@@ -56,7 +56,6 @@
 
   function realizedAmountOf(entry = {}) {
     const total = roundMoney(entry.amount);
-    if (entry.status === "paid" && entry.paidAmount === undefined) return total;
     return Math.min(total, roundMoney(entry.paidAmount));
   }
 

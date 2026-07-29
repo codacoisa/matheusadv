@@ -6,10 +6,6 @@
   'use strict';
 
   const STORAGE_KEY = 'officejur-gist-settings-v1';
-  const LEGACY_KEYS = [
-    'gm-financeiro-gist-v2',
-    'gm-payments-gist-settings-v1'
-  ];
 
   function normalize(value) {
     const source = value && typeof value === 'object' ? value : {};
@@ -33,29 +29,8 @@
   }
 
   function load(options) {
-    const opts = options || {};
-    const storage = opts.storage || localStorage;
-    const legacyKeys = Array.isArray(opts.legacyKeys)
-      ? opts.legacyKeys
-      : opts.legacyKey
-        ? [opts.legacyKey]
-        : LEGACY_KEYS;
-    const globalSettings = read(storage, STORAGE_KEY);
-    if (storage.getItem(STORAGE_KEY) !== null) {
-      legacyKeys.forEach((key) => storage.removeItem(key));
-      return globalSettings;
-    }
-
-    const candidates = legacyKeys.map((key) => read(storage, key));
-    const legacySettings =
-      candidates.find((settings) => settings.gistId && settings.token) ||
-      candidates.find((settings) => settings.gistId || settings.token) ||
-      normalize({});
-    if (legacySettings.gistId || legacySettings.token) {
-      storage.setItem(STORAGE_KEY, JSON.stringify(legacySettings));
-    }
-    legacyKeys.forEach((key) => storage.removeItem(key));
-    return legacySettings;
+    const storage = (options && options.storage) || localStorage;
+    return read(storage, STORAGE_KEY);
   }
 
   function save(value, options) {
@@ -72,5 +47,5 @@
     return settings;
   }
 
-  return { LEGACY_KEYS, STORAGE_KEY, clear, load, normalize, save };
+  return { STORAGE_KEY, clear, load, normalize, save };
 });
