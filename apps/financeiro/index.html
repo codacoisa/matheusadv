@@ -22,7 +22,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=25" />
+    <link rel="stylesheet" href="./assets/styles.css?v=26" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <script
       src="./assets/fontawesome-7.3.0.min.js"
@@ -34,8 +34,9 @@
     <script src="./assets/contracts.js?v=1" defer></script>
     <script src="./assets/ledger.js?v=1" defer></script>
     <script src="./assets/metrics.js?v=3" defer></script>
+    <script src="./assets/files.js?v=1" defer></script>
     <script src="./assets/gist-settings.js?v=2" defer></script>
-    <script src="./assets/app.js?v=24" defer></script>
+    <script src="./assets/app.js?v=25" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -631,14 +632,81 @@
             >Observações<textarea name="notes" rows="3"></textarea>
           </label>
         </div>
-        <div class="modal-actions">
-          <button class="btn ghost" value="cancel" formnovalidate>
-            Cancelar</button
-          ><button class="btn primary" value="default" id="save-client">
-            Salvar cliente
-          </button>
+        <div class="modal-actions split">
+          <button class="btn danger" type="button" id="delete-client" hidden>
+            Excluir cliente</button
+          ><span
+            ><button class="btn ghost" value="cancel" formnovalidate>
+              Cancelar</button
+            ><button class="btn primary" value="default" id="save-client">
+              Salvar cliente
+            </button></span
+          >
         </div>
       </form>
+    </dialog>
+    <dialog id="client-files-dialog" class="wide-dialog">
+      <section class="files-modal">
+        <header class="modal-head files-modal-head">
+          <div>
+            <p class="eyebrow">ARQUIVOS DO CLIENTE</p>
+            <h2 id="client-files-title">Pasta do cliente</h2>
+            <p id="client-files-subtitle"></p>
+          </div>
+          <button
+            class="icon-btn dark"
+            id="close-client-files"
+            type="button"
+            aria-label="Fechar arquivos"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+        <div class="file-upload-panel">
+          <label class="file-picker" for="client-file-input">
+            <i class="fa-solid fa-file-pdf"></i>
+            <span
+              ><strong>Selecionar PDF</strong
+              ><small>Até 3 MB e média máxima de 250 KB por página</small></span
+            >
+          </label>
+          <input
+            id="client-file-input"
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+          />
+          <label class="file-case-field"
+            >Tag inicial<select id="client-file-case">
+              <option value="">Geral do cliente</option>
+            </select></label
+          >
+        </div>
+        <p id="file-storage-summary" class="file-storage-summary"></p>
+        <p class="file-security-note">
+          <i class="fa-solid fa-shield-halved"></i>
+          Base64 transforma o PDF em texto, mas não o criptografa. Quem acessar
+          o Gist secreto poderá recuperar o documento.
+        </p>
+        <div id="client-files-list" class="client-files-list"></div>
+        <section id="file-preview" class="file-preview" hidden>
+          <header>
+            <div>
+              <strong id="file-preview-title">Visualização do PDF</strong>
+              <small id="file-preview-detail"></small>
+            </div>
+            <button
+              class="icon-btn dark"
+              id="close-file-preview"
+              type="button"
+              aria-label="Fechar visualização"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </header>
+          <iframe id="file-preview-frame" title="Visualização do PDF"></iframe>
+        </section>
+      </section>
     </dialog>
     <dialog id="package-dialog">
       <form method="dialog" id="package-form">

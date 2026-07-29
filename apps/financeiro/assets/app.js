@@ -3,11 +3,16 @@
   const officeConfig = window.OFFICEJUR_CONFIG?.office || {};
   const statementDescriptor = officeConfig.statementDescriptor || "OFFICEJUR";
   const gistSettings = window.OfficeJurGistSettings;
+  const financeFiles = window.FinanceFiles;
   const SCHEMA = "gm-financeiro-v6";
   const DATA_KEY = "gm-financeiro-data-v2",
     SYNC_STATE_KEY = "gm-financeiro-sync-state-v1",
     MP_KEY = "gm-financeiro-mp-v2",
-    FILE = "financeiro-juridico.json";
+    FILE = "financeiro-juridico.json",
+    FILES_FILE = "financeiro-arquivos.json",
+    FILES_DB = "gm-financeiro-arquivos-db-v1",
+    FILES_STORE = "state",
+    FILES_RECORD = "financeiro-arquivos";
   const DOCUMENT_HANDOFF_PREFIX = "gm-document-handoff-v1:",
     DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
   const DOCUMENT_ROUTES = {
@@ -73,6 +78,19 @@
   ];
   const $ = (s) => document.querySelector(s),
     $$ = (s) => [...document.querySelectorAll(s)];
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const fileSize = (value) =>
+    Number(value || 0) < 1024 * 1024
+      ? `${Math.max(1, Math.round(Number(value || 0) / 1024))} KB`
+      : `${(Number(value || 0) / (1024 * 1024)).toLocaleString("pt-BR", {
+          maximumFractionDigits: 2,
+        })} MB`;
   const uid = () =>
     crypto.randomUUID?.() ||
     `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -449,6 +467,49 @@
       return emptyData();
     }
   }
+  function openFilesDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(FILES_DB, 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains(FILES_STORE))
+          request.result.createObjectStore(FILES_STORE);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () =>
+        reject(
+          request.error ||
+            new Error("Não foi possível abrir o armazenamento de arquivos."),
+        );
+    });
+  }
+  async function loadFilesData() {
+    try {
+      const database = await openFilesDatabase();
+      return await new Promise((resolve, reject) => {
+        const transaction = database.transaction(FILES_STORE, "readonly"),
+          request = transaction.objectStore(FILES_STORE).get(FILES_RECORD);
+        request.onsuccess = () =>
+          resolve(financeFiles.normalizeData(request.result));
+        request.onerror = () => reject(request.error);
+        transaction.oncomplete = () => database.close();
+      });
+    } catch {
+      return financeFiles.emptyData();
+    }
+  }
+  async function saveFilesData(nextData) {
+    const normalized = financeFiles.normalizeData(nextData),
+      database = await openFilesDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(FILES_STORE, "readwrite");
+      transaction.objectStore(FILES_STORE).put(normalized, FILES_RECORD);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+    return normalized;
+  }
   function loadSettings() {
     const defaults = {
       gistId: "",
@@ -561,12 +622,21 @@
     );
   }
   let data = load(),
+    filesData = financeFiles.emptyData(),
     settings = loadSettings(),
     mp = loadMp(),
     syncTimer = 0,
     syncInFlight = null,
     syncPending = false,
-    caseTeamFilterId = "";
+    caseTeamFilterId = "",
+    currentFilesClientId = "",
+    filePreviewUrl = "";
+  const filesReady = loadFilesData().then((loaded) => {
+    filesData = loaded;
+    renderClients();
+    if (currentFilesClientId) renderClientFiles();
+    return loaded;
+  });
   setupPhoneCountries();
   setupAgreementEditor($("#case-agreement-editor"));
   setupAgreementEditor($("#package-agreement-editor"));
@@ -602,14 +672,32 @@
     data.updatedAt = now();
     localStorage.setItem(DATA_KEY, JSON.stringify(data));
     render();
-    if (!skipSync && settings.autoSync && settings.gistId && settings.token) {
-      clearTimeout(syncTimer);
-      if (dataSignature(data) === settings.lastSyncSignature) return;
-      syncTimer = setTimeout(
-        () => pushGist().catch((e) => toast(e.message)),
-        1400,
+    if (!skipSync) scheduleAutoSync();
+  }
+  function scheduleAutoSync() {
+    if (!settings.autoSync || !settings.gistId || !settings.token) return;
+    clearTimeout(syncTimer);
+    if (syncSignature() === settings.lastSyncSignature) return;
+    syncTimer = setTimeout(
+      () => pushGist().catch((error) => toast(error.message)),
+      1400,
+    );
+  }
+  async function persistFiles(nextData, skipSync = false) {
+    const candidate = {
+      ...nextData,
+      updatedAt: now(),
+    };
+    try {
+      filesData = await saveFilesData(candidate);
+    } catch {
+      throw new Error(
+        "Não foi possível salvar o PDF neste navegador. Verifique o espaço disponível.",
       );
     }
+    renderClients();
+    if (currentFilesClientId) renderClientFiles();
+    if (!skipSync) scheduleAutoSync();
   }
   function markDeleted(key, id, deletedAt = now()) {
     if (!id) return;
@@ -922,6 +1010,9 @@
       ? clients
           .map((c) => {
             const cases = data.cases.filter((x) => x.clientId === c.id),
+              clientFiles = filesData.files.filter(
+                (file) => file.clientId === c.id,
+              ),
               es = data.entries.filter((e) => e.clientId === c.id),
               rec = es
                 .filter((e) => e.kind === "income")
@@ -931,10 +1022,175 @@
               .slice(0, 2)
               .map((x) => x[0])
               .join("")
-              .toUpperCase()}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button><button class="link-btn" data-delete-client="${c.id}" title="Excluir cliente"><i class="fa-solid fa-trash"></i></button></span></header><h3>${c.name}</h3><p>${c.document || "CPF não informado"}${c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${displayPhone(c)}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${c.email}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${c.city}${c.state ? `/${c.state}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
+              .toUpperCase()}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${c.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${c.name}</h3><p>${c.document || "CPF não informado"}${c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${displayPhone(c)}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${c.email}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${c.city}${c.state ? `/${c.state}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum cliente encontrado.</div>';
+  }
+  function clientFileCases(clientId) {
+    return data.cases
+      .filter((item) => item.clientId === clientId)
+      .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
+  }
+  function closeFilePreview() {
+    $("#file-preview").hidden = true;
+    $("#file-preview-frame").removeAttribute("src");
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    filePreviewUrl = "";
+  }
+  function fileBlob(item) {
+    return new Blob([financeFiles.fromBase64(item.base64)], {
+      type: "application/pdf",
+    });
+  }
+  function renderClientFiles() {
+    const client = data.clients.find(
+      (item) => item.id === currentFilesClientId,
+    );
+    if (!client) return;
+    const records = filesData.files
+        .filter((item) => item.clientId === client.id)
+        .sort((a, b) => timestamp(b).localeCompare(timestamp(a))),
+      cases = clientFileCases(client.id),
+      totalSize = records.reduce((sum, item) => sum + item.size, 0),
+      encodedSize = records.reduce(
+        (sum, item) => sum + item.base64.length,
+        0,
+      );
+    $("#client-files-title").textContent = `Pasta de ${client.name}`;
+    $("#client-files-subtitle").textContent =
+      `${records.length} ${records.length === 1 ? "PDF armazenado" : "PDFs armazenados"} em financeiro-arquivos.json`;
+    $("#client-file-case").innerHTML =
+      '<option value="">Geral do cliente</option>' +
+      cases
+        .map(
+          (item) =>
+            `<option value="${item.id}">${escapeHtml(item.title)} · ${escapeHtml(item.number)}</option>`,
+        )
+        .join("");
+    $("#file-storage-summary").textContent = records.length
+      ? `${fileSize(totalSize)} em PDFs · aproximadamente ${fileSize(encodedSize)} codificados em Base64`
+      : "Nenhum arquivo armazenado nesta pasta.";
+    $("#client-files-list").innerHTML = records.length
+      ? records
+          .map((item) => {
+            const tags = item.caseIds
+                .map((caseId) =>
+                  cases.find((caseItem) => caseItem.id === caseId),
+                )
+                .filter(Boolean),
+              availableCases = cases.filter(
+                (caseItem) => !item.caseIds.includes(caseItem.id),
+              );
+            return `<article class="client-file-card">
+              <span class="file-icon"><i class="fa-solid fa-file-pdf"></i></span>
+              <div class="file-content">
+                <strong title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</strong>
+                <small>${fileSize(item.size)} · ${item.pageCount} ${item.pageCount === 1 ? "página" : "páginas"} · ${date(item.createdAt.slice(0, 10))}</small>
+                <div class="file-tags">
+                  ${
+                    tags.length
+                      ? tags
+                          .map(
+                            (caseItem) =>
+                              `<span><i class="fa-solid fa-tag"></i>${escapeHtml(caseItem.title)}<button type="button" data-remove-file-case="${item.id}" data-case-id="${caseItem.id}" title="Remover tag"><i class="fa-solid fa-xmark"></i></button></span>`,
+                          )
+                          .join("")
+                      : '<em>Geral do cliente</em>'
+                  }
+                  ${
+                    availableCases.length
+                      ? `<label><i class="fa-solid fa-plus"></i><select data-add-file-case="${item.id}" aria-label="Adicionar tag de caso"><option value="">Adicionar tag</option>${availableCases.map((caseItem) => `<option value="${caseItem.id}">${escapeHtml(caseItem.title)}</option>`).join("")}</select></label>`
+                      : ""
+                  }
+                </div>
+              </div>
+              <div class="file-actions">
+                <button type="button" data-view-file="${item.id}" title="Visualizar PDF"><i class="fa-solid fa-eye"></i></button>
+                <button type="button" data-download-file="${item.id}" title="Baixar PDF"><i class="fa-solid fa-download"></i></button>
+                <button type="button" data-delete-file="${item.id}" title="Excluir PDF"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </article>`;
+          })
+          .join("")
+      : '<div class="file-empty"><i class="fa-regular fa-folder-open"></i><strong>Pasta vazia</strong><p>Selecione um PDF para armazená-lo codificado em Base64.</p></div>';
+  }
+  async function openClientFiles(clientId) {
+    await filesReady;
+    const client = data.clients.find((item) => item.id === clientId);
+    if (!client) return;
+    currentFilesClientId = client.id;
+    closeFilePreview();
+    $("#client-file-input").value = "";
+    renderClientFiles();
+    $("#client-files-dialog").showModal();
+  }
+  function viewClientFile(id) {
+    const item = filesData.files.find((candidate) => candidate.id === id);
+    if (!item) return;
+    closeFilePreview();
+    filePreviewUrl = URL.createObjectURL(fileBlob(item));
+    $("#file-preview-title").textContent = item.name;
+    $("#file-preview-detail").textContent =
+      `${fileSize(item.size)} · ${item.pageCount} ${item.pageCount === 1 ? "página" : "páginas"}`;
+    $("#file-preview-frame").src = filePreviewUrl;
+    $("#file-preview").hidden = false;
+    $("#file-preview").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function downloadClientFile(id) {
+    const item = filesData.files.find((candidate) => candidate.id === id);
+    if (!item) return;
+    const url = URL.createObjectURL(fileBlob(item)),
+      link = document.createElement("a");
+    link.href = url;
+    link.download = item.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function changeFileCase(id, caseId, remove = false) {
+    const item = filesData.files.find((candidate) => candidate.id === id),
+      validCase = data.cases.some(
+        (candidate) =>
+          candidate.id === caseId && candidate.clientId === item?.clientId,
+      );
+    if (!item || (!remove && !validCase)) return;
+    const caseIds = remove
+      ? item.caseIds.filter((candidate) => candidate !== caseId)
+      : [...new Set([...item.caseIds, caseId])];
+    await persistFiles({
+      ...filesData,
+      files: filesData.files.map((candidate) =>
+        candidate.id === id
+          ? { ...candidate, caseIds, updatedAt: now() }
+          : candidate,
+      ),
+    });
+    toast(remove ? "Tag removida do arquivo." : "Tag adicionada ao arquivo.");
+  }
+  async function deleteClientFile(id) {
+    const item = filesData.files.find((candidate) => candidate.id === id);
+    if (
+      !item ||
+      !(await askConfirmation({
+        title: "Excluir PDF?",
+        message: `Você está prestes a excluir “${item.name}”.`,
+        impact:
+          "O conteúdo codificado será removido do navegador e do Gist na próxima sincronização.",
+      }))
+    )
+      return;
+    closeFilePreview();
+    await persistFiles({
+      ...filesData,
+      files: filesData.files.filter((candidate) => candidate.id !== id),
+      deletedFiles: [
+        ...filesData.deletedFiles.filter(
+          (candidate) => candidate.id !== item.id,
+        ),
+        { id: item.id, deletedAt: now() },
+      ],
+    });
+    toast("PDF excluído da pasta do cliente.");
   }
   function renderPackages() {
     const grid = $("#packages-grid");
@@ -1644,6 +1900,7 @@
     $("#client-modal-title").textContent = c
       ? "Editar cliente"
       : "Novo cliente";
+    $("#delete-client").hidden = !c;
     $("#client-dialog").showModal();
   }
   function updateCaseContractFields() {
@@ -2059,27 +2316,40 @@
       );
     return r.json();
   }
-  async function fetchGistFile() {
+  async function fetchGistFiles() {
     refreshGistCredentials();
     if (!settings.gistId || !settings.token)
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
-    const gist = await api(`/gists/${encodeURIComponent(settings.gistId)}`),
-      file = gist.files?.[FILE];
-    return { gist, file };
+    const gist = await api(`/gists/${encodeURIComponent(settings.gistId)}`);
+    return {
+      gist,
+      dataFile: gist.files?.[FILE],
+      filesFile: gist.files?.[FILES_FILE],
+    };
   }
-  async function readGistFile(file) {
+  async function readGistFile(file, parser, missingMessage) {
     if (!file) throw new Error("Arquivo JSON não encontrado.");
+    let content;
     if (!file.truncated && typeof file.content === "string")
-      return currentData(JSON.parse(file.content));
-    if (!file.raw_url)
-      throw new Error("O GitHub não retornou o conteúdo completo do arquivo.");
-    const r = await fetch(file.raw_url, {
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${settings.token}` },
-    });
-    if (!r.ok)
-      throw new Error("Não foi possível ler o conteúdo completo do Gist.");
-    return currentData(JSON.parse(await r.text()));
+      content = file.content;
+    else {
+      if (!file.raw_url)
+        throw new Error(
+          missingMessage ||
+            "O GitHub não retornou o conteúdo completo do arquivo.",
+        );
+      const response = await fetch(file.raw_url, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${settings.token}` },
+      });
+      if (!response.ok)
+        throw new Error(
+          missingMessage ||
+            "Não foi possível ler o conteúdo completo do Gist.",
+        );
+      content = await response.text();
+    }
+    return parser(JSON.parse(content));
   }
   function timestamp(item) {
     return String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");
@@ -2152,6 +2422,7 @@
     [
       "clients",
       "cases",
+      "packages",
       "team",
       "entries",
       "charges",
@@ -2165,9 +2436,15 @@
     );
     return JSON.stringify(canonical(copy));
   }
+  function syncSignature() {
+    return JSON.stringify({
+      data: dataSignature(data),
+      files: financeFiles.signature(filesData),
+    });
+  }
   function saveSyncState() {
     settings.lastSyncAt = now();
-    settings.lastSyncSignature = dataSignature(data);
+    settings.lastSyncSignature = syncSignature();
     localStorage.setItem(
       SYNC_STATE_KEY,
       JSON.stringify({
@@ -2186,29 +2463,60 @@
     if (!settings.gistId || !settings.token)
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
-      const { file } = await fetchGistFile();
-      let remote = emptyData();
-      if (file) remote = normalize(await readGistFile(file));
+      await filesReady;
+      const { dataFile, filesFile } = await fetchGistFiles();
+      let remote = emptyData(),
+        remoteFiles = financeFiles.emptyData();
+      if (dataFile)
+        remote = normalize(
+          await readGistFile(
+            dataFile,
+            currentData,
+            "Não foi possível ler os dados financeiros completos.",
+          ),
+        );
+      if (filesFile)
+        remoteFiles = financeFiles.normalizeData(
+          await readGistFile(
+            filesFile,
+            financeFiles.normalizeData,
+            "Não foi possível ler os arquivos completos do Gist.",
+          ),
+        );
       data = mergeData(data, remote);
+      filesData = financeFiles.mergeData(filesData, remoteFiles);
       localStorage.setItem(DATA_KEY, JSON.stringify(data));
+      await saveFilesData(filesData);
       render();
-      if (file && dataSignature(data) === dataSignature(remote)) {
+      if (currentFilesClientId) renderClientFiles();
+      const dataChanged =
+          !dataFile || dataSignature(data) !== dataSignature(remote),
+        filesChanged =
+          !filesFile ||
+          financeFiles.signature(filesData) !==
+            financeFiles.signature(remoteFiles);
+      if (!dataChanged && !filesChanged) {
         saveSyncState();
-        toast("Dados já estavam atualizados no Gist.");
+        toast("Dados e arquivos já estavam atualizados no Gist.");
         return;
       }
+      const changedFiles = {};
+      if (dataChanged)
+        changedFiles[FILE] = {
+          content: JSON.stringify(data, null, 2),
+        };
+      if (filesChanged)
+        changedFiles[FILES_FILE] = {
+          content: JSON.stringify(filesData, null, 2),
+        };
       await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
         method: "PATCH",
         body: JSON.stringify({
-          files: {
-            [FILE]: {
-              content: JSON.stringify(data, null, 2),
-            },
-          },
+          files: changedFiles,
         }),
       });
       saveSyncState();
-      toast("Dados sincronizados com segurança.");
+      toast("Dados e arquivos sincronizados.");
       renderGistStatus();
     })();
     try {
@@ -2867,6 +3175,65 @@
     persist();
     toast("Pessoa removida da equipe e dos casos.");
   };
+  $("#delete-client").onclick = async () => {
+    await filesReady;
+    const id = $("#client-form").elements.id.value,
+      item = data.clients.find((candidate) => candidate.id === id),
+      caseCount = data.cases.filter(
+        (candidate) => candidate.clientId === id,
+      ).length,
+      packageCount = data.packages.filter(
+        (candidate) => candidate.clientId === id,
+      ).length,
+      clientFiles = filesData.files.filter(
+        (candidate) => candidate.clientId === id,
+      );
+    if (!item) return;
+    if (caseCount || packageCount)
+      return toast(
+        `Este cliente possui ${caseCount} caso(s) e ${packageCount} pacote(s). Exclua ou transfira os vínculos primeiro.`,
+      );
+    if (
+      !(await askConfirmation({
+        title: "Excluir cliente?",
+        message: `Você está prestes a excluir o cadastro de ${item.name}.`,
+        impact: `${clientFiles.length ? `${clientFiles.length} PDF(s) da pasta também serão excluídos. ` : ""}Os lançamentos gerais serão preservados sem cliente vinculado. Esta ação não pode ser desfeita.`,
+      }))
+    )
+      return;
+    const deletedAt = now();
+    if (clientFiles.length)
+      await persistFiles(
+        {
+          ...filesData,
+          files: filesData.files.filter(
+            (candidate) => candidate.clientId !== id,
+          ),
+          deletedFiles: [
+            ...filesData.deletedFiles,
+            ...clientFiles.map((file) => ({ id: file.id, deletedAt })),
+          ],
+        },
+        true,
+      );
+    markDeleted("deletedClients", id, deletedAt);
+    data.clients = data.clients.filter((candidate) => candidate.id !== id);
+    data.entries = data.entries.map((entry) =>
+      entry.clientId === id
+        ? {
+            ...entry,
+            clientId: "",
+            caseId: "",
+            packageId: "",
+            billingScope: "office",
+            updatedAt: deletedAt,
+          }
+        : entry,
+    );
+    $("#client-dialog").close();
+    persist();
+    toast("Cliente excluído.");
+  };
   $("#add-assignment").onclick = () => addAssignmentRow();
   $("#case-form [name=clientId]").onchange = () => {
     $("#case-form [name=packageId]").value = "";
@@ -2938,7 +3305,28 @@
       }))
     )
       return;
+    await filesReady;
     const deletedAt = now();
+    if (
+      filesData.files.some((file) => file.caseIds.includes(caseId))
+    )
+      await persistFiles(
+        {
+          ...filesData,
+          files: filesData.files.map((file) =>
+            file.caseIds.includes(caseId)
+              ? {
+                  ...file,
+                  caseIds: file.caseIds.filter(
+                    (candidate) => candidate !== caseId,
+                  ),
+                  updatedAt: deletedAt,
+                }
+              : file,
+          ),
+        },
+        true,
+      );
     markDeleted("deletedCases", caseId, deletedAt);
     data.cases = data.cases.filter((x) => x.id !== caseId);
     clearPendingContractEntries("case", caseId);
@@ -2960,7 +3348,6 @@
     const edit = e.target.closest("[data-edit-entry]"),
       del = e.target.closest("[data-delete-entry]"),
       ec = e.target.closest("[data-edit-client]"),
-      dc = e.target.closest("[data-delete-client]"),
       nc = e.target.closest("[data-new-case],#new-case"),
       nt = e.target.closest("#new-team-member"),
       np = e.target.closest("[data-new-package]"),
@@ -3019,42 +3406,6 @@
       showView("clients");
       $("#client-search").value = clientName(sc.dataset.showClient);
       renderClients();
-    }
-    if (dc) {
-      const id = dc.dataset.deleteClient,
-        item = data.clients.find((x) => x.id === id),
-        caseCount = data.cases.filter((x) => x.clientId === id).length,
-        packageCount = data.packages.filter((x) => x.clientId === id).length;
-      if (caseCount || packageCount)
-        return toast(
-          `Este cliente possui ${caseCount} caso(s) e ${packageCount} pacote(s). Exclua ou transfira os vínculos primeiro.`,
-        );
-      if (
-        item &&
-        (await askConfirmation({
-          title: "Excluir cliente?",
-          message: `Você está prestes a excluir o cadastro de ${item.name}.`,
-          impact:
-            "Os lançamentos gerais serão preservados, mas ficarão sem cliente vinculado. O cadastro não poderá ser recuperado.",
-        }))
-      ) {
-        markDeleted("deletedClients", id);
-        data.clients = data.clients.filter((x) => x.id !== id);
-        data.entries = data.entries.map((x) =>
-          x.clientId === id
-            ? {
-                ...x,
-                clientId: "",
-                caseId: "",
-                packageId: "",
-                billingScope: "office",
-                updatedAt: now(),
-              }
-            : x,
-        );
-        persist();
-        toast("Cliente excluído.");
-      }
     }
   });
   document.addEventListener("click", (e) => {
@@ -3202,6 +3553,108 @@
       }
     }
   });
+  $("#close-client-files").onclick = () => $("#client-files-dialog").close();
+  $("#close-file-preview").onclick = closeFilePreview;
+  $("#client-files-dialog").addEventListener("close", () => {
+    closeFilePreview();
+    currentFilesClientId = "";
+    $("#client-file-input").value = "";
+  });
+  $("#client-file-input").addEventListener("change", async (event) => {
+    const input = event.currentTarget,
+      selected = input.files?.[0],
+      client = data.clients.find(
+        (item) => item.id === currentFilesClientId,
+      );
+    if (!selected || !client) return;
+    try {
+      await filesReady;
+      const buffer = await selected.arrayBuffer(),
+        pageCount = financeFiles.countPdfPages(buffer),
+        validation = financeFiles.validatePdf({
+          name: selected.name,
+          type: selected.type,
+          size: selected.size,
+          pageCount,
+        });
+      if (validation) return toast(validation);
+      if (
+        filesData.files.some(
+          (item) =>
+            item.clientId === client.id &&
+            item.name.localeCompare(selected.name, "pt-BR", {
+              sensitivity: "base",
+            }) === 0,
+        )
+      )
+        return toast(
+          "Já existe um arquivo com este nome na pasta do cliente.",
+        );
+      const caseId = $("#client-file-case").value,
+        validCase = data.cases.some(
+          (item) => item.id === caseId && item.clientId === client.id,
+        ),
+        createdAt = now(),
+        record = {
+          id: uid(),
+          clientId: client.id,
+          caseIds: validCase ? [caseId] : [],
+          name: selected.name,
+          mimeType: "application/pdf",
+          size: selected.size,
+          pageCount,
+          base64: financeFiles.toBase64(buffer),
+          createdAt,
+          updatedAt: createdAt,
+        };
+      await persistFiles({
+        ...filesData,
+        files: [...filesData.files, record],
+      });
+      toast(
+        `PDF armazenado com ${pageCount} ${pageCount === 1 ? "página" : "páginas"}.`,
+      );
+    } catch (error) {
+      toast(error.message || "Não foi possível armazenar o PDF.");
+    } finally {
+      input.value = "";
+    }
+  });
+  document.addEventListener("change", async (event) => {
+    const select = event.target.closest("[data-add-file-case]");
+    if (!select || !select.value) return;
+    try {
+      await changeFileCase(select.dataset.addFileCase, select.value);
+    } catch (error) {
+      toast(error.message);
+    }
+  });
+  document.addEventListener("click", async (event) => {
+    const folder = event.target.closest("[data-client-files]"),
+      view = event.target.closest("[data-view-file]"),
+      download = event.target.closest("[data-download-file]"),
+      removeCase = event.target.closest("[data-remove-file-case]"),
+      removeFile = event.target.closest("[data-delete-file]");
+    if (folder) await openClientFiles(folder.dataset.clientFiles);
+    if (view) viewClientFile(view.dataset.viewFile);
+    if (download) downloadClientFile(download.dataset.downloadFile);
+    if (removeCase)
+      try {
+        await changeFileCase(
+          removeCase.dataset.removeFileCase,
+          removeCase.dataset.caseId,
+          true,
+        );
+      } catch (error) {
+        toast(error.message);
+      }
+    if (removeFile)
+      try {
+        await deleteClientFile(removeFile.dataset.deleteFile);
+      } catch (error) {
+        toast(error.message);
+      }
+  });
   $("#sync-now").onclick = () => pushGist().catch((e) => toast(e.message));
   document.addEventListener("click", (e) => {
     const action = e.target.closest("[data-client-document]"),
@@ -3222,9 +3675,10 @@
   });
   showView((location.hash || "#dashboard").slice(1));
   render();
-  if (settings.gistId && settings.token) {
-    pushGist().catch((error) =>
-      toast(`Não foi possível sincronizar ao abrir: ${error.message}`),
-    );
-  }
+  if (settings.gistId && settings.token)
+    filesReady
+      .then(() => pushGist())
+      .catch((error) =>
+        toast(`Não foi possível sincronizar ao abrir: ${error.message}`),
+      );
 })();
