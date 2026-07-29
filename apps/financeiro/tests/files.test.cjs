@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   countPdfPages,
+  deletedPayloadFiles,
   emptyData,
   fromBase64,
   mergeData,
@@ -126,4 +127,30 @@ test("publicar payloads apenas quando os metadados divergirem", () => {
   };
   assert.equal(needsPayloadUpload(local, { ...local }), false);
   assert.equal(needsPayloadUpload(local, null), true);
+});
+
+test("excluir do Gist apenas payloads sem arquivo ativo", () => {
+  const data = {
+    ...emptyData("2026-01-03T00:00:00.000Z"),
+    files: [
+      {
+        id: "arquivo-ativo",
+        clientId: "cliente-1",
+        name: "ativo.pdf",
+        updatedAt: "2026-01-03T00:00:00.000Z",
+      },
+    ],
+    deletedFiles: [
+      { id: "arquivo-excluido", deletedAt: "2026-01-03T00:00:00.000Z" },
+      { id: "arquivo-ativo", deletedAt: "2026-01-02T00:00:00.000Z" },
+    ],
+  };
+
+  assert.deepEqual(
+    deletedPayloadFiles(data, {
+      "financeiro-pdf-arquivo-excluido.b64": {},
+      "financeiro-pdf-arquivo-ativo.b64": {},
+    }),
+    ["financeiro-pdf-arquivo-excluido.b64"],
+  );
 });

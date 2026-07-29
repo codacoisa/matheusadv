@@ -1331,7 +1331,7 @@
         title: "Excluir PDF?",
         message: `Você está prestes a excluir “${item.name}”.`,
         impact:
-          "O conteúdo será removido deste navegador e deixará de aparecer no índice sincronizado. O payload remoto é preservado como medida de recuperação.",
+          "O conteúdo será removido deste navegador, do índice sincronizado e do Gist. O histórico de versões do Gist continuará disponível.",
       }))
     )
       return;
@@ -2603,7 +2603,7 @@
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
       await filesReady;
-      const { dataFile, filesFile, revision: initialRevision } =
+      const { gist, dataFile, filesFile, revision: initialRevision } =
         await fetchGistFiles();
       let revision = initialRevision;
       let remote = emptyData(),
@@ -2671,6 +2671,11 @@
         changedFiles[FILES_FILE] = {
           content: JSON.stringify(filesData, null, 2),
         };
+      financeFiles
+        .deletedPayloadFiles(filesData, gist.files)
+        .forEach((fileName) => {
+          changedFiles[fileName] = null;
+        });
       if (Object.keys(changedFiles).length)
         await gistClient.patch(
           settings.gistId,

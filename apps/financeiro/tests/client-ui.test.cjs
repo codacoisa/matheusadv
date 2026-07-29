@@ -51,3 +51,20 @@ test("exigir os campos complementares do cliente", () => {
   assert.match(app, /neighborhood:\s*"bairro"/);
   assert.match(app, /city:\s*"cidade"/);
 });
+
+test("remover do Gist o payload de PDFs excluídos", () => {
+  assert.match(
+    app,
+    /\.deletedPayloadFiles\(filesData,\s*gist\.files\)[\s\S]*changedFiles\[fileName\]\s*=\s*null/,
+  );
+});
+
+test("informar de forma objetiva os limites do Base64", () => {
+  const text = html.replace(/\s+/g, " ");
+
+  assert.match(
+    text,
+    /O índice é sincronizado separadamente dos PDFs\. Base64 transforma o PDF em texto, mas não o criptografa\./,
+  );
+  assert.doesNotMatch(text, /quem acessar o Gist secreto/);
+});

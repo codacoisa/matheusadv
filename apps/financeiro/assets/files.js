@@ -77,6 +77,18 @@
     );
   }
 
+  function deletedPayloadFiles(raw, remoteFiles = {}) {
+    const normalized = normalizeData(raw),
+      activeIds = new Set(normalized.files.map((item) => item.id));
+    return normalized.deletedFiles
+      .filter((item) => !activeIds.has(item.id))
+      .map((item) => payloadFileName(item.id))
+      .filter((fileName) =>
+        Object.prototype.hasOwnProperty.call(remoteFiles, fileName),
+      )
+      .sort();
+  }
+
   function mergeData(leftRaw, rightRaw) {
     const left = normalizeData(leftRaw),
       right = normalizeData(rightRaw),
@@ -190,6 +202,7 @@
     emptyData,
     normalizeData,
     needsPayloadUpload,
+    deletedPayloadFiles,
     mergeData,
     signature,
     payloadFileName,
