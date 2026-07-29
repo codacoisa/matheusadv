@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#17213a">
+    <meta name="msapplication-TileColor" content="#17213a">
+    <meta name="application-name" content="OfficeJur">
+    <meta name="apple-mobile-web-app-title" content="OfficeJur">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Configurações | OfficeJur</title>
+    <link rel="icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" type="image/png">
+    <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
+    <script src="../assets/office-config.js"></script>
+    <script src="../assets/office-context.js" defer></script>
+    <link rel="stylesheet" href="./assets/styles.css?v=1">
+    <script src="./assets/gist-settings.js?v=1" defer></script>
+    <script src="./assets/app.js?v=1" defer></script>
+    <script src="./assets/app-switcher.js?v=5" defer></script>
+    <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
+    <script src="./assets/site-footer.js?v=5" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="../">
+        <img src="../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt="">
+        <span><strong>Configurações</strong><small data-officejur-field="office.name">Escritório</small></span>
+      </a>
+      <office-app-switcher current="configuracoes"></office-app-switcher>
+    </header>
+
+    <main>
+      <header class="page-head">
+        <p class="eyebrow">CONFIGURAÇÃO CENTRAL</p>
+        <h1>Gist privado do OfficeJur</h1>
+        <p>Configure uma vez neste navegador. Todo módulo sincronizável atual ou futuro poderá usar a mesma conexão e manter seu próprio arquivo dentro do Gist.</p>
+      </header>
+
+      <div class="layout">
+        <section class="panel">
+          <div class="connection-head">
+            <div>
+              <span id="connection-dot" class="status-dot"></span>
+              <strong id="connection-title">Gist não configurado</strong>
+              <small id="connection-detail">Os módulos continuarão salvando apenas neste navegador.</small>
+            </div>
+          </div>
+
+          <form id="gist-form">
+            <label>
+              Gist ID ou endereço
+              <input id="gist-id" autocomplete="off" placeholder="Cole o ID ou o endereço do Gist">
+            </label>
+            <label>
+              Token do GitHub
+              <input id="gist-token" type="password" autocomplete="off" placeholder="Token com permissão de leitura e escrita em Gists">
+            </label>
+            <p class="field-note">A credencial permanece somente no armazenamento local deste navegador e nunca é enviada ao repositório do OfficeJur.</p>
+            <div class="actions">
+              <button id="save-test" class="button primary" type="submit">Salvar e testar</button>
+              <button id="create-gist" class="button secondary" type="button">Criar novo Gist privado</button>
+              <button id="clear-gist" class="button danger" type="button">Remover configuração</button>
+            </div>
+          </form>
+          <p id="action-status" class="action-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <aside class="side">
+          <section class="info-card">
+            <p class="eyebrow">COMO FUNCIONA</p>
+            <h2>Um Gist, arquivos separados</h2>
+            <ul>
+              <li><strong>Financeiro</strong><code>financeiro-juridico.json</code></li>
+              <li><strong>Controle de Pagamentos</strong><code>controle-pagamentos.json</code></li>
+              <li><strong>Novos módulos</strong><span>podem consumir a configuração global e declarar seu próprio arquivo.</span></li>
+            </ul>
+          </section>
+          <section class="info-card security">
+            <p class="eyebrow">SEGURANÇA</p>
+            <h2>Permissão mínima</h2>
+            <p>Use um token dedicado com acesso somente a Gists, preferencialmente com prazo de validade. O Gist deve permanecer privado.</p>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <office-site-footer repository="officejur"></office-site-footer>
+  </body>
+</html>

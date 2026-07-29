@@ -34,8 +34,9 @@
     <script src="./assets/contracts.js?v=1" defer></script>
     <script src="./assets/ledger.js?v=1" defer></script>
     <script src="./assets/metrics.js?v=3" defer></script>
-    <script src="./assets/app.js?v=21" defer></script>
-    <script src="./assets/app-switcher.js?v=4" defer></script>
+    <script src="./assets/gist-settings.js?v=1" defer></script>
+    <script src="./assets/app.js?v=23" defer></script>
+    <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
   </head>
@@ -886,25 +887,22 @@
         <div class="modal-head">
           <div>
             <p class="eyebrow">SINCRONIZAÇÃO</p>
-            <h2>Gist privado</h2>
-            <p>O token fica somente neste navegador.</p>
+            <h2>Ajustes do Financeiro</h2>
+            <p>
+              A conexão com o Gist é gerenciada nas Configurações do OfficeJur.
+            </p>
           </div>
           <button class="icon-btn dark" value="cancel" formnovalidate>
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
         <div class="form-grid">
+          <div class="span-2 notice">
+            <strong id="global-gist-status">Gist global não configurado.</strong>
+            <a class="btn secondary" href="../configuracoes/">Abrir configurações globais</a>
+          </div>
           <label class="span-2"
-            >Gist ID<input
-              name="gistId"
-              placeholder="Deixe vazio para criar" /></label
-          ><label class="span-2"
-            >Token do GitHub<input
-              name="token"
-              type="password"
-              placeholder="Token com permissão gist" /></label
-          ><label class="span-2"
-            >Nome do arquivo<input
+            >Arquivo deste módulo<input
               name="fileName"
               value="financeiro-juridico.json" /></label
           ><label class="check span-2"
@@ -916,12 +914,6 @@
         <div class="modal-actions split settings-actions">
           <span>
             <button
-              class="btn secondary"
-              type="button"
-              id="create-gist"
-              title="Use esta opção apenas para começar do zero. Ela cria um novo Gist privado e gera um novo Gist ID.">
-              Criar Gist</button
-            ><button
               class="btn ghost"
               type="button"
               id="pull-gist"
@@ -930,9 +922,7 @@
             </button>
           </span>
           <span>
-            <button class="btn ghost" type="button" id="clear-settings">
-              <i class="fa-solid fa-eraser"></i> Limpar</button
-            ><button class="btn danger" type="button" id="delete-local-data">
+            <button class="btn danger" type="button" id="delete-local-data">
               <i class="fa-solid fa-trash"></i> Excluir</button
             ><button class="btn primary" value="default" id="save-settings">
               Salvar

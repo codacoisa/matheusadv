@@ -8,6 +8,7 @@
   const AUTO_SYNC_DELAY_MS = 1500;
   const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const COLORS = ['#b38731', '#17213a', '#667085', '#d9bd7a', '#067647', '#9e3b2f', '#46627f', '#8c6f2f'];
+  const gistSettings = window.OfficeJurGistSettings;
 
   const state = {
     data: loadData(),
@@ -64,12 +65,9 @@
     openSettings: $('#open-settings'),
     settingsModal: $('#settings-modal'),
     closeSettings: $('#close-settings'),
-    gistId: $('#gist-id'),
     gistFile: $('#gist-file'),
-    gistToken: $('#gist-token'),
     autoSync: $('#auto-sync'),
     saveSettings: $('#save-settings'),
-    createGist: $('#create-gist'),
     pullGist: $('#pull-gist'),
     pushGist: $('#push-gist'),
     settingsStatus: $('#settings-status'),
@@ -222,7 +220,9 @@
 
   function loadSettings() {
     try {
-      return normalizeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'));
+      const moduleSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      const globalSettings = gistSettings.load();
+      return normalizeSettings({ ...moduleSettings, ...globalSettings });
     } catch (_) {
       return normalizeSettings({});
     }
@@ -242,8 +242,19 @@
 
   function saveSettings() {
     state.settings = normalizeSettings(state.settings);
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+    const moduleSettings = { ...state.settings };
+    delete moduleSettings.gistId;
+    delete moduleSettings.token;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(moduleSettings));
     renderStatus();
+  }
+
+  function refreshGistCredentials() {
+    state.settings = normalizeSettings({
+      ...state.settings,
+      ...gistSettings.load()
+    });
+    return state.settings;
   }
 
   function persist(options) {
@@ -694,10 +705,12 @@
   }
 
   function renderSettingsForm() {
-    els.gistId.value = state.settings.gistId;
+    refreshGistCredentials();
     els.gistFile.value = state.settings.fileName;
-    els.gistToken.value = state.settings.token;
     els.autoSync.checked = state.settings.autoSync;
+    document.querySelector('#global-gist-status').textContent = state.settings.gistId
+      ? `Gist global configurado: ${state.settings.gistId}`
+      : 'Gist global não configurado.';
   }
 
   function render() {
@@ -869,14 +882,14 @@
   function readSettingsForm() {
     const previous = state.settings;
     const next = normalizeSettings({
-      gistId: els.gistId.value,
+      gistId: previous.gistId,
       fileName: els.gistFile.value,
-      token: els.gistToken.value,
+      token: previous.token,
       autoSync: els.autoSync.checked,
       lastSyncAt: previous.lastSyncAt,
       lastSyncSignature: previous.lastSyncSignature
     });
-    if (next.gistId !== previous.gistId || next.fileName !== previous.fileName) {
+    if (next.fileName !== previous.fileName) {
       next.lastSyncAt = '';
       next.lastSyncSignature = '';
     }
@@ -906,8 +919,10 @@
   }
 
   async function fetchGistFile() {
-    if (!state.settings.gistId) throw new Error('Informe o Gist ID.');
-    if (!state.settings.token) throw new Error('Informe o token do GitHub.');
+    refreshGistCredentials();
+    if (!state.settings.gistId || !state.settings.token) {
+      throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+    }
     const gist = await githubRequest(`/gists/${encodeURIComponent(state.settings.gistId)}`, { method: 'GET' });
     const file = gist.files ? gist.files[state.settings.fileName] : null;
     return { gist, file };
@@ -937,56 +952,15 @@
     };
   }
 
-  async function createGist() {
-    readSettingsForm();
-    if (!state.settings.token) throw new Error('Informe o token do GitHub.');
-    if (state.settings.gistId) {
-      const { file } = await fetchGistFile();
-      if (file) {
-        const shouldRead = confirm(`Já existe um arquivo "${state.settings.fileName}" neste Gist. Clique em OK para mesclar com o arquivo existente. Clique em Cancelar para decidir se quer sincronizar depois.`);
-        if (shouldRead) {
-          await applyGistFile(file);
-          setSettingsStatus('Arquivo existente mesclado do Gist.', 'ok');
-          return;
-        }
-        const shouldOverwrite = confirm('Deseja mesclar seus dados locais com o arquivo existente e atualizar o Gist?');
-        if (!shouldOverwrite) {
-          setSettingsStatus('Nenhuma alteração enviada ao Gist.', '');
-          return;
-        }
-        await pushToGist();
-        return;
-      }
-      await pushToGist();
-      return;
-    }
-    const gist = await githubRequest('/gists', {
-      method: 'POST',
-      body: {
-        description: `Controle de Pagamentos - ${window.OFFICEJUR_CONFIG?.office?.name || 'OfficeJur'}`,
-        public: false,
-        files: {
-          [state.settings.fileName]: {
-            content: JSON.stringify(gistPayload(), null, 2)
-          }
-        }
-      }
-    });
-    state.settings.gistId = gist.id || '';
-    state.settings.lastSyncAt = nowISO();
-    state.settings.lastSyncSignature = dataSignature(state.data);
-    saveSettings();
-    renderSettingsForm();
-    setSettingsStatus('Gist criado e dados enviados.', 'ok');
-  }
-
   async function pushToGist() {
     if (syncInFlight) {
       syncPending = true;
       return syncInFlight;
     }
-    if (!state.settings.gistId) throw new Error('Informe o Gist ID ou crie um Gist.');
-    if (!state.settings.token) throw new Error('Informe o token do GitHub.');
+    refreshGistCredentials();
+    if (!state.settings.gistId || !state.settings.token) {
+      throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+    }
 
     syncInFlight = (async () => {
       const { file } = await fetchGistFile();
@@ -1040,8 +1014,10 @@
   }
 
   async function pullFromGist() {
-    if (!state.settings.gistId) throw new Error('Informe o Gist ID.');
-    if (!state.settings.token) throw new Error('Informe o token do GitHub.');
+    refreshGistCredentials();
+    if (!state.settings.gistId || !state.settings.token) {
+      throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+    }
     const { file } = await fetchGistFile();
     if (!file) throw new Error('Arquivo não encontrado no Gist.');
     await applyGistFile(file);
@@ -1060,23 +1036,7 @@
 
   async function saveSettingsSafely() {
     readSettingsForm();
-    if (!state.settings.gistId || !state.settings.token) {
-      setSettingsStatus('Configurações salvas.', 'ok');
-      return;
-    }
-    setSettingsStatus('Verificando arquivo no Gist...', '');
-    const { file } = await fetchGistFile();
-    if (file) {
-      const shouldRead = confirm(`Já existe um arquivo "${state.settings.fileName}" neste Gist. Clique em OK para mesclar os dados existentes. Clique em Cancelar para manter os dados locais sem sincronizar agora.`);
-      if (shouldRead) {
-        await applyGistFile(file);
-        setSettingsStatus('Configurações salvas e arquivo existente mesclado.', 'ok');
-        return;
-      }
-      setSettingsStatus('Configurações salvas. Dados locais mantidos; nada foi sincronizado agora.', 'ok');
-      return;
-    }
-    setSettingsStatus('Configurações salvas. Arquivo ainda não existe neste Gist.', 'ok');
+    setSettingsStatus('Ajustes deste módulo salvos.', 'ok');
   }
 
   function setSettingsStatus(message, tone) {
@@ -1134,7 +1094,7 @@
     els.openSettings.addEventListener('click', () => {
       renderSettingsForm();
       els.settingsModal.hidden = false;
-      els.gistId.focus();
+      els.gistFile.focus();
     });
     els.closeSettings.addEventListener('click', () => {
       els.settingsModal.hidden = true;
@@ -1165,7 +1125,6 @@
     els.saveSettings.addEventListener('click', () => {
       runGistAction(saveSettingsSafely, 'Salvando configurações...');
     });
-    els.createGist.addEventListener('click', () => runGistAction(createGist, 'Criando Gist...'));
     els.pushGist.addEventListener('click', () => {
       readSettingsForm();
       runGistAction(pushToGist, 'Sincronizando dados...');
@@ -1192,4 +1151,7 @@
   bind();
   state.selectedId = state.data.people[0] ? state.data.people[0].id : '';
   render();
+  if (state.settings.gistId && state.settings.token) {
+    runGistAction(pushToGist, 'Sincronizando ao abrir...');
+  }
 })();

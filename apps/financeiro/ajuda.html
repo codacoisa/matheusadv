@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="./assets/help.css?v=1">
   <link rel="stylesheet" href="./assets/system.css?v=1">
   <script src="./assets/fontawesome-7.3.0.min.js" data-auto-replace-svg="nest" data-observe-mutations="true" defer></script>
-  <script src="./assets/app-switcher.js?v=4" defer></script>
+<script src="./assets/app-switcher.js?v=5" defer></script>
   <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
   <script src="./assets/site-footer.js?v=5" defer></script>
 </head>
@@ -54,7 +54,7 @@
 
       <section id="entenda" class="help-section">
         <p class="eyebrow">VISÃO GERAL</p><h2>Como a sincronização funciona</h2>
-        <p>O sistema mantém uma cópia dos dados neste navegador e usa um <strong>Gist privado</strong> como ponto central para compartilhar as informações entre computadores. O Gist é um arquivo protegido dentro da conta do GitHub.</p>
+        <p>O sistema mantém uma cópia dos dados neste navegador e usa um <strong>Gist privado global do OfficeJur</strong> como ponto central para compartilhar as informações entre computadores. O Gist contém um arquivo separado para cada módulo, e o Financeiro usa <code>financeiro-juridico.json</code>.</p>
         <div class="help-flow">
           <div><i class="fa-solid fa-laptop"></i><strong>Computador A</strong><small>Dados locais</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div class="central"><i class="fa-brands fa-github"></i><strong>Gist privado</strong><small>Cópia central</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div><i class="fa-solid fa-computer"></i><strong>Computador B</strong><small>Dados locais</small></div>
         </div>
@@ -63,6 +63,7 @@
           <li><i class="fa-solid fa-check"></i><span>Inclusões, edições e exclusões são mescladas registro por registro.</span></li>
           <li><i class="fa-solid fa-check"></i><span>Alterações feitas em computadores diferentes são preservadas.</span></li>
           <li><i class="fa-solid fa-check"></i><span>Se o mesmo registro for alterado em dois lugares, prevalece a alteração mais recente.</span></li>
+          <li><i class="fa-solid fa-check"></i><span>Ao abrir um módulo sincronizável, o OfficeJur baixa, mescla e publica automaticamente o arquivo desse módulo.</span></li>
           <li><i class="fa-solid fa-check"></i><span>O token fica somente no navegador em que foi configurado; ele não é gravado no Gist.</span></li>
         </ul>
       </section>
@@ -84,10 +85,10 @@
       <section id="primeiro" class="help-section">
         <p class="eyebrow">ETAPA 2</p><h2>Configure o primeiro computador</h2>
         <ol class="help-steps">
-          <li><span>1</span><div><strong>Abra as configurações</strong><p>No Financeiro Jurídico, clique na engrenagem no canto superior direito.</p></div></li>
+          <li><span>1</span><div><strong>Abra a área central</strong><p>No portal ou no seletor de apps, abra <strong>Configurações</strong>. Gist ID e token são administrados somente nessa área.</p></div></li>
           <li><span>2</span><div><strong>Cole o token</strong><p>No campo “Token do GitHub”, cole a credencial criada na etapa anterior.</p></div></li>
-          <li><span>3</span><div><strong>Confirme o nome do arquivo</strong><p>Mantenha <code>financeiro-juridico.json</code>. Todos os computadores devem usar exatamente o mesmo nome.</p></div></li>
-          <li><span>4</span><div><strong>Crie o Gist privado</strong><p>Deixe o campo “Gist ID” vazio e clique em <strong>Criar Gist</strong>. O sistema criará o arquivo privado, preencherá o ID automaticamente e enviará os dados deste navegador.</p></div></li>
+          <li><span>3</span><div><strong>Conecte um Gist existente</strong><p>Se já houver um Gist privado, informe seu ID ou endereço e clique em <strong>Salvar e testar</strong>.</p></div></li>
+          <li><span>4</span><div><strong>Ou crie um novo Gist</strong><p>Com o token informado, clique em <strong>Criar novo Gist privado</strong>. O sistema criará a estrutura global e preencherá o ID automaticamente.</p></div></li>
           <li><span>5</span><div><strong>Guarde o Gist ID</strong><p>O ID é a sequência final do endereço do Gist. Exemplo: em <code>gist.github.com/usuario/abc123</code>, o ID é <code>abc123</code>. Ele será usado nos outros computadores.</p></div></li>
         </ol>
         <div class="help-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Configuração concluída</strong><p>Quando o topo mostrar “Gist configurado”, use o botão “Sincronizar” para confirmar que os dados já estão atualizados.</p></div></div>
@@ -98,9 +99,9 @@
         <p>Repita esta etapa em cada navegador que terá acesso ao sistema. Perfis diferentes do mesmo navegador também possuem configurações separadas.</p>
         <ol class="help-steps">
           <li><span>1</span><div><strong>Crie uma credencial para o equipamento</strong><p>Por segurança, prefira um token diferente para cada computador. Assim, um equipamento perdido pode ter seu token revogado sem interromper os demais.</p></div></li>
-          <li><span>2</span><div><strong>Informe o mesmo Gist ID</strong><p>Abra a engrenagem e cole o ID criado no primeiro computador.</p></div></li>
-          <li><span>3</span><div><strong>Informe token e nome do arquivo</strong><p>Cole o token autorizado e mantenha <code>financeiro-juridico.json</code>.</p></div></li>
-          <li><span>4</span><div><strong>Baixe antes de começar a trabalhar</strong><p>Clique em <strong>Baixar e mesclar</strong>. Isso traz os dados existentes do Gist sem apagar eventuais registros locais.</p></div></li>
+          <li><span>2</span><div><strong>Informe o mesmo Gist ID</strong><p>Abra a área central <strong>Configurações</strong> e cole o ID ou endereço criado no primeiro computador.</p></div></li>
+          <li><span>3</span><div><strong>Informe e teste o token</strong><p>Cole o token autorizado e clique em <strong>Salvar e testar</strong>. Os módulos deste navegador passarão a usar essa conexão.</p></div></li>
+          <li><span>4</span><div><strong>Abra o módulo</strong><p>Ao abrir, o Financeiro baixa e mescla os dados existentes do Gist sem apagar eventuais registros locais. O botão <strong>Baixar/Mesclar</strong> continua disponível para repetir a operação manualmente.</p></div></li>
           <li><span>5</span><div><strong>Salve e sincronize</strong><p>Ative a sincronização automática se desejar e clique em “Sincronizar” para confirmar a conexão.</p></div></li>
         </ol>
       </section>
@@ -108,7 +109,7 @@
       <section id="rotina" class="help-section">
         <p class="eyebrow">USO DIÁRIO</p><h2>Boas práticas entre computadores</h2>
         <div class="help-grid">
-          <article><i class="fa-solid fa-play"></i><strong>Ao iniciar</strong><p>Clique em “Sincronizar” antes de começar, especialmente se outra pessoa utilizou o sistema em outro computador.</p></article>
+          <article><i class="fa-solid fa-play"></i><strong>Ao iniciar</strong><p>Aguarde a sincronização automática de abertura concluir antes de começar, especialmente se outra pessoa utilizou o sistema em outro computador.</p></article>
           <article><i class="fa-solid fa-floppy-disk"></i><strong>Durante o trabalho</strong><p>Com a opção automática ativada, alterações salvas são enviadas após um pequeno intervalo.</p></article>
           <article><i class="fa-solid fa-stop"></i><strong>Ao terminar</strong><p>Clique novamente em “Sincronizar” e aguarde a mensagem de confirmação antes de fechar a página.</p></article>
           <article><i class="fa-solid fa-user-group"></i><strong>Edição simultânea</strong><p>Evite duas pessoas editarem o mesmo cliente, lançamento ou processo ao mesmo tempo. Para o mesmo registro, prevalece a versão mais recente.</p></article>
@@ -117,7 +118,7 @@
         <div class="help-actions">
           <div><i class="fa-solid fa-rotate"></i><span><strong>Sincronizar</strong><small>Lê o Gist, mescla com este navegador e atualiza a cópia central.</small></span></div>
           <div><i class="fa-solid fa-cloud-arrow-down"></i><span><strong>Baixar e mesclar</strong><small>Traz o conteúdo do Gist e combina com os dados locais sem enviar imediatamente.</small></span></div>
-          <div><i class="fa-solid fa-cloud-arrow-up"></i><span><strong>Criar Gist</strong><small>Cria a primeira cópia privada quando ainda não existe um Gist ID.</small></span></div>
+          <div><i class="fa-solid fa-gear"></i><span><strong>Configurações globais</strong><small>Cria, testa, substitui ou remove a conexão usada por todos os módulos.</small></span></div>
           <div><i class="fa-solid fa-wand-magic-sparkles"></i><span><strong>Sincronização automática</strong><small>Agenda uma sincronização depois de cada alteração salva.</small></span></div>
         </div>
       </section>
@@ -137,12 +138,12 @@
       <section id="problemas" class="help-section">
         <p class="eyebrow">SOLUÇÃO DE PROBLEMAS</p><h2>Mensagens e correções mais comuns</h2>
         <div class="help-faq">
-          <details open><summary>“Bad credentials” ou status 401</summary><div>O token está incorreto, expirou ou foi revogado. Gere um novo token, substitua-o na engrenagem e salve novamente.</div></details>
+          <details open><summary>“Bad credentials” ou status 401</summary><div>O token está incorreto, expirou ou foi revogado. Gere um novo token, substitua-o na área central <strong>Configurações</strong> e teste novamente.</div></details>
           <details><summary>Status 403 ou “Resource not accessible”</summary><div>O token não possui permissão de gravação em Gists. Em um token refinado, confirme <strong>Account permissions → Gists → Read and write</strong>. Em um token clássico, confirme o escopo <code>gist</code>.</div></details>
-          <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID foi copiado integralmente e se o token pertence a uma conta com acesso ao Gist privado. Não cole o endereço completo no campo: use somente o ID.</div></details>
+          <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID ou endereço foi copiado integralmente e se o token pertence a uma conta com acesso ao Gist privado.</div></details>
           <details><summary>Arquivo JSON não encontrado</summary><div>Confirme que todos os computadores usam o mesmo nome: <code>financeiro-juridico.json</code>. Evite renomear ou excluir o arquivo diretamente no GitHub.</div></details>
           <details><summary>As alterações não apareceram no outro computador</summary><div>No computador que fez a alteração, clique em “Sincronizar” e aguarde a confirmação. Depois, sincronize o segundo computador. Verifique também se ambos usam o mesmo Gist ID e nome de arquivo.</div></details>
-          <details><summary>O token sumiu após limpar o navegador</summary><div>Isso é esperado: a credencial fica somente no armazenamento local. Reconfigure o equipamento com o Gist ID e um token autorizado; depois use “Baixar e mesclar”.</div></details>
+          <details><summary>O token sumiu após limpar o navegador</summary><div>Isso é esperado: a credencial fica somente no armazenamento local. Reconfigure o equipamento na área central com o Gist ID e um token autorizado; ao abrir o Financeiro, ele fará a mesclagem automaticamente.</div></details>
           <details><summary>Preciso recuperar uma versão anterior</summary><div>Não edite o JSON manualmente. Abra o Gist no GitHub e consulte o histórico de revisões. Antes de restaurar qualquer versão, preserve uma cópia do estado atual e confirme a operação com a pessoa responsável pelo sistema.</div></details>
         </div>
       </section>

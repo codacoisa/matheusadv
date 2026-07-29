@@ -16,7 +16,7 @@ Toda receita deve ser vinculada a um cliente e pode apontar para um pacote ou pa
 
 Backups no formato atual continuam aceitos. Campos contratuais que não existirem no arquivo permanecem em branco; valores de estruturas anteriores não são convertidos implicitamente.
 
-Os dados ficam no navegador e podem ser sincronizados com um Gist privado em **Configurações**. Antes de enviar, o sistema lê o conteúdo atual do Gist e mescla inclusões, edições e exclusões por registro, evitando que um navegador com dados antigos apague alterações feitas em outro computador. O token do GitHub nunca é gravado no repositório: permanece apenas no `localStorage` do navegador.
+Os dados ficam no navegador e podem ser sincronizados com o Gist privado global definido na área **Configurações** do OfficeJur. O Gist ID e o token valem para todos os módulos sincronizáveis no mesmo navegador e não podem ser alterados dentro do Financeiro; este módulo mantém somente o ajuste do arquivo próprio `financeiro-juridico.json`. Ao abrir e antes de enviar, o sistema lê o conteúdo atual desse arquivo e mescla inclusões, edições e exclusões por registro, evitando que um navegador com dados antigos apague alterações feitas em outro computador. O token do GitHub nunca é gravado no repositório: permanece apenas no `localStorage` do navegador.
 
 O sistema inicia completamente vazio, sem clientes, casos, equipe, configurações ou lançamentos demonstrativos. Dados existentes devem ser recuperados exclusivamente após configurar e mesclar o Gist de forma consciente.
 

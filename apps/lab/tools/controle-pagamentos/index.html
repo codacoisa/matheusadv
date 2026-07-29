@@ -16,8 +16,9 @@
     <script src="../../assets/office-config.js"></script>
     <script src="../../assets/office-context.js" defer></script>
     <link rel="stylesheet" href="./assets/styles.css?v=3">
-    <script src="./assets/app.js?v=3" defer></script>
-    <script src="./assets/app-switcher.js?v=4" defer></script>
+    <script src="./assets/gist-settings.js?v=1" defer></script>
+    <script src="./assets/app.js?v=5" defer></script>
+    <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
   </head>
@@ -136,21 +137,19 @@
       <section class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
         <header>
           <div>
-            <strong id="settings-title">Configurações do Gist</strong>
-            <span>Use um Gist privado para sincronizar este controle entre computadores.</span>
+            <strong id="settings-title">Ajustes do Controle de Pagamentos</strong>
+            <span>A conexão com o Gist é gerenciada nas Configurações do OfficeJur.</span>
           </div>
           <button id="close-settings" class="close-button" type="button" aria-label="Fechar">x</button>
         </header>
 
         <div class="settings-grid">
-          <label>Gist ID
-            <input id="gist-id" placeholder="Cole o ID ou deixe vazio para criar">
-          </label>
-          <label>Arquivo no Gist
+          <div class="span-2">
+            <strong id="global-gist-status">Gist global não configurado.</strong>
+            <a class="button secondary dark" href="../../configuracoes/">Abrir configurações globais</a>
+          </div>
+          <label>Arquivo deste módulo
             <input id="gist-file" placeholder="controle-pagamentos.json">
-          </label>
-          <label class="span-2">Token do GitHub
-            <input id="gist-token" type="password" placeholder="Token com permissão para gist">
           </label>
           <label class="check-row">
             <input id="auto-sync" type="checkbox">
@@ -160,7 +159,6 @@
 
         <div class="settings-actions">
           <button id="save-settings" class="button primary" type="button">Salvar ajustes</button>
-          <button id="create-gist" class="button secondary dark" type="button">Criar Gist</button>
           <button id="pull-gist" class="button secondary dark" type="button">Mesclar do Gist</button>
           <button id="push-gist" class="button secondary dark" type="button">Sincronizar agora</button>
         </div>

@@ -1,8 +1,8 @@
 (() => {
   "use strict";
   const officeConfig = window.OFFICEJUR_CONFIG?.office || {};
-  const officeName = officeConfig.name || "Escritório";
   const statementDescriptor = officeConfig.statementDescriptor || "OFFICEJUR";
+  const gistSettings = window.OfficeJurGistSettings;
   const SCHEMA = "gm-financeiro-v6";
   const DATA_KEY = "gm-financeiro-data-v2",
     SETTINGS_KEY = "gm-financeiro-gist-v2",
@@ -450,25 +450,22 @@
     }
   }
   function loadSettings() {
+    const defaults = {
+      gistId: "",
+      token: "",
+      fileName: FILE,
+      autoSync: false,
+      lastSyncAt: "",
+      lastSyncSignature: "",
+    };
     try {
-      return {
-        gistId: "",
-        token: "",
-        fileName: FILE,
-        autoSync: false,
-        lastSyncAt: "",
-        lastSyncSignature: "",
-        ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"),
-      };
+      const moduleSettings = JSON.parse(
+          localStorage.getItem(SETTINGS_KEY) || "{}",
+        ),
+        globalSettings = gistSettings.load();
+      return { ...defaults, ...moduleSettings, ...globalSettings };
     } catch {
-      return {
-        gistId: "",
-        token: "",
-        fileName: FILE,
-        autoSync: false,
-        lastSyncAt: "",
-        lastSyncSignature: "",
-      };
+      return defaults;
     }
   }
   function loadMp() {
@@ -2064,12 +2061,11 @@
     return r.json();
   }
   async function fetchGistFile() {
+    refreshGistCredentials();
     if (!settings.gistId || !settings.token)
-      throw new Error("Informe Gist ID e token.");
+      throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     const gist = await api(`/gists/${encodeURIComponent(settings.gistId)}`),
-      file =
-        gist.files?.[settings.fileName || FILE] ||
-        Object.values(gist.files || {})[0];
+      file = gist.files?.[settings.fileName || FILE];
     return { gist, file };
   }
   async function readGistFile(file) {
@@ -2180,8 +2176,9 @@
       syncPending = true;
       return syncInFlight;
     }
+    refreshGistCredentials();
     if (!settings.gistId || !settings.token)
-      throw new Error("Configure o Gist primeiro.");
+      throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
       const { file } = await fetchGistFile();
       let remote = emptyData();
@@ -2218,25 +2215,6 @@
       }
     }
   }
-  async function createGist() {
-    if (!settings.token) throw new Error("Informe e salve o token.");
-    const g = await api("/gists", {
-      method: "POST",
-      body: JSON.stringify({
-        description: `Financeiro Jurídico — ${officeName}`,
-        public: false,
-        files: {
-          [settings.fileName || FILE]: {
-            content: JSON.stringify(data, null, 2),
-          },
-        },
-      }),
-    });
-    settings.gistId = g.id;
-    saveSyncState();
-    $("#settings-form").gistId.value = g.id;
-    toast("Gist privado criado.");
-  }
   async function pullGist() {
     const { file } = await fetchGistFile();
     const remote = normalize(await readGistFile(file));
@@ -2246,22 +2224,29 @@
     toast("Dados do Gist mesclados neste navegador.");
   }
   function saveSettingsLocal() {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    const moduleSettings = { ...settings };
+    delete moduleSettings.gistId;
+    delete moduleSettings.token;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(moduleSettings));
     renderGistStatus();
   }
-  function clearGistSettings() {
-    const form = $("#settings-form");
+  function refreshGistCredentials() {
+    settings = { ...settings, ...gistSettings.load() };
+    return settings;
+  }
+  function readGistSettingsForm() {
+    const form = $("#settings-form"),
+      previousFileName = settings.fileName;
     settings = {
       ...settings,
-      gistId: "",
-      token: "",
-      lastSyncAt: "",
-      lastSyncSignature: "",
+      fileName: form.fileName.value.trim() || FILE,
+      autoSync: form.autoSync.checked,
     };
-    form.gistId.value = "";
-    form.token.value = "";
-    saveSettingsLocal();
-    toast("Gist ID e token removidos deste navegador.");
+    if (settings.fileName !== previousFileName) {
+      settings.lastSyncAt = "";
+      settings.lastSyncSignature = "";
+    }
+    return settings;
   }
   function removeDocumentHandoffs() {
     for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -2276,9 +2261,9 @@
     const confirmed = await askConfirmation({
       title: "Excluir todos os dados locais?",
       message:
-        "Você está prestes a deixar o OfficeJur limpo neste navegador.",
+        "Você está prestes a limpar os dados locais do Financeiro neste navegador.",
       impact:
-        "Dados financeiros, configurações e credenciais locais serão apagados. O Gist remoto no GitHub não será excluído. Esta ação não pode ser desfeita.",
+        "Dados financeiros e configurações deste módulo serão apagados. A configuração global e o Gist remoto no GitHub serão preservados. Esta ação não pode ser desfeita.",
       label: "Excluir tudo",
     });
     if (!confirmed) return;
@@ -2295,12 +2280,19 @@
     mp = loadMp();
     $("#settings-dialog").close();
     render();
-    toast("Dados e configurações locais excluídos.");
+    toast("Dados e configurações locais do Financeiro excluídos.");
   }
   function renderGistStatus() {
+    refreshGistCredentials();
     $("#sync-label").innerHTML = settings.gistId
       ? '<i class="fa-solid fa-cloud"></i> Gist configurado'
       : '<i class="fa-solid fa-hard-drive"></i> Neste navegador';
+    const globalStatus = $("#global-gist-status");
+    if (globalStatus) {
+      globalStatus.textContent = settings.gistId
+        ? `Gist global configurado: ${settings.gistId}`
+        : "Gist global não configurado.";
+    }
   }
   function exportCsv() {
     const q = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;
@@ -3275,8 +3267,7 @@
   });
   $("#settings-btn").onclick = () => {
     const f = $("#settings-form");
-    f.gistId.value = settings.gistId;
-    f.token.value = settings.token;
+    refreshGistCredentials();
     f.fileName.value = settings.fileName;
     f.autoSync.checked = settings.autoSync;
     $("#settings-dialog").showModal();
@@ -3284,46 +3275,20 @@
   $("#settings-form").addEventListener("submit", (e) => {
     if (e.submitter?.value === "cancel") return;
     e.preventDefault();
-    const f = e.currentTarget;
-    settings = {
-      gistId: f.gistId.value.trim(),
-      token: f.token.value.trim(),
-      fileName: f.fileName.value.trim() || FILE,
-      autoSync: f.autoSync.checked,
-    };
+    readGistSettingsForm();
     saveSettingsLocal();
     $("#settings-dialog").close();
     toast("Configurações salvas.");
   });
-  $("#create-gist").onclick = async () => {
-    try {
-      const f = $("#settings-form");
-      settings = {
-        gistId: f.gistId.value.trim(),
-        token: f.token.value.trim(),
-        fileName: f.fileName.value.trim() || FILE,
-        autoSync: f.autoSync.checked,
-      };
-      await createGist();
-    } catch (e) {
-      toast(e.message);
-    }
-  };
   $("#pull-gist").onclick = async () => {
     try {
-      const f = $("#settings-form");
-      settings = {
-        gistId: f.gistId.value.trim(),
-        token: f.token.value.trim(),
-        fileName: f.fileName.value.trim() || FILE,
-        autoSync: f.autoSync.checked,
-      };
+      readGistSettingsForm();
+      saveSettingsLocal();
       await pullGist();
     } catch (e) {
       toast(e.message);
     }
   };
-  $("#clear-settings").onclick = clearGistSettings;
   $("#delete-local-data").onclick = deleteAllLocalData;
   $("#sync-now").onclick = () => pushGist().catch((e) => toast(e.message));
   document.addEventListener("click", (e) => {
@@ -3345,4 +3310,9 @@
   });
   showView((location.hash || "#dashboard").slice(1));
   render();
+  if (settings.gistId && settings.token) {
+    pushGist().catch((error) =>
+      toast(`Não foi possível sincronizar ao abrir: ${error.message}`),
+    );
+  }
 })();

@@ -8,6 +8,7 @@ SITE_DIR="$ROOT_DIR/_site"
 rm -rf "$SITE_DIR"
 
 mkdir -p "$SITE_DIR/documentos/assets"
+mkdir -p "$SITE_DIR/configuracoes"
 mkdir -p "$SITE_DIR/financeiro"
 mkdir -p "$SITE_DIR/financeiro/worker/src"
 mkdir -p "$SITE_DIR/lab/assets"
@@ -25,6 +26,8 @@ cp "$ROOT_DIR/apps/portal/index.html" "$SITE_DIR/index.html"
 cp -R "$ROOT_DIR/packages/ui/assets/." "$SITE_DIR/assets/"
 cp "$ROOT_DIR/config/office.js" "$SITE_DIR/assets/office-config.js"
 cp "$ROOT_DIR/packages/ui/office-context.js" "$SITE_DIR/assets/office-context.js"
+
+copy_static_app "$ROOT_DIR/apps/configuracoes" "$SITE_DIR/configuracoes"
 
 cp "$ROOT_DIR/apps/lab/index.html" "$SITE_DIR/lab/index.html"
 cp -R "$ROOT_DIR/apps/lab/assets/." "$SITE_DIR/lab/assets/"
@@ -60,12 +63,14 @@ cp "$ROOT_DIR/apps/financeiro/worker/src/index.js" "$SITE_DIR/financeiro/worker/
 inject_shared_ui() {
   local assets="$1"
   cp "$ROOT_DIR/packages/ui/app-switcher.js" "$assets/app-switcher.js"
+  cp "$ROOT_DIR/packages/ui/gist-settings.js" "$assets/gist-settings.js"
   cp "$ROOT_DIR/packages/ui/modal-scroll-lock.js" "$assets/modal-scroll-lock.js"
   cp "$ROOT_DIR/packages/ui/site-footer.js" "$assets/site-footer.js"
 }
 
 for assets in \
   "$SITE_DIR/assets" \
+  "$SITE_DIR/configuracoes/assets" \
   "$SITE_DIR/documentos/assets" \
   "$SITE_DIR/financeiro/assets" \
   "$SITE_DIR/lab/assets" \

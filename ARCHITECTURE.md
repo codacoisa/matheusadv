@@ -12,6 +12,7 @@
 
 - `config/office.js`: configuração única da identidade do escritório e da implantação.
 - `apps/portal`: entrada do sistema e acesso aos módulos permanentes.
+- `apps/configuracoes`: interface única para conexões globais consumidas pelos módulos.
 - `apps/lab`: catálogo isolado de ferramentas temporárias, experimentais ou em avaliação.
 - `apps/documentos`: geradores jurídicos independentes, apoiados por uma única base visual e documental em `apps/documentos/assets`.
 - `apps/financeiro`: domínio financeiro e relacionamento entre clientes, casos e equipe.
@@ -35,7 +36,7 @@ As ferramentas do Lab podem consumir os componentes e imagens institucionais de 
 
 ## Dados
 
-Os módulos iniciam sem dados operacionais versionados. Informações jurídicas e financeiras são mantidas no navegador e, quando configurado pelo usuário, sincronizadas com Gists privados.
+Os módulos iniciam sem dados operacionais versionados. Informações jurídicas e financeiras são mantidas no navegador e, quando configurado pelo usuário em `apps/configuracoes`, sincronizadas com um Gist privado global do OfficeJur. A biblioteca `packages/ui/gist-settings.js` é a única interface de persistência do Gist ID e do token no navegador. Cada módulo apenas consome essa configuração, mantém um arquivo próprio dentro do Gist e aplica sua própria estratégia de mesclagem. Módulos sincronizáveis baixam, mesclam e publicam seu arquivo ao serem abertos.
 
 ## Geradores de documentos
 

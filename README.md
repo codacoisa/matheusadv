@@ -89,6 +89,7 @@ Também fazem parte da política do projeto:
 O workflow `Publicar OfficeJur` monta todas as aplicações em um único artefato estático e o publica no GitHub Pages:
 
 - `/officejur/` — portal;
+- `/officejur/configuracoes/` — conexões globais da instalação;
 - `/officejur/documentos/<modulo>/` — geradores de documentos;
 - `/officejur/financeiro/` — financeiro;
 - `/officejur/validador-projudi/` — validação de PDFs e assinaturas P7S;
@@ -100,4 +101,4 @@ Não há etapa de compilação das aplicações. O workflow apenas organiza os a
 
 ## Dados e credenciais
 
-Dados jurídicos e financeiros não são arquivos da aplicação e não devem ser versionados. Tokens do GitHub permanecem somente no navegador, e credenciais privadas de integrações, como o Mercado Pago, permanecem em serviços protegidos.
+Dados jurídicos e financeiros não são arquivos da aplicação e não devem ser versionados. A área permanente `/configuracoes/` concentra o Gist ID e o token de um único Gist privado no navegador. Os módulos sincronizáveis apenas consomem essa configuração compartilhada e armazenam seus dados em arquivos separados dentro dele. Ao abrir, cada módulo baixa, mescla e publica seu próprio arquivo. O token do GitHub permanece somente no navegador, e credenciais privadas de integrações, como o Mercado Pago, permanecem em serviços protegidos.
