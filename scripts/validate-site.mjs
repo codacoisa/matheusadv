@@ -156,6 +156,7 @@ if (
 const documentModulesRoot = "apps/documentos";
 const sharedDocumentAssets = [
   "document-header.js",
+  "document-utils.js",
   "jspdf.umd.min.js",
   "styles.css",
   "watermark.png",
@@ -242,6 +243,7 @@ for (const entry of readdirSync(documentModulesRoot)) {
   if (
     !html.includes("<office-document-header") ||
     !html.includes("../assets/styles.css") ||
+    !html.includes("../assets/document-utils.js") ||
     !html.includes("../assets/jspdf.umd.min.js")
   ) {
     console.error(
@@ -283,13 +285,13 @@ const currentSourceChecks = [
     "formato antigo de backup",
   ],
   [
-    "apps/lab/tools/central-guias/index.html",
+    "apps/lab/tools/central-guias/assets/app.js",
     /function\s+getPayloadDb\b/,
     "formato antigo da Central de Guias",
   ],
   [
-    "apps/lab/tools/central-guias/index.html",
-    /(?:github-token|FINANCE_SETTINGS_KEY|DEFAULT_GIST_ID|Authorization[^\n]+state\.token)/,
+    "apps/lab/tools/central-guias/assets/app.js",
+    /(?:github-token|FINANCE_SETTINGS_KEY|DEFAULT_GIST_ID|Authorization[^\n]+state\.token|\bfetch\s*\()/,
     "credencial ou configuração herdada na Central de Guias",
   ],
   [
@@ -307,6 +309,40 @@ const currentSourceChecks = [
 for (const [path, pattern, label] of currentSourceChecks) {
   if (pattern.test(readFileSync(path, "utf8"))) {
     console.error(`Compatibilidade obsoleta encontrada em ${path}: ${label}.`);
+    process.exit(1);
+  }
+}
+
+const modularPages = [
+  "apps/portal/index.html",
+  "apps/lab/index.html",
+  "apps/lab/tools/central-guias/index.html",
+];
+
+for (const path of modularPages) {
+  const html = readFileSync(path, "utf8");
+  if (
+    /<style\b/i.test(html) ||
+    /<script\b(?![^>]*\bsrc\s*=)[^>]*>/i.test(html) ||
+    /\sstyle\s*=/i.test(html)
+  ) {
+    console.error(`CSS ou JavaScript embutido encontrado em ${path}.`);
+    process.exit(1);
+  }
+}
+
+if (!readFileSync("apps/lab/tools/central-guias/index.html", "utf8").includes("gist-client.js")) {
+  console.error("A Central de Guias não utiliza o cliente compartilhado do Gist.");
+  process.exit(1);
+}
+
+const duplicatedDocumentUtilityPattern =
+  /^function\s+(?:todayISO|clean|joinParts|formatCPF|formatCNPJ|formatZip|formatPhone|normalizeFilename|formatLongDate|formatShortDate|formatTime|arrayBufferToBinaryString)\b/m;
+
+for (const entry of readdirSync(documentModulesRoot)) {
+  const appScript = join(documentModulesRoot, entry, "assets", "app.js");
+  if (existsSync(appScript) && duplicatedDocumentUtilityPattern.test(readFileSync(appScript, "utf8"))) {
+    console.error(`Utilitário documental compartilhado duplicado no gerador ${entry}.`);
     process.exit(1);
   }
 }

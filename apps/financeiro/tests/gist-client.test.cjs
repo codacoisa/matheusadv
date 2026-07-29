@@ -68,6 +68,17 @@ test("baixa arquivo truncado sem expor token e aplica limite real", async (conte
   );
 });
 
+test("recusa origem externa no endereço bruto retornado pelo Gist", async () => {
+  await assert.rejects(
+    gistClient.text({
+      truncated: true,
+      size: 8,
+      raw_url: "https://example.com/arquivo.json",
+    }),
+    /origem não autorizada/,
+  );
+});
+
 test("protege atualizações com a revisão recebida do Gist", async (context) => {
   const originalFetch = global.fetch;
   context.after(() => {

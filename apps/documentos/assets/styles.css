@@ -2,7 +2,7 @@
   color-scheme: light;
   --navy: #17213a;
   --navy-2: #23304f;
-  --gold: #b38731;
+  --gold: #8b651f;
   --gold-light: #d9bd7a;
   --paper: #fff;
   --bg: #eef1f5;
@@ -61,8 +61,8 @@ button, input, select, textarea { font: inherit; }
   object-fit: contain;
 }
 
-.brand strong, .brand small { display: block; }
-.brand strong { font-family: Georgia, serif; font-size: 18px; }
+.brand h1, .brand small { display: block; }
+.brand h1 { margin: 0; font-family: Georgia, serif; font-size: 18px; }
 .brand small { margin-top: 2px; color: #c8cfdd; font-size: 11px; }
 
 .top-actions { display: flex; gap: 8px; }

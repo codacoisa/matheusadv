@@ -244,12 +244,6 @@ for (const eventName of ["dragleave", "drop"]) {
 }
 
 elements.dropZone.addEventListener("drop", event => handleFiles(event.dataTransfer.files));
-elements.dropZone.addEventListener("keydown", event => {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    elements.fileInput.click();
-  }
-});
 elements.clearButton.addEventListener("click", () => {
   results = [];
   filterErrors = false;

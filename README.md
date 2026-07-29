@@ -25,8 +25,9 @@ config/
 
 apps/
 ├── portal/
+│   └── assets/                 # estilos exclusivos da entrada do sistema
 ├── documentos/
-│   ├── assets/                 # interface, imagens e jsPDF compartilhados
+│   ├── assets/                 # interface, utilitários, imagens e jsPDF compartilhados
 │   ├── procuracao/
 │   ├── hipossuficiencia/
 │   ├── honorarios/
@@ -44,6 +45,9 @@ packages/
     ├── assets/                 # identidade visual institucional compartilhada
     ├── app-switcher.js
     └── site-footer.js
+
+tests/
+└── browser/                    # navegação real e auditoria WCAG A/AA
 ```
 
 ## Configuração do escritório
@@ -54,7 +58,7 @@ Os módulos exibem o OfficeJur como produto e consomem os dados do escritório c
 
 Os modelos de documentos ainda pertencem à implantação atual e não consomem essa configuração. Essa separação é intencional até que seja definido um formato seguro para parametrizar textos jurídicos, profissionais, assinaturas e identidade documental.
 
-Os módulos continuam isolados internamente. Os geradores compartilham cabeçalho, estilos, imagens documentais e jsPDF em `apps/documentos/assets`; todo o sistema compartilha navegação, rodapé e imagens institucionais mantidos em `packages/ui`.
+Os módulos continuam isolados internamente. Os geradores compartilham cabeçalho, estilos, utilitários de campos e rascunhos, imagens documentais e jsPDF em `apps/documentos/assets`; todo o sistema compartilha navegação, rodapé e imagens institucionais mantidos em `packages/ui`. Portal, Lab e Central de Guias mantêm marcação, estilos e comportamento em arquivos separados.
 
 As bibliotecas de terceiros, suas versões, origens e licenças estão registradas
 em [Avisos de terceiros](THIRD-PARTY-NOTICES.md).
@@ -99,7 +103,24 @@ O workflow `Publicar OfficeJur` monta todas as aplicações em um único artefat
 
 O site é majoritariamente estático, mas o Validador Projudi é compilado com
 esbuild antes da publicação. O workflow valida, monta e injeta os componentes
-compartilhados no artefato publicado.
+compartilhados no artefato publicado. Antes da publicação, uma suíte abre todos
+os módulos em Chromium, bloqueia erros de execução e aplica verificações
+automatizadas WCAG A/AA com axe-core.
+
+## Verificações locais
+
+Na raiz do repositório:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run test:browser
+./scripts/build-site.sh
+node ./scripts/validate-site.mjs
+```
+
+As verificações específicas do Financeiro, do worker do Mercado Pago e do
+Validador Projudi continuam disponíveis em suas respectivas pastas.
 
 ## Dados e credenciais
 

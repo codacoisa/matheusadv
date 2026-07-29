@@ -23,6 +23,16 @@ Os componentes visuais próprios utilizam SVGs escritos para o OfficeJur e não 
 Dependências transitivas do Validador Projudi e suas licenças estão registradas
 em `apps/validador-projudi/package-lock.json`.
 
+## 🧪 Ferramentas de desenvolvimento
+
+| Projeto | Versão | Uso no OfficeJur | Licença |
+| --- | --- | --- | --- |
+| [Playwright](https://playwright.dev/) | 1.62.0 | Testes automatizados em navegador real | Apache-2.0 |
+| [axe-core para Playwright](https://github.com/dequelabs/axe-core-npm) | 4.12.1 | Auditoria automatizada WCAG A/AA | MPL-2.0 |
+
+Essas ferramentas não são incorporadas ao site publicado. Suas dependências
+transitivas e versões ficam registradas no `package-lock.json` da raiz.
+
 ## 🌐 Serviços externos
 
 GitHub, GitHub Gists, Mercado Pago, Cloudflare Workers, WhatsApp, Google Maps,

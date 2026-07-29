@@ -52,6 +52,9 @@ mesclado depois da confirmação de aceite.
 Na raiz do repositório:
 
 ```bash
+npm ci
+npx playwright install chromium
+npm run test:browser
 ./scripts/build-site.sh
 node scripts/validate-site.mjs
 ```

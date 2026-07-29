@@ -199,54 +199,17 @@ const state = {
   previewUrl: null,
 };
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function clean(value) {
-  return String(value || '').trim();
-}
-
-function joinParts(parts, separator = ', ') {
-  return parts.map(clean).filter(Boolean).join(separator);
-}
-
-function formatCPF(value) {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
-  const groups = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9)].filter(Boolean);
-  let result = groups.join('.');
-  if (digits.length > 9) result += `-${digits.slice(9, 11)}`;
-  return result;
-}
-
-function formatCNPJ(value) {
-  const d = String(value || '').replace(/\D/g, '').slice(0, 14);
-  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
-}
-
-function formatZip(value) {
-  const d = String(value || '').replace(/\D/g, '').slice(0, 8);
-  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2-$3');
-}
-
-function normalizeFilename(value) {
-  return (clean(value) || 'procuracao')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'procuracao';
-}
-
-function formatLongDate(value) {
-  if (!value) return '';
-  const date = new Date(`${value}T12:00:00`);
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date);
-}
+const {
+  arrayBufferToBinaryString,
+  clean,
+  formatCNPJ,
+  formatCPF,
+  formatLongDate,
+  formatZip,
+  joinParts,
+  todayISO,
+} = window.OfficeJurDocumentUtils;
+const normalizeFilename = value => window.OfficeJurDocumentUtils.normalizeFilename(value, 'procuracao');
 
 function cloneDraft(draft) {
   return JSON.parse(JSON.stringify(draft || {}));
@@ -317,7 +280,7 @@ function setDraft(draft, options = {}) {
 
 function renderPeopleUI(savedPeople) {
   const people = savedPeople && savedPeople.length ? savedPeople : [{}];
-  peopleContainer.innerHTML = '';
+  peopleContainer.replaceChildren();
 
   people.forEach((person, index) => {
     const savedPersonType = person.type === 'pj' ? 'pj' : 'pf';
@@ -347,7 +310,10 @@ function renderPeopleUI(savedPeople) {
     typeLabel.textContent = 'Tipo de pessoa';
     const typeSelect = document.createElement('select');
     typeSelect.name = `people.${index}.type`;
-    typeSelect.innerHTML = '<option value="pf">Pessoa física</option><option value="pj">Pessoa jurídica</option>';
+    typeSelect.append(
+      new Option('Pessoa física', 'pf'),
+      new Option('Pessoa jurídica', 'pj'),
+    );
     typeSelect.value = savedPersonType;
     typeSelect.addEventListener('change', () => {
       const draft = getDraft();
@@ -455,31 +421,17 @@ function consumeDocumentHandoff() {
 }
 
 function encodePdfDraft(draft) {
-  const json = JSON.stringify(normalizeDraft(draft, { useTodayDate: false }));
-  return `${PDF_DRAFT_MARKER}${btoa(unescape(encodeURIComponent(json)))}`;
+  const normalized = normalizeDraft(draft, { useTodayDate: false });
+  return window.OfficeJurDocumentUtils.encodePdfDraft(PDF_DRAFT_MARKER, normalized);
 }
 
 function decodePdfDraft(value) {
-  try {
-    return normalizeDraft(JSON.parse(decodeURIComponent(escape(atob(value)))), { useTodayDate: false });
-  } catch {
-    return null;
-  }
+  const draft = window.OfficeJurDocumentUtils.decodePdfDraft(value);
+  return draft ? normalizeDraft(draft, { useTodayDate: false }) : null;
 }
 
 function extractDraftFromPdfText(text) {
-  const match = String(text || '').match(/GM_PROCURACAO_DRAFT:([A-Za-z0-9+/=]+)/);
-  return match ? decodePdfDraft(match[1]) : null;
-}
-
-function arrayBufferToBinaryString(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 8192;
-  let result = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    result += String.fromCharCode(...bytes.slice(i, i + chunkSize));
-  }
-  return result;
+  return window.OfficeJurDocumentUtils.extractDraftFromPdfText(text, PDF_DRAFT_MARKER, decodePdfDraft);
 }
 
 async function importDraftFromPdf(file) {

@@ -160,63 +160,19 @@ const state = {
   previewUrl: null,
 };
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function clean(value) {
-  return String(value || '').trim();
-}
-
-function joinParts(parts, separator = ', ') {
-  return parts.map(clean).filter(Boolean).join(separator);
-}
-
-function formatCPF(value) {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
-  const groups = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9)].filter(Boolean);
-  let result = groups.join('.');
-  if (digits.length > 9) result += `-${digits.slice(9, 11)}`;
-  return result;
-}
-
-function formatCNPJ(value) {
-  const d = String(value || '').replace(/\D/g, '').slice(0, 14);
-  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
-}
-
-function formatZip(value) {
-  const d = String(value || '').replace(/\D/g, '').slice(0, 8);
-  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2-$3');
-}
-
-function formatPhone(value) {
-  if (String(value || '').trim().startsWith('+')) {
-    return String(value).replace(/[^\d+()\s-]/g, '').replace(/\s+/g, ' ').trim();
-  }
-  const d = String(value || '').replace(/\D/g, '').slice(0, 11);
-  if (d.length <= 10) return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
-  return d.replace(/^(\d{2})(\d)(\d)/, '($1) $2 $3').replace(/(\d{4})(\d)/, '$1-$2');
-}
-
-function normalizeFilename(value) {
-  return (clean(value) || 'contrato-de-honorarios')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'contrato-de-honorarios';
-}
-
-function formatLongDate(value) {
-  if (!value) return '';
-  const date = new Date(`${value}T12:00:00`);
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date);
-}
+const {
+  arrayBufferToBinaryString,
+  clean,
+  decodePdfDraft,
+  formatCNPJ,
+  formatCPF,
+  formatLongDate,
+  formatPhone,
+  formatZip,
+  joinParts,
+  todayISO,
+} = window.OfficeJurDocumentUtils;
+const normalizeFilename = value => window.OfficeJurDocumentUtils.normalizeFilename(value, 'contrato-de-honorarios');
 
 function getDraft() {
   const draft = { people: [], params: {}, document: {}, clauses: {} };
@@ -260,7 +216,7 @@ function setDraft(draft) {
 
 function renderPeopleUI(savedPeople) {
   const people = savedPeople && savedPeople.length ? savedPeople : [{}];
-  peopleContainer.innerHTML = '';
+  peopleContainer.replaceChildren();
 
   people.forEach((person, index) => {
     const personType = person.type === 'pj' ? 'pj' : 'pf';
@@ -287,7 +243,10 @@ function renderPeopleUI(savedPeople) {
     typeLabel.textContent = 'Tipo de pessoa';
     const typeSelect = document.createElement('select');
     typeSelect.name = `people.${index}.type`;
-    typeSelect.innerHTML = '<option value="pf">Pessoa física</option><option value="pj">Pessoa jurídica</option>';
+    typeSelect.append(
+      new Option('Pessoa física', 'pf'),
+      new Option('Pessoa jurídica', 'pj'),
+    );
     typeSelect.value = personType;
     typeSelect.addEventListener('change', () => {
       const draft = getDraft();
@@ -393,32 +352,11 @@ function consumeDocumentHandoff() {
 }
 
 function encodePdfDraft(draft) {
-  const json = JSON.stringify(draft || {});
-  return `${PDF_DRAFT_MARKER}${btoa(unescape(encodeURIComponent(json)))}`;
-}
-
-function decodePdfDraft(value) {
-  try {
-    const draft = JSON.parse(decodeURIComponent(escape(atob(value))));
-    return draft && typeof draft === 'object' && !Array.isArray(draft) ? draft : null;
-  } catch {
-    return null;
-  }
+  return window.OfficeJurDocumentUtils.encodePdfDraft(PDF_DRAFT_MARKER, draft);
 }
 
 function extractDraftFromPdfText(text) {
-  const match = String(text || '').match(/GM_HONORARIOS_DRAFT:([A-Za-z0-9+/=]+)/);
-  return match ? decodePdfDraft(match[1]) : null;
-}
-
-function arrayBufferToBinaryString(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 8192;
-  let result = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    result += String.fromCharCode(...bytes.slice(i, i + chunkSize));
-  }
-  return result;
+  return window.OfficeJurDocumentUtils.extractDraftFromPdfText(text, PDF_DRAFT_MARKER, decodePdfDraft);
 }
 
 async function importDraftFromPdf(file) {
@@ -462,22 +400,40 @@ function syncStagesField() {
 function addStageRow(stage = {}) {
   const row = document.createElement('div');
   row.className = 'stage-row';
-  row.innerHTML = `<input data-stage="description" placeholder="Descrição da etapa" aria-label="Descrição da etapa"><input data-stage="amount" inputmode="decimal" placeholder="Valor (R$)" aria-label="Valor da etapa"><input data-stage="dueDate" type="date" aria-label="Vencimento da etapa"><button type="button" class="remove-stage" aria-label="Remover etapa">×</button>`;
-  row.querySelector('[data-stage="description"]').value = stage.description || '';
-  row.querySelector('[data-stage="amount"]').value = stage.amount || '';
-  row.querySelector('[data-stage="dueDate"]').value = stage.dueDate || '';
-  row.querySelector('.remove-stage').addEventListener('click', () => {
+  const description = document.createElement('input');
+  description.dataset.stage = 'description';
+  description.placeholder = 'Descrição da etapa';
+  description.setAttribute('aria-label', 'Descrição da etapa');
+  description.value = stage.description || '';
+  const amount = document.createElement('input');
+  amount.dataset.stage = 'amount';
+  amount.inputMode = 'decimal';
+  amount.placeholder = 'Valor (R$)';
+  amount.setAttribute('aria-label', 'Valor da etapa');
+  amount.value = stage.amount || '';
+  const dueDate = document.createElement('input');
+  dueDate.dataset.stage = 'dueDate';
+  dueDate.type = 'date';
+  dueDate.setAttribute('aria-label', 'Vencimento da etapa');
+  dueDate.value = stage.dueDate || '';
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'remove-stage';
+  removeButton.setAttribute('aria-label', 'Remover etapa');
+  removeButton.textContent = '×';
+  removeButton.addEventListener('click', () => {
     row.remove();
     syncStagesField();
     saveDraft();
     updateAgreementEditor();
     updatePreview();
   });
+  row.append(description, amount, dueDate, removeButton);
   stageList.appendChild(row);
 }
 
 function renderStages(value) {
-  stageList.innerHTML = '';
+  stageList.replaceChildren();
   parseStages(value).forEach(addStageRow);
 }
 
@@ -524,7 +480,7 @@ function autoSizeAllClauseTextareas() {
 }
 
 function renderClausesUI(savedClauses = {}) {
-  clausesList.innerHTML = '';
+  clausesList.replaceChildren();
   DEFAULT_CLAUSES.forEach(clause => {
     const saved = savedClauses[clause.id] || {};
     const editing = saved.editing === true;

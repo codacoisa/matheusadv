@@ -11,7 +11,7 @@
 ## Camadas
 
 - `config/office.js`: configuração única da identidade do escritório e da implantação.
-- `apps/portal`: entrada do sistema e acesso aos módulos permanentes.
+- `apps/portal`: entrada do sistema e acesso aos módulos permanentes, com estilos próprios separados da marcação.
 - `apps/configuracoes`: interface única para conexões globais consumidas pelos módulos.
 - `apps/lab`: catálogo isolado de ferramentas temporárias, experimentais ou em avaliação.
 - `apps/documentos`: geradores jurídicos independentes, apoiados por uma única base visual e documental em `apps/documentos/assets`.
@@ -32,7 +32,7 @@ Ferramentas que ainda não são módulos permanentes ficam em `apps/lab/tools/<i
 
 Para adicionar ou remover uma ferramenta, basta alterar sua pasta e a entrada no catálogo. O portal e o app-switcher conhecem apenas o Lab, evitando acoplamento com ferramentas que podem mudar ou desaparecer.
 
-As ferramentas do Lab podem consumir os componentes e imagens institucionais de `packages/ui`, pois essa dependência é estável e injetada pelo build. Seus estilos, dados e comportamentos específicos permanecem dentro da própria pasta para que a ferramenta continue removível de forma isolada.
+As ferramentas do Lab podem consumir os componentes e imagens institucionais de `packages/ui`, pois essa dependência é estável e injetada pelo build. Seus estilos, dados e comportamentos específicos permanecem dentro da própria pasta para que a ferramenta continue removível de forma isolada. A Central de Guias segue essa regra sem CSS ou JavaScript embutidos na página.
 
 ## Dados
 
@@ -40,4 +40,12 @@ Os módulos iniciam sem dados operacionais versionados. Informações jurídicas
 
 ## Geradores de documentos
 
-Cada pasta em `apps/documentos/<modulo>` contém somente a página e a lógica específica do documento. Cabeçalho, estilos, identidade visual e jsPDF ficam em `apps/documentos/assets`, permitindo que novos geradores adotem a mesma estrutura sem duplicar arquivos.
+Cada pasta em `apps/documentos/<modulo>` contém somente a página e a lógica específica do documento. Cabeçalho, estilos, identidade visual, jsPDF e utilitários de formatação e rascunhos ficam em `apps/documentos/assets`, permitindo que novos geradores adotem a mesma estrutura sem duplicar arquivos.
+
+## Qualidade da interface
+
+O build estático é verificado estruturalmente por `scripts/validate-site.mjs`.
+A suíte em `tests/browser` abre todas as rotas publicadas em Chromium, reprova
+erros de execução, valida comportamentos compartilhados e executa axe-core
+contra WCAG A/AA. URLs provenientes da configuração passam por validação de
+protocolo antes de serem usadas em navegação ou recursos.

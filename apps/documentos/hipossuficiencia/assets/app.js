@@ -80,54 +80,18 @@ const state = {
   previewUrl: null,
 };
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function clean(value) {
-  return String(value || '').trim();
-}
-
-function joinParts(parts, separator = ', ') {
-  return parts.map(clean).filter(Boolean).join(separator);
-}
-
-function formatCPF(value) {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
-  const groups = [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 9)].filter(Boolean);
-  let result = groups.join('.');
-  if (digits.length > 9) result += `-${digits.slice(9, 11)}`;
-  return result;
-}
-
-function formatCNPJ(value) {
-  const d = String(value || '').replace(/\D/g, '').slice(0, 14);
-  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
-}
-
-function formatZip(value) {
-  const d = String(value || '').replace(/\D/g, '').slice(0, 8);
-  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2-$3');
-}
-
-function normalizeFilename(value) {
-  return (clean(value) || 'hipossuficiencia')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'hipossuficiencia';
-}
-
-function formatLongDate(value) {
-  if (!value) return '';
-  const date = new Date(`${value}T12:00:00`);
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date);
-}
+const {
+  arrayBufferToBinaryString,
+  clean,
+  decodePdfDraft,
+  formatCNPJ,
+  formatCPF,
+  formatLongDate,
+  formatZip,
+  joinParts,
+  todayISO,
+} = window.OfficeJurDocumentUtils;
+const normalizeFilename = value => window.OfficeJurDocumentUtils.normalizeFilename(value, 'hipossuficiencia');
 
 function getDraft() {
   const draft = { mode: state.mode, person: {}, guardian: {}, document: {} };
@@ -164,32 +128,11 @@ function loadDraft() {
 }
 
 function encodePdfDraft(draft) {
-  const json = JSON.stringify(draft || {});
-  return `${PDF_DRAFT_MARKER}${btoa(unescape(encodeURIComponent(json)))}`;
-}
-
-function decodePdfDraft(value) {
-  try {
-    const draft = JSON.parse(decodeURIComponent(escape(atob(value))));
-    return draft && typeof draft === 'object' && !Array.isArray(draft) ? draft : null;
-  } catch {
-    return null;
-  }
+  return window.OfficeJurDocumentUtils.encodePdfDraft(PDF_DRAFT_MARKER, draft);
 }
 
 function extractDraftFromPdfText(text) {
-  const match = String(text || '').match(/GM_HIPOSSUFICIENCIA_DRAFT:([A-Za-z0-9+/=]+)/);
-  return match ? decodePdfDraft(match[1]) : null;
-}
-
-function arrayBufferToBinaryString(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 8192;
-  let result = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    result += String.fromCharCode(...bytes.slice(i, i + chunkSize));
-  }
-  return result;
+  return window.OfficeJurDocumentUtils.extractDraftFromPdfText(text, PDF_DRAFT_MARKER, decodePdfDraft);
 }
 
 async function importDraftFromPdf(file) {

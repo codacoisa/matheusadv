@@ -1,6 +1,14 @@
 (() => {
   const config = window.OFFICEJUR_CONFIG || {};
-  const BASE_URL = String(config.installation?.baseUrl || '/').replace(/\/?$/, '/');
+  const safeNavigationUrl = (value, fallback = '/') => {
+    try {
+      const url = new URL(String(value || ''), document.baseURI);
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const BASE_URL = safeNavigationUrl(config.installation?.baseUrl || '/').replace(/\/?$/, '/');
   const productName = config.product?.name || 'OfficeJur';
   const officeName = config.office?.name || 'Escritório não configurado';
   const escapeHtml = (value) => String(value)
@@ -275,11 +283,11 @@
       const items = APPS.map((app) => {
         const isCurrent = app.id === currentId;
         return `
-          <a class="app" data-app="${app.id}" href="${app.url}" title="${app.description}" ${isCurrent ? 'aria-current="page"' : ''}>
+          <a class="app" data-app="${escapeHtml(app.id)}" href="${escapeHtml(safeNavigationUrl(app.url))}" title="${escapeHtml(app.description)}" ${isCurrent ? 'aria-current="page"' : ''}>
             <span class="icon" style="--app-color: ${app.color}">
               <svg viewBox="0 0 24 24" aria-hidden="true">${app.icon}</svg>
             </span>
-            <span class="name">${app.name}</span>
+            <span class="name">${escapeHtml(app.name)}</span>
             ${isCurrent ? '<span class="current">Atual</span>' : ''}
           </a>
         `;

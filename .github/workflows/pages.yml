@@ -26,7 +26,12 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/validador-projudi/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            apps/validador-projudi/package-lock.json
+
+      - name: Instalar ferramentas de qualidade
+        run: npm ci
 
       - name: Montar Validador Projudi
         working-directory: apps/validador-projudi
@@ -49,6 +54,12 @@ jobs:
 
       - name: Validar site publicado
         run: node ./scripts/validate-site.mjs
+
+      - name: Instalar navegador de testes
+        run: npx playwright install --with-deps chromium
+
+      - name: Testar navegador e acessibilidade
+        run: npm run test:browser
 
       - name: Confirmar bundles rastreados
         run: git diff --exit-code -- apps/validador-projudi/assets

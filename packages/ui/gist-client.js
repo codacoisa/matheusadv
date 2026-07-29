@@ -8,6 +8,7 @@
   const API_URL = "https://api.github.com";
   const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
   const DEFAULT_TIMEOUT = 15_000;
+  const ALLOWED_RAW_HOSTS = new Set(["gist.githubusercontent.com"]);
 
   function normalizeId(value) {
     const raw = String(value || "").trim();
@@ -76,10 +77,19 @@
       throw new Error("O arquivo do Gist excede o limite permitido.");
     if (!file.truncated && typeof file.content === "string") return file.content;
     if (!file.raw_url) throw new Error("O GitHub não retornou o conteúdo completo do arquivo.");
+    let rawUrl;
+    try {
+      rawUrl = new URL(file.raw_url);
+    } catch {
+      throw new Error("O GitHub retornou um endereço inválido para o arquivo.");
+    }
+    if (rawUrl.protocol !== "https:" || !ALLOWED_RAW_HOSTS.has(rawUrl.hostname)) {
+      throw new Error("O GitHub retornou uma origem não autorizada para o arquivo.");
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeout || DEFAULT_TIMEOUT);
     try {
-      const response = await fetch(file.raw_url, {
+      const response = await fetch(rawUrl.href, {
         cache: "no-store",
         signal: controller.signal,
       });
