@@ -5,8 +5,14 @@ const {
   countPdfPages,
   emptyData,
   fromBase64,
+  isLegacyData,
   mergeData,
+  needsPayloadUpload,
+  normalizeData,
+  normalizeLegacyData,
+  payloadFileName,
   signature,
+  shouldMigrateLegacy,
   toBase64,
   validatePdf,
 } = require("../assets/files.js");
@@ -60,7 +66,7 @@ test("recusar arquivo acima de 3 MB ou 250 KB por página", () => {
   );
 });
 
-test("mesclar arquivos por atualização e respeitar exclusões", () => {
+test("manter no índice apenas metadados e mesclar por atualização", () => {
   const base = {
       ...emptyData("2026-01-01T00:00:00.000Z"),
       files: [
@@ -71,7 +77,8 @@ test("mesclar arquivos por atualização e respeitar exclusões", () => {
           name: "antigo.pdf",
           size: 100,
           pageCount: 1,
-          base64: "YW50aWdv",
+          sha256: "abc123",
+          payloadFile: payloadFileName("arquivo-1"),
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
@@ -82,7 +89,8 @@ test("mesclar arquivos por atualização e respeitar exclusões", () => {
           name: "excluir.pdf",
           size: 100,
           pageCount: 1,
-          base64: "ZXhjbHVpcg==",
+          sha256: "def456",
+          payloadFile: payloadFileName("arquivo-2"),
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
@@ -110,5 +118,46 @@ test("mesclar arquivos por atualização e respeitar exclusões", () => {
   assert.equal(merged.files.length, 1);
   assert.equal(merged.files[0].name, "atual.pdf");
   assert.deepEqual(merged.files[0].caseIds, ["caso-1"]);
+  assert.equal(merged.files[0].base64, undefined);
   assert.equal(signature(merged), signature(mergeData(remote, base)));
+});
+
+test("identificar e preparar o formato legado sem incluí-lo no índice", () => {
+  const legacy = {
+    schema: "gm-financeiro-arquivos-v1",
+    files: [
+      {
+        id: "arquivo-1",
+        clientId: "cliente-1",
+        name: "antigo.pdf",
+        size: 10,
+        pageCount: 1,
+        base64: "YW50aWdv",
+      },
+    ],
+  };
+  assert.equal(isLegacyData(legacy), true);
+  assert.equal(normalizeLegacyData(legacy).files[0].base64, "YW50aWdv");
+  const normalized = normalizeData({
+    ...emptyData(),
+    files: [normalizeLegacyData(legacy).files[0]],
+  });
+  assert.equal(normalized.files[0].base64, undefined);
+  assert.equal(normalized.files[0].payloadFile, "financeiro-pdf-arquivo-1.b64");
+});
+
+test("não reativar o legado quando já existe um índice atual vazio", () => {
+  const legacy = { files: [{ id: "arquivo-1" }] };
+  assert.equal(shouldMigrateLegacy(false, legacy), true);
+  assert.equal(shouldMigrateLegacy(true, legacy), false);
+});
+
+test("publicar payloads durante a migração mesmo com metadados equivalentes", () => {
+  const local = {
+    sha256: "abc123",
+    payloadFile: "financeiro-pdf-arquivo-1.b64",
+  };
+  assert.equal(needsPayloadUpload(local, { ...local }, false), false);
+  assert.equal(needsPayloadUpload(local, { ...local }, true), true);
+  assert.equal(needsPayloadUpload(local, null, false), true);
 });

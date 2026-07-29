@@ -10,9 +10,13 @@
     MP_KEY = "gm-financeiro-mp-v2",
     FILE = "financeiro-juridico.json",
     FILES_FILE = "financeiro-arquivos.json",
+    LEGACY_FILES_BACKUP = "financeiro-arquivos-legado-v1.json",
     FILES_DB = "gm-financeiro-arquivos-db-v1",
     FILES_STORE = "state",
-    FILES_RECORD = "financeiro-arquivos";
+    FILES_CONTENT_STORE = "content",
+    FILES_RECORD = "financeiro-arquivos",
+    FILES_META_RECORD = "financeiro-arquivos-v2",
+    GIST_RAW_MAX_SIZE = 10 * 1024 * 1024;
   const DOCUMENT_HANDOFF_PREFIX = "gm-document-handoff-v1:",
     DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
   const DOCUMENT_ROUTES = {
@@ -469,10 +473,14 @@
   }
   function openFilesDatabase() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(FILES_DB, 1);
+      const request = indexedDB.open(FILES_DB, 2);
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains(FILES_STORE))
           request.result.createObjectStore(FILES_STORE);
+        if (!request.result.objectStoreNames.contains(FILES_CONTENT_STORE))
+          request.result.createObjectStore(FILES_CONTENT_STORE, {
+            keyPath: "id",
+          });
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () =>
@@ -482,33 +490,115 @@
         );
     });
   }
-  async function loadFilesData() {
+  function filesTransaction(database, stores, mode, callback) {
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(stores, mode);
+      callback(transaction);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+  }
+  async function loadFilesState() {
     try {
       const database = await openFilesDatabase();
-      return await new Promise((resolve, reject) => {
+      const result = await new Promise((resolve, reject) => {
         const transaction = database.transaction(FILES_STORE, "readonly"),
-          request = transaction.objectStore(FILES_STORE).get(FILES_RECORD);
-        request.onsuccess = () =>
-          resolve(financeFiles.normalizeData(request.result));
-        request.onerror = () => reject(request.error);
-        transaction.oncomplete = () => database.close();
+          store = transaction.objectStore(FILES_STORE),
+          metaRequest = store.get(FILES_META_RECORD),
+          legacyRequest = store.get(FILES_RECORD);
+        transaction.oncomplete = () =>
+          resolve({
+            data: metaRequest.result
+              ? financeFiles.normalizeData(metaRequest.result)
+              : financeFiles.emptyData(),
+            hasCurrentData: Boolean(metaRequest.result),
+            legacy: financeFiles.normalizeLegacyData(legacyRequest.result),
+          });
+        metaRequest.onerror = () => reject(metaRequest.error);
+        legacyRequest.onerror = () => reject(legacyRequest.error);
       });
+      database.close();
+      return result;
     } catch {
-      return financeFiles.emptyData();
+      return { data: financeFiles.emptyData(), legacy: null };
     }
   }
   async function saveFilesData(nextData) {
     const normalized = financeFiles.normalizeData(nextData),
       database = await openFilesDatabase();
-    await new Promise((resolve, reject) => {
-      const transaction = database.transaction(FILES_STORE, "readwrite");
-      transaction.objectStore(FILES_STORE).put(normalized, FILES_RECORD);
-      transaction.oncomplete = resolve;
-      transaction.onerror = () => reject(transaction.error);
-      transaction.onabort = () => reject(transaction.error);
-    });
+    await filesTransaction(database, FILES_STORE, "readwrite", (transaction) =>
+      transaction.objectStore(FILES_STORE).put(normalized, FILES_META_RECORD),
+    );
     database.close();
     return normalized;
+  }
+  async function getFileContent(id) {
+    const database = await openFilesDatabase();
+    try {
+      let result;
+      await filesTransaction(database, FILES_CONTENT_STORE, "readonly", (transaction) => {
+        const request = transaction.objectStore(FILES_CONTENT_STORE).get(id);
+        request.onsuccess = () => (result = request.result || null);
+      });
+      return result;
+    } finally {
+      database.close();
+    }
+  }
+  async function saveFileContent(item, blob) {
+    const database = await openFilesDatabase();
+    try {
+      await filesTransaction(database, FILES_CONTENT_STORE, "readwrite", (transaction) =>
+        transaction.objectStore(FILES_CONTENT_STORE).put({
+          id: item.id,
+          blob,
+          sha256: item.sha256 || "",
+          updatedAt: item.updatedAt || now(),
+        }),
+      );
+    } finally {
+      database.close();
+    }
+  }
+  async function removeFileContent(id) {
+    const database = await openFilesDatabase();
+    try {
+      await filesTransaction(database, FILES_CONTENT_STORE, "readwrite", (transaction) =>
+        transaction.objectStore(FILES_CONTENT_STORE).delete(id),
+      );
+    } finally {
+      database.close();
+    }
+  }
+  async function prepareLegacyFiles(legacy) {
+    if (!legacy?.files?.length)
+      return { data: financeFiles.emptyData(), contents: new Map() };
+    const migrated = financeFiles.emptyData(legacy.updatedAt || now());
+    migrated.deletedFiles = legacy.deletedFiles || [];
+    const contents = new Map();
+    for (const legacyFile of legacy.files) {
+      const blob = new Blob([financeFiles.fromBase64(legacyFile.base64)], {
+          type: "application/pdf",
+        });
+      const item = {
+        ...legacyFile,
+        sha256: legacyFile.sha256 || (await financeFiles.sha256(blob)),
+        payloadFile: legacyFile.payloadFile || financeFiles.payloadFileName(legacyFile.id),
+      };
+      delete item.base64;
+      migrated.files.push(item);
+      contents.set(item.id, { item, blob });
+    }
+    return { data: financeFiles.normalizeData(migrated), contents };
+  }
+  async function migrateLegacyFiles(legacy) {
+    const prepared = await prepareLegacyFiles(legacy);
+    if (!prepared?.data) return financeFiles.emptyData();
+    for (const { item, blob } of prepared.contents.values())
+      await saveFileContent(item, blob);
+    const migrated = prepared.data;
+    return saveFilesData(migrated);
   }
   function loadSettings() {
     const defaults = {
@@ -623,6 +713,7 @@
   }
   let data = load(),
     filesData = financeFiles.emptyData(),
+    legacyFilesData = null,
     settings = loadSettings(),
     mp = loadMp(),
     syncTimer = 0,
@@ -631,8 +722,11 @@
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "";
-  const filesReady = loadFilesData().then((loaded) => {
-    filesData = loaded;
+  const filesReady = loadFilesState().then(async (loaded) => {
+    legacyFilesData = loaded.legacy;
+    filesData = loaded.data;
+    if (financeFiles.shouldMigrateLegacy(loaded.hasCurrentData, legacyFilesData))
+      filesData = await migrateLegacyFiles(legacyFilesData);
     renderClients();
     if (currentFilesClientId) renderClientFiles();
     return loaded;
@@ -1038,10 +1132,30 @@
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     filePreviewUrl = "";
   }
-  function fileBlob(item) {
-    return new Blob([financeFiles.fromBase64(item.base64)], {
+  async function fileBlob(item) {
+    const local = await getFileContent(item.id);
+    if (
+      local?.blob &&
+      (!item.sha256 ||
+        (local.sha256 === item.sha256 &&
+          (await financeFiles.sha256(local.blob)) === item.sha256))
+    )
+      return local.blob;
+    const { gist } = await fetchGistFiles(),
+      payload = gist.files?.[item.payloadFile];
+    if (!payload)
+      throw new Error("O conteúdo deste PDF ainda não está disponível neste navegador ou no Gist.");
+    const encoded = await readGistText(
+      payload,
+      "Não foi possível baixar o PDF armazenado no Gist.",
+    );
+    const blob = new Blob([financeFiles.fromBase64(encoded)], {
       type: "application/pdf",
     });
+    if (item.sha256 && (await financeFiles.sha256(blob)) !== item.sha256)
+      throw new Error("O PDF baixado não passou na verificação de integridade.");
+    await saveFileContent(item, blob);
+    return blob;
   }
   function renderClientFiles() {
     const client = data.clients.find(
@@ -1052,14 +1166,10 @@
         .filter((item) => item.clientId === client.id)
         .sort((a, b) => timestamp(b).localeCompare(timestamp(a))),
       cases = clientFileCases(client.id),
-      totalSize = records.reduce((sum, item) => sum + item.size, 0),
-      encodedSize = records.reduce(
-        (sum, item) => sum + item.base64.length,
-        0,
-      );
+      totalSize = records.reduce((sum, item) => sum + item.size, 0);
     $("#client-files-title").textContent = `Pasta de ${client.name}`;
     $("#client-files-subtitle").textContent =
-      `${records.length} ${records.length === 1 ? "PDF armazenado" : "PDFs armazenados"} em financeiro-arquivos.json`;
+      `${records.length} ${records.length === 1 ? "PDF armazenado" : "PDFs armazenados"} com índice em financeiro-arquivos.json`;
     $("#client-file-case").innerHTML =
       '<option value="">Geral do cliente</option>' +
       cases
@@ -1069,7 +1179,7 @@
         )
         .join("");
     $("#file-storage-summary").textContent = records.length
-      ? `${fileSize(totalSize)} em PDFs · aproximadamente ${fileSize(encodedSize)} codificados em Base64`
+      ? `${fileSize(totalSize)} em PDFs · cada conteúdo é sincronizado separadamente em Base64`
       : "Nenhum arquivo armazenado nesta pasta.";
     $("#client-files-list").innerHTML = records.length
       ? records
@@ -1125,11 +1235,11 @@
     renderClientFiles();
     $("#client-files-dialog").showModal();
   }
-  function viewClientFile(id) {
+  async function viewClientFile(id) {
     const item = filesData.files.find((candidate) => candidate.id === id);
     if (!item) return;
     closeFilePreview();
-    filePreviewUrl = URL.createObjectURL(fileBlob(item));
+    filePreviewUrl = URL.createObjectURL(await fileBlob(item));
     $("#file-preview-title").textContent = item.name;
     $("#file-preview-detail").textContent =
       `${fileSize(item.size)} · ${item.pageCount} ${item.pageCount === 1 ? "página" : "páginas"}`;
@@ -1137,10 +1247,10 @@
     $("#file-preview").hidden = false;
     $("#file-preview").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function downloadClientFile(id) {
+  async function downloadClientFile(id) {
     const item = filesData.files.find((candidate) => candidate.id === id);
     if (!item) return;
-    const url = URL.createObjectURL(fileBlob(item)),
+    const url = URL.createObjectURL(await fileBlob(item)),
       link = document.createElement("a");
     link.href = url;
     link.download = item.name;
@@ -1175,7 +1285,7 @@
         title: "Excluir PDF?",
         message: `Você está prestes a excluir “${item.name}”.`,
         impact:
-          "O conteúdo codificado será removido do navegador e do Gist na próxima sincronização.",
+          "O conteúdo será removido deste navegador e deixará de aparecer no índice sincronizado. O payload remoto é preservado como medida de recuperação.",
       }))
     )
       return;
@@ -1190,6 +1300,7 @@
         { id: item.id, deletedAt: now() },
       ],
     });
+    await removeFileContent(item.id);
     toast("PDF excluído da pasta do cliente.");
   }
   function renderPackages() {
@@ -2325,14 +2436,20 @@
       gist,
       dataFile: gist.files?.[FILE],
       filesFile: gist.files?.[FILES_FILE],
+      legacyFilesFile: gist.files?.[LEGACY_FILES_BACKUP],
     };
   }
-  async function readGistFile(file, parser, missingMessage) {
+  async function readGistText(file, missingMessage) {
     if (!file) throw new Error("Arquivo JSON não encontrado.");
     let content;
     if (!file.truncated && typeof file.content === "string")
       content = file.content;
     else {
+      if (Number(file.size || 0) > GIST_RAW_MAX_SIZE)
+        throw new Error(
+          missingMessage ||
+            "Este arquivo excede o limite de leitura pela API do Gist.",
+        );
       if (!file.raw_url)
         throw new Error(
           missingMessage ||
@@ -2340,7 +2457,6 @@
         );
       const response = await fetch(file.raw_url, {
         cache: "no-store",
-        headers: { Authorization: `Bearer ${settings.token}` },
       });
       if (!response.ok)
         throw new Error(
@@ -2349,7 +2465,10 @@
         );
       content = await response.text();
     }
-    return parser(JSON.parse(content));
+    return content;
+  }
+  async function readGistFile(file, parser, missingMessage) {
+    return parser(JSON.parse(await readGistText(file, missingMessage)));
   }
   function timestamp(item) {
     return String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");
@@ -2464,7 +2583,7 @@
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
       await filesReady;
-      const { dataFile, filesFile } = await fetchGistFiles();
+      const { dataFile, filesFile, legacyFilesFile } = await fetchGistFiles();
       let remote = emptyData(),
         remoteFiles = financeFiles.emptyData();
       if (dataFile)
@@ -2475,16 +2594,52 @@
             "Não foi possível ler os dados financeiros completos.",
           ),
         );
-      if (filesFile)
-        remoteFiles = financeFiles.normalizeData(
-          await readGistFile(
-            filesFile,
-            financeFiles.normalizeData,
-            "Não foi possível ler os arquivos completos do Gist.",
-          ),
-        );
+      let legacyRemote = null;
+      let legacyRemoteContents = new Map();
+      if (filesFile) {
+        if (Number(filesFile.size || 0) > GIST_RAW_MAX_SIZE) {
+          if (!legacyFilesData?.files?.length && !filesData.files.length)
+            throw new Error(
+              "O arquivo antigo de PDFs no Gist excede 10 MB e não há cópia local para migrá-lo. Restaure-o em um navegador que tenha os PDFs ou faça um backup pelo Git antes de sincronizar.",
+            );
+          legacyRemote = { tooLarge: true };
+        } else {
+          const rawFiles = JSON.parse(
+            await readGistText(
+              filesFile,
+              "Não foi possível ler o índice de arquivos do Gist.",
+            ),
+          );
+          if (financeFiles.isLegacyData(rawFiles)) legacyRemote = rawFiles;
+          else remoteFiles = financeFiles.normalizeData(rawFiles);
+        }
+      }
+      if (legacyRemote && !legacyRemote.tooLarge) {
+        legacyFilesData = financeFiles.normalizeLegacyData(legacyRemote);
+        const prepared = await prepareLegacyFiles(legacyFilesData);
+        remoteFiles = prepared.data;
+        legacyRemoteContents = prepared.contents;
+      }
+      if (legacyRemote) {
+        if (legacyFilesFile)
+          throw new Error(
+            "Foi encontrado um índice legado e também um backup legado no Gist. Nenhum arquivo foi alterado para evitar sobrescrever a recuperação existente.",
+          );
+        await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            files: { [FILES_FILE]: { filename: LEGACY_FILES_BACKUP } },
+          }),
+        });
+      }
       data = mergeData(data, remote);
       filesData = financeFiles.mergeData(filesData, remoteFiles);
+      for (const remoteItem of remoteFiles.files) {
+        const selected = filesData.files.find((item) => item.id === remoteItem.id),
+          content = legacyRemoteContents.get(remoteItem.id);
+        if (selected?.sha256 === remoteItem.sha256 && content)
+          await saveFileContent(selected, content.blob);
+      }
       localStorage.setItem(DATA_KEY, JSON.stringify(data));
       await saveFilesData(filesData);
       render();
@@ -2495,7 +2650,7 @@
           !filesFile ||
           financeFiles.signature(filesData) !==
             financeFiles.signature(remoteFiles);
-      if (!dataChanged && !filesChanged) {
+      if (!dataChanged && !filesChanged && !legacyRemote) {
         saveSyncState();
         toast("Dados e arquivos já estavam atualizados no Gist.");
         return;
@@ -2505,16 +2660,33 @@
         changedFiles[FILE] = {
           content: JSON.stringify(data, null, 2),
         };
-      if (filesChanged)
+      const remoteById = new Map(remoteFiles.files.map((item) => [item.id, item]));
+      for (const item of filesData.files) {
+        const remoteItem = remoteById.get(item.id);
+        if (!financeFiles.needsPayloadUpload(item, remoteItem, Boolean(legacyRemote)))
+          continue;
+        const content = await getFileContent(item.id);
+        if (!content?.blob)
+          throw new Error(
+            `O PDF “${item.name}” não está disponível neste navegador para concluir a sincronização. Abra ou baixe o arquivo antes de sincronizar.`,
+          );
+        const encoded = financeFiles.toBase64(await content.blob.arrayBuffer());
+        await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            files: { [item.payloadFile]: { content: encoded } },
+          }),
+        });
+      }
+      if (filesChanged || legacyRemote)
         changedFiles[FILES_FILE] = {
           content: JSON.stringify(filesData, null, 2),
         };
-      await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          files: changedFiles,
-        }),
-      });
+      if (Object.keys(changedFiles).length)
+        await api(`/gists/${encodeURIComponent(settings.gistId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ files: changedFiles }),
+        });
       saveSyncState();
       toast("Dados e arquivos sincronizados.");
       renderGistStatus();
@@ -3202,7 +3374,7 @@
     )
       return;
     const deletedAt = now();
-    if (clientFiles.length)
+    if (clientFiles.length) {
       await persistFiles(
         {
           ...filesData,
@@ -3216,6 +3388,8 @@
         },
         true,
       );
+      await Promise.all(clientFiles.map((file) => removeFileContent(file.id)));
+    }
     markDeleted("deletedClients", id, deletedAt);
     data.clients = data.clients.filter((candidate) => candidate.id !== id);
     data.entries = data.entries.map((entry) =>
@@ -3590,23 +3764,26 @@
         return toast(
           "Já existe um arquivo com este nome na pasta do cliente.",
         );
-      const caseId = $("#client-file-case").value,
+      const fileId = uid(),
+        caseId = $("#client-file-case").value,
         validCase = data.cases.some(
           (item) => item.id === caseId && item.clientId === client.id,
         ),
         createdAt = now(),
         record = {
-          id: uid(),
+          id: fileId,
           clientId: client.id,
           caseIds: validCase ? [caseId] : [],
           name: selected.name,
           mimeType: "application/pdf",
           size: selected.size,
           pageCount,
-          base64: financeFiles.toBase64(buffer),
+          sha256: await financeFiles.sha256(buffer),
+          payloadFile: financeFiles.payloadFileName(fileId),
           createdAt,
           updatedAt: createdAt,
         };
+      await saveFileContent(record, selected);
       await persistFiles({
         ...filesData,
         files: [...filesData.files, record],
@@ -3636,8 +3813,18 @@
       removeCase = event.target.closest("[data-remove-file-case]"),
       removeFile = event.target.closest("[data-delete-file]");
     if (folder) await openClientFiles(folder.dataset.clientFiles);
-    if (view) viewClientFile(view.dataset.viewFile);
-    if (download) downloadClientFile(download.dataset.downloadFile);
+    if (view)
+      try {
+        await viewClientFile(view.dataset.viewFile);
+      } catch (error) {
+        toast(error.message || "Não foi possível abrir o PDF.");
+      }
+    if (download)
+      try {
+        await downloadClientFile(download.dataset.downloadFile);
+      } catch (error) {
+        toast(error.message || "Não foi possível baixar o PDF.");
+      }
     if (removeCase)
       try {
         await changeFileCase(

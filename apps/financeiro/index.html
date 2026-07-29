@@ -34,9 +34,9 @@
     <script src="./assets/contracts.js?v=1" defer></script>
     <script src="./assets/ledger.js?v=1" defer></script>
     <script src="./assets/metrics.js?v=3" defer></script>
-    <script src="./assets/files.js?v=1" defer></script>
+    <script src="./assets/files.js?v=2" defer></script>
     <script src="./assets/gist-settings.js?v=2" defer></script>
-    <script src="./assets/app.js?v=25" defer></script>
+    <script src="./assets/app.js?v=26" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -685,8 +685,9 @@
         <p id="file-storage-summary" class="file-storage-summary"></p>
         <p class="file-security-note">
           <i class="fa-solid fa-shield-halved"></i>
-          Base64 transforma o PDF em texto, mas não o criptografa. Quem acessar
-          o Gist secreto poderá recuperar o documento.
+          O índice é sincronizado separadamente dos PDFs. Base64 transforma o
+          PDF em texto, mas não o criptografa; quem acessar o Gist secreto
+          poderá recuperar o documento.
         </p>
         <div id="client-files-list" class="client-files-list"></div>
         <section id="file-preview" class="file-preview" hidden>

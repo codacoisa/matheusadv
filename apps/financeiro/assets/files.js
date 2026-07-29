@@ -1,12 +1,14 @@
 (() => {
   "use strict";
 
-  const SCHEMA = "gm-financeiro-arquivos-v1";
+  const SCHEMA = "gm-financeiro-arquivos-v2";
+  const LEGACY_SCHEMA = "gm-financeiro-arquivos-v1";
   const MAX_FILE_SIZE = 3 * 1024 * 1024;
   const MAX_AVERAGE_PAGE_SIZE = 250 * 1024;
 
   const timestamp = (item) =>
     String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");
+  const payloadFileName = (id) => `financeiro-pdf-${String(id)}.b64`;
 
   function emptyData(updatedAt = new Date().toISOString()) {
     return {
@@ -21,20 +23,21 @@
     const map = new Map();
     (Array.isArray(list) ? list : []).forEach((item) => {
       if (!item?.id) return;
-      const normalized = {
+      const value = {
         id: String(item.id),
         deletedAt: String(item.deletedAt || ""),
       };
-      const current = map.get(normalized.id);
-      if (!current || normalized.deletedAt > current.deletedAt)
-        map.set(normalized.id, normalized);
+      const current = map.get(value.id);
+      if (!current || value.deletedAt > current.deletedAt)
+        map.set(value.id, value);
     });
     return [...map.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
 
   function normalizeFile(item = {}) {
+    const id = String(item.id || "");
     return {
-      id: String(item.id || ""),
+      id,
       clientId: String(item.clientId || ""),
       caseIds: [
         ...new Set(
@@ -47,7 +50,8 @@
       mimeType: "application/pdf",
       size: Math.max(0, Number(item.size || 0)),
       pageCount: Math.max(1, Number(item.pageCount || 1)),
-      base64: String(item.base64 || ""),
+      sha256: String(item.sha256 || ""),
+      payloadFile: String(item.payloadFile || payloadFileName(id)),
       createdAt: String(item.createdAt || ""),
       updatedAt: String(item.updatedAt || item.createdAt || ""),
     };
@@ -61,27 +65,45 @@
       ...emptyData(String(source.updatedAt || new Date().toISOString())),
       files: (Array.isArray(source.files) ? source.files : [])
         .map(normalizeFile)
-        .filter((item) => item.id && item.clientId && item.base64),
+        .filter((item) => item.id && item.clientId),
       deletedFiles: normalizeDeleted(source.deletedFiles),
     };
   }
 
-  function mergeRecords(left, right, deleted) {
-    const deletedMap = new Map(
-        deleted.map((item) => [item.id, item.deletedAt]),
-      ),
-      records = new Map();
-    [...left, ...right].forEach((item) => {
-      const current = records.get(item.id);
-      if (!current || timestamp(item) >= timestamp(current))
-        records.set(item.id, item);
-    });
-    return [...records.values()]
-      .filter(
-        (item) =>
-          !deletedMap.get(item.id) || deletedMap.get(item.id) < timestamp(item),
-      )
-      .sort((a, b) => a.id.localeCompare(b.id));
+  function isLegacyData(raw) {
+    return (
+      raw?.schema === LEGACY_SCHEMA ||
+      (!raw?.schema &&
+        Array.isArray(raw?.files) &&
+        raw.files.some((item) => item?.base64))
+    );
+  }
+
+  function shouldMigrateLegacy(hasCurrentData, legacy) {
+    return !hasCurrentData && Boolean(legacy?.files?.length);
+  }
+
+  function needsPayloadUpload(local, remote, legacyMigration = false) {
+    return (
+      legacyMigration ||
+      !remote ||
+      remote.sha256 !== local.sha256 ||
+      remote.payloadFile !== local.payloadFile
+    );
+  }
+
+  function normalizeLegacyData(raw) {
+    if (!isLegacyData(raw)) return null;
+    return {
+      updatedAt: String(raw.updatedAt || ""),
+      files: (raw.files || [])
+        .map((item) => ({
+          ...normalizeFile(item),
+          base64: String(item.base64 || ""),
+        }))
+        .filter((item) => item.id && item.clientId && item.base64),
+      deletedFiles: normalizeDeleted(raw.deletedFiles),
+    };
   }
 
   function mergeData(leftRaw, rightRaw) {
@@ -90,13 +112,27 @@
       deletedFiles = normalizeDeleted([
         ...left.deletedFiles,
         ...right.deletedFiles,
-      ]);
+      ]),
+      deleted = new Map(
+        deletedFiles.map((item) => [item.id, item.deletedAt]),
+      ),
+      map = new Map();
+    [...left.files, ...right.files].forEach((item) => {
+      const current = map.get(item.id);
+      if (!current || timestamp(item) >= timestamp(current))
+        map.set(item.id, item);
+    });
     return normalizeData({
       schema: SCHEMA,
       updatedAt:
         [left.updatedAt, right.updatedAt].sort().pop() ||
         new Date().toISOString(),
-      files: mergeRecords(left.files, right.files, deletedFiles),
+      files: [...map.values()]
+        .filter(
+          (item) =>
+            !deleted.get(item.id) || deleted.get(item.id) < timestamp(item),
+        )
+        .sort((a, b) => a.id.localeCompare(b.id)),
       deletedFiles,
     });
   }
@@ -114,23 +150,33 @@
 
   function countPdfPages(buffer) {
     const bytes =
-      buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer || 0);
-    const header = new TextDecoder("latin1").decode(bytes.slice(0, 8));
+        buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer || 0),
+      header = new TextDecoder("latin1").decode(bytes.slice(0, 8));
     if (!header.startsWith("%PDF-")) return 0;
-    const content = new TextDecoder("latin1").decode(bytes);
-    const directPages = (content.match(/\/Type\s*\/Page(?!s)\b/g) || [])
-      .length;
-    if (directPages) return directPages;
-    const pageTreeCounts = [...content.matchAll(/\/Count\s+(\d+)/g)].map(
-      (match) => Number(match[1]),
+    const content = new TextDecoder("latin1").decode(bytes),
+      direct = (content.match(/\/Type\s*\/Page(?!s)\b/g) || []).length;
+    return (
+      direct ||
+      Math.max(
+        0,
+        ...[...content.matchAll(/\/Count\s+(\d+)/g)].map((match) =>
+          Number(match[1]),
+        ),
+      )
     );
-    return Math.max(0, ...pageTreeCounts);
   }
 
   function validatePdf({ name, type, size, pageCount }) {
     if (!String(name || "").toLowerCase().endsWith(".pdf"))
       return "Selecione um arquivo com extensão PDF.";
-    if (type && type !== "application/pdf")
+    if (
+      type &&
+      ![
+        "application/pdf",
+        "application/x-pdf",
+        "application/octet-stream",
+      ].includes(type)
+    )
       return "O arquivo selecionado não foi identificado como PDF.";
     if (!Number(size) || Number(size) > MAX_FILE_SIZE)
       return "O PDF deve possuir no máximo 3 MB.";
@@ -158,20 +204,34 @@
     return bytes;
   }
 
-  const api = {
-    MAX_AVERAGE_PAGE_SIZE,
-    MAX_FILE_SIZE,
-    SCHEMA,
-    countPdfPages,
-    emptyData,
-    fromBase64,
-    mergeData,
-    normalizeData,
-    signature,
-    toBase64,
-    validatePdf,
-  };
+  async function sha256(value) {
+    const bytes = value instanceof Blob ? await value.arrayBuffer() : value,
+      digest = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)]
+      .map((item) => item.toString(16).padStart(2, "0"))
+      .join("");
+  }
 
+  const api = {
+    SCHEMA,
+    LEGACY_SCHEMA,
+    MAX_FILE_SIZE,
+    MAX_AVERAGE_PAGE_SIZE,
+    emptyData,
+    normalizeData,
+    normalizeLegacyData,
+    isLegacyData,
+    shouldMigrateLegacy,
+    needsPayloadUpload,
+    mergeData,
+    signature,
+    payloadFileName,
+    countPdfPages,
+    validatePdf,
+    toBase64,
+    fromBase64,
+    sha256,
+  };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   globalThis.FinanceFiles = api;
 })();
