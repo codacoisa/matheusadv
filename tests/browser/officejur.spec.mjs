@@ -102,3 +102,30 @@ test('componentes compartilhados rejeitam URLs com protocolos inseguros', async 
     new URL(image.src).protocol);
   expect(['http:', 'https:']).toContain(logoProtocol);
 });
+
+test('cliente do Gist atualiza sem cabeçalho condicional incompatível', async ({ page }) => {
+  const requests = [];
+  await page.route('https://api.github.com/gists/test-gist', async route => {
+    const request = route.request();
+    requests.push({
+      method: request.method(),
+      headers: request.headers(),
+    });
+    await route.fulfill({
+      contentType: 'application/json',
+      headers: { ETag: '"revisao-1"' },
+      body: JSON.stringify({ files: {} }),
+    });
+  });
+
+  await page.goto('configuracoes/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => window.OfficeJurGistClient.patch(
+    'test-gist',
+    'token-de-teste',
+    { 'dados.json': { content: '{}' } },
+    { etag: '"revisao-1"' },
+  ));
+
+  expect(requests.map(request => request.method)).toEqual(['GET', 'PATCH', 'GET']);
+  expect(requests[1].headers).not.toHaveProperty('if-match');
+});

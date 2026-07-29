@@ -8,7 +8,10 @@
   const API_URL = "https://api.github.com";
   const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
   const DEFAULT_TIMEOUT = 15_000;
+  const MUTATION_INTERVAL = 1_000;
   const ALLOWED_RAW_HOSTS = new Set(["gist.githubusercontent.com"]);
+  let mutationQueue = Promise.resolve();
+  let lastMutationAt = 0;
 
   function normalizeId(value) {
     const raw = String(value || "").trim();
@@ -70,6 +73,43 @@
     };
   }
 
+  function revisionConflict() {
+    return new Error(
+      "O Gist foi alterado em outro navegador. Sincronize novamente para mesclar as versões.",
+    );
+  }
+
+  async function confirmRevision(id, token, expectedEtag) {
+    if (!expectedEtag) return;
+    const current = await gistSnapshot(id, token);
+    if (current.etag && current.etag !== expectedEtag) throw revisionConflict();
+  }
+
+  function wait(milliseconds) {
+    return milliseconds > 0
+      ? new Promise((resolve) => setTimeout(resolve, milliseconds))
+      : Promise.resolve();
+  }
+
+  function withBrowserWriteLock(operation) {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.locks &&
+      typeof navigator.locks.request === "function"
+    ) {
+      return navigator.locks.request("officejur-gist-write", operation);
+    }
+    return operation();
+  }
+
+  function enqueueMutation(operation) {
+    const queued = mutationQueue
+      .catch(() => undefined)
+      .then(() => withBrowserWriteLock(operation));
+    mutationQueue = queued;
+    return queued;
+  }
+
   async function text(file, options = {}) {
     if (!file) throw new Error("Arquivo não encontrado no Gist.");
     const maxBytes = Number(options.maxBytes || DEFAULT_MAX_BYTES);
@@ -107,20 +147,29 @@
     }
   }
 
-  async function patch(id, token, files, options = {}) {
-    const response = await request(
-      "/gists/" + encodeURIComponent(normalizeId(id)),
-      token,
-      {
-      method: "PATCH",
-      headers: options.etag ? { "If-Match": options.etag } : undefined,
-      body: JSON.stringify({ files }),
-      },
-    );
-    return {
-      gist: await response.json(),
-      etag: response.headers.get("ETag") || "",
-    };
+  function patch(id, token, files, options = {}) {
+    return enqueueMutation(async () => {
+      await wait(MUTATION_INTERVAL - (Date.now() - lastMutationAt));
+      await confirmRevision(id, token, options.etag);
+      const response = await request(
+        "/gists/" + encodeURIComponent(normalizeId(id)),
+        token,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ files }),
+        },
+      );
+      lastMutationAt = Date.now();
+      const gist = await response.json();
+      let etag = response.headers.get("ETag") || "";
+      if (!etag && options.etag) {
+        etag = (await gistSnapshot(id, token)).etag;
+      }
+      return {
+        gist,
+        etag,
+      };
+    });
   }
 
   return {

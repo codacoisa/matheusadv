@@ -304,6 +304,11 @@ const currentSourceChecks = [
     /\b(?:billingMode|feeAmount)\b/,
     "campos contratuais antigos",
   ],
+  [
+    "packages/ui/gist-client.js",
+    /["']If-Match["']/,
+    "cabeçalho condicional incompatível com PATCH do Gist",
+  ],
 ];
 
 for (const [path, pattern, label] of currentSourceChecks) {

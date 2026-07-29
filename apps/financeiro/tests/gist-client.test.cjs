@@ -79,7 +79,7 @@ test("recusa origem externa no endereço bruto retornado pelo Gist", async () =>
   );
 });
 
-test("protege atualizações com a revisão recebida do Gist", async (context) => {
+test("protege atualizações sem enviar If-Match em PATCH", async (context) => {
   const originalFetch = global.fetch;
   context.after(() => {
     global.fetch = originalFetch;
@@ -101,8 +101,36 @@ test("protege atualizações com a revisão recebida do Gist", async (context) =
     { etag: snapshot.etag },
   );
 
-  assert.equal(
-    new Headers(calls[1].headers).get("If-Match"),
-    '"revisao-1"',
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].method, "PATCH");
+  assert.equal(new Headers(calls[2].headers).has("If-Match"), false);
+});
+
+test("recusa atualização quando a revisão remota mudou", async (context) => {
+  const originalFetch = global.fetch;
+  context.after(() => {
+    global.fetch = originalFetch;
+  });
+  let call = 0;
+  global.fetch = async () => {
+    call += 1;
+    return new Response(JSON.stringify({ files: {} }), {
+      headers: {
+        "Content-Type": "application/json",
+        ETag: call === 1 ? '"revisao-1"' : '"revisao-2"',
+      },
+    });
+  };
+
+  const snapshot = await gistClient.gistSnapshot("abc123", "token");
+  await assert.rejects(
+    gistClient.patch(
+      "abc123",
+      "token",
+      { "dados.json": { content: "{}" } },
+      { etag: snapshot.etag },
+    ),
+    /alterado em outro navegador/,
   );
+  assert.equal(call, 2);
 });
