@@ -1127,7 +1127,11 @@
       .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
   }
   function closeFilePreview() {
-    $("#file-preview").hidden = true;
+    const dialog = $("#file-preview-dialog");
+    if (dialog.open) dialog.close();
+    clearFilePreview();
+  }
+  function clearFilePreview() {
     $("#file-preview-frame").removeAttribute("src");
     if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
     filePreviewUrl = "";
@@ -1238,14 +1242,14 @@
   async function viewClientFile(id) {
     const item = filesData.files.find((candidate) => candidate.id === id);
     if (!item) return;
-    closeFilePreview();
+    clearFilePreview();
     filePreviewUrl = URL.createObjectURL(await fileBlob(item));
     $("#file-preview-title").textContent = item.name;
     $("#file-preview-detail").textContent =
       `${fileSize(item.size)} · ${item.pageCount} ${item.pageCount === 1 ? "página" : "páginas"}`;
     $("#file-preview-frame").src = filePreviewUrl;
-    $("#file-preview").hidden = false;
-    $("#file-preview").scrollIntoView({ behavior: "smooth", block: "start" });
+    const dialog = $("#file-preview-dialog");
+    if (!dialog.open) dialog.showModal();
   }
   async function downloadClientFile(id) {
     const item = filesData.files.find((candidate) => candidate.id === id);
@@ -3099,6 +3103,18 @@
       return toast(
         `Informe um telefone válido para ${phoneCountryName(fd.phoneCountry)} (+${phoneCallingCode(fd.phoneCountry)}).`,
       );
+    const requiredFields = {
+      maritalStatus: "estado civil",
+      profession: "profissão",
+      street: "endereço",
+      neighborhood: "bairro",
+      city: "cidade",
+    };
+    const missingField = Object.entries(requiredFields).find(
+      ([field]) => !String(fd[field] || "").trim(),
+    );
+    if (missingField)
+      return toast(`Informe ${missingField[1]} do cliente.`);
     if (hasDuplicateDocument(data.clients, fd.document, fd.id))
       return toast("Já existe um cliente cadastrado com este CPF.");
     const old = data.clients.find((x) => x.id === fd.id),
@@ -3729,6 +3745,7 @@
   });
   $("#close-client-files").onclick = () => $("#client-files-dialog").close();
   $("#close-file-preview").onclick = closeFilePreview;
+  $("#file-preview-dialog").addEventListener("close", clearFilePreview);
   $("#client-files-dialog").addEventListener("close", () => {
     closeFilePreview();
     currentFilesClientId = "";

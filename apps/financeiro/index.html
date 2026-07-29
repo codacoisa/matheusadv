@@ -22,7 +22,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=26" />
+    <link rel="stylesheet" href="./assets/styles.css?v=27" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <script
       src="./assets/fontawesome-7.3.0.min.js"
@@ -36,7 +36,7 @@
     <script src="./assets/metrics.js?v=3" defer></script>
     <script src="./assets/files.js?v=2" defer></script>
     <script src="./assets/gist-settings.js?v=2" defer></script>
-    <script src="./assets/app.js?v=26" defer></script>
+    <script src="./assets/app.js?v=27" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -613,19 +613,20 @@
             >Nacionalidade<input
               name="nationality"
               placeholder="Ex.: brasileira" /></label
-          ><label>Estado civil<input name="maritalStatus" /></label
-          ><label class="span-2">Profissão<input name="profession" /></label
+          ><label>Estado civil *<input name="maritalStatus" required /></label
+          ><label class="span-2">Profissão *<input name="profession" required /></label
           ><label>RG<input name="rg" /></label
           ><label>Órgão expedidor<input name="rgIssuer" /></label
           ><label class="span-2"
-            >Endereço<input
+            >Endereço *<input
               name="street"
+              required
               autocomplete="street-address"
               placeholder="Logradouro" /></label
           ><label>Número<input name="addressNumber" /></label
           ><label>Complemento<input name="complement" /></label
-          ><label>Bairro<input name="neighborhood" /></label
-          ><label>Cidade<input name="city" /></label
+          ><label>Bairro *<input name="neighborhood" required /></label
+          ><label>Cidade *<input name="city" required /></label
           ><label>UF<input name="state" maxlength="2" /></label
           ><label>CEP<input name="zip" inputmode="numeric" /></label
           ><label class="span-2"
@@ -690,23 +691,25 @@
           poderá recuperar o documento.
         </p>
         <div id="client-files-list" class="client-files-list"></div>
-        <section id="file-preview" class="file-preview" hidden>
-          <header>
-            <div>
-              <strong id="file-preview-title">Visualização do PDF</strong>
-              <small id="file-preview-detail"></small>
-            </div>
-            <button
-              class="icon-btn dark"
-              id="close-file-preview"
-              type="button"
-              aria-label="Fechar visualização"
-            >
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </header>
-          <iframe id="file-preview-frame" title="Visualização do PDF"></iframe>
-        </section>
+      </section>
+    </dialog>
+    <dialog id="file-preview-dialog" class="file-preview-dialog">
+      <section class="file-preview">
+        <header>
+          <div>
+            <strong id="file-preview-title">Visualização do PDF</strong>
+            <small id="file-preview-detail"></small>
+          </div>
+          <button
+            class="icon-btn file-preview-close"
+            id="close-file-preview"
+            type="button"
+            aria-label="Fechar visualização"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+        <iframe id="file-preview-frame" title="Visualização do PDF"></iframe>
       </section>
     </dialog>
     <dialog id="package-dialog">

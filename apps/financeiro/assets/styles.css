@@ -797,8 +797,11 @@ dialog form {
   margin: 5px 0 0;
   font-size: 11px;
 }
+.file-preview-dialog {
+  width: min(1080px, calc(100% - 28px));
+  background: var(--navy);
+}
 .file-preview {
-  margin-top: 16px;
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
@@ -826,6 +829,17 @@ dialog form {
   margin-top: 2px;
   color: #cbd3df;
   font-size: 9px;
+}
+.file-preview-close {
+  flex: 0 0 auto;
+  border-color: #ffffff4d;
+  color: #fff;
+  background: #ffffff1f;
+}
+.file-preview-close:hover,
+.file-preview-close:focus-visible {
+  border-color: #fff;
+  background: #ffffff36;
 }
 .file-preview iframe {
   display: block;
@@ -2499,6 +2513,7 @@ textarea {
 }
 .contact-card > .case-line {
   min-height: 58px;
+  margin-top: auto;
   align-items: flex-start;
 }
 .contact-card > .case-line .amount {
