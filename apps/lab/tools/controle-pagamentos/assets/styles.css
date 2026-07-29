@@ -79,18 +79,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .button.secondary.dark { border-color: var(--line); background: #fff; color: var(--navy); }
 .button.ghost { border-color: var(--line); background: #fff; color: var(--navy); }
 .button.danger { border-color: rgba(179,38,30,.24); background: #fff; color: var(--danger); }
-.button:hover, .tabs button:hover, .icon-button:hover { filter: brightness(1.06); }
-
-.icon-button {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255,255,255,.24);
-  border-radius: 7px;
-  background: transparent;
-  color: #fff;
-  font-size: 19px;
-  font-weight: 800;
-}
+.button:hover, .tabs button:hover { filter: brightness(1.06); }
 
 .workspace {
   display: grid;
@@ -118,7 +107,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
   font-weight: 650;
 }
 
-.person-form, .payment-form, .settings-grid {
+.person-form, .payment-form {
   display: grid;
   gap: 11px;
 }
@@ -538,7 +527,6 @@ input:focus {
   background: rgba(23,33,58,.45);
 }
 
-.settings-card,
 .payments-card,
 .delete-card {
   width: min(720px, 100%);
@@ -551,7 +539,6 @@ input:focus {
   width: min(860px, 100%);
 }
 
-.settings-card > header,
 .payments-card > header,
 .delete-card > header {
   display: flex;
@@ -562,7 +549,6 @@ input:focus {
   border-bottom: 1px solid var(--line);
 }
 
-.settings-card header strong,
 .payments-card header strong,
 .delete-card header strong {
   display: block;
@@ -571,7 +557,6 @@ input:focus {
   font-size: 20px;
 }
 
-.settings-card header span,
 .payments-card header span,
 .delete-card header span {
   display: block;
@@ -707,41 +692,6 @@ input:focus {
   color: var(--muted);
 }
 
-.settings-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 16px;
-}
-
-.span-2 { grid-column: 1 / -1; }
-
-.check-row {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.check-row input {
-  width: 16px;
-  min-height: 16px;
-}
-
-.settings-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px 16px;
-}
-
-.settings-status {
-  min-height: 20px;
-  margin: 0;
-  padding: 0 16px 16px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-}
-
 [hidden] { display: none !important; }
 
 @media (max-width: 1080px) {
@@ -754,11 +704,9 @@ input:focus {
 @media (max-width: 760px) {
   .topbar { align-items: flex-start; flex-direction: column; }
   .top-actions, .top-actions .button { width: 100%; }
-  .icon-button { width: 100%; }
-  .person-form, .payment-form, .modal-payment-fields, .stats-grid, .settings-grid, .month-grid, .pie-wrap {
+  .person-form, .payment-form, .modal-payment-fields, .stats-grid, .month-grid, .pie-wrap {
     grid-template-columns: 1fr;
   }
-  .span-2, .check-row { grid-column: auto; }
   .person-header { flex-direction: column; }
   .person-header .button { width: 100%; }
   .tabs { width: 100%; }

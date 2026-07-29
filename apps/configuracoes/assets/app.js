@@ -6,6 +6,7 @@
   const form = document.querySelector('#gist-form');
   const gistIdInput = document.querySelector('#gist-id');
   const tokenInput = document.querySelector('#gist-token');
+  const autoSyncInput = document.querySelector('#auto-sync');
   const saveButton = document.querySelector('#save-test');
   const createButton = document.querySelector('#create-gist');
   const clearButton = document.querySelector('#clear-gist');
@@ -17,13 +18,15 @@
   function currentFormSettings() {
     return gistSettings.normalize({
       gistId: gistIdInput.value,
-      token: tokenInput.value
+      token: tokenInput.value,
+      autoSync: autoSyncInput.checked
     });
   }
 
   function render(settings = gistSettings.load()) {
     gistIdInput.value = settings.gistId;
     tokenInput.value = settings.token;
+    autoSyncInput.checked = settings.autoSync;
     const configured = !!(settings.gistId && settings.token);
     connectionDot.classList.toggle('configured', configured);
     connectionTitle.textContent = configured ? 'Gist global configurado' : 'Gist não configurado';

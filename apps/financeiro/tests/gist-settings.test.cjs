@@ -29,11 +29,16 @@ test('migra a configuração antiga para a chave global', () => {
 
   const loaded = gistSettings.load({ storage, legacyKey: 'legacy' });
 
-  assert.deepEqual(loaded, { gistId: 'antigo', token: 'segredo' });
+  assert.deepEqual(loaded, {
+    gistId: 'antigo',
+    token: 'segredo',
+    autoSync: true
+  });
   assert.deepEqual(
     JSON.parse(storage.getItem(gistSettings.STORAGE_KEY)),
     loaded
   );
+  assert.equal(storage.getItem('legacy'), null);
 });
 
 test('a configuração global prevalece sobre configurações antigas de módulos', () => {
@@ -44,7 +49,8 @@ test('a configuração global prevalece sobre configurações antigas de módulo
 
   assert.deepEqual(gistSettings.load({ storage, legacyKey: 'legacy' }), {
     gistId: 'global',
-    token: 'token-global'
+    token: 'token-global',
+    autoSync: false
   });
 });
 
@@ -62,24 +68,35 @@ test('a migração padrão prioriza o Financeiro independentemente do módulo ab
 
   assert.deepEqual(gistSettings.load({ storage }), {
     gistId: 'financeiro',
-    token: 'token-financeiro'
+    token: 'token-financeiro',
+    autoSync: false
   });
 });
 
-test('salva e limpa apenas Gist ID e token globais', () => {
+test('salva e limpa somente a configuração global do Gist', () => {
   const storage = memoryStorage();
 
   assert.deepEqual(
     gistSettings.save(
-      { gistId: ' abc ', token: ' xyz ', fileName: 'nao-global.json' },
+      {
+        gistId: ' abc ',
+        token: ' xyz ',
+        autoSync: true,
+        fileName: 'nao-global.json'
+      },
       { storage }
     ),
-    { gistId: 'abc', token: 'xyz' }
+    { gistId: 'abc', token: 'xyz', autoSync: true }
   );
-  assert.deepEqual(gistSettings.clear({ storage }), { gistId: '', token: '' });
+  assert.deepEqual(gistSettings.clear({ storage }), {
+    gistId: '',
+    token: '',
+    autoSync: false
+  });
   assert.deepEqual(JSON.parse(storage.getItem(gistSettings.STORAGE_KEY)), {
     gistId: '',
-    token: ''
+    token: '',
+    autoSync: false
   });
 });
 
@@ -89,7 +106,7 @@ test('aceita o endereço completo de um Gist na configuração central', () => {
       gistId: 'https://gist.github.com/usuario/abcdef123456',
       token: 'token'
     }),
-    { gistId: 'abcdef123456', token: 'token' }
+    { gistId: 'abcdef123456', token: 'token', autoSync: false }
   );
 });
 
@@ -102,6 +119,7 @@ test('não restaura uma configuração antiga depois de limpar a global', () => 
 
   assert.deepEqual(gistSettings.load({ storage, legacyKey: 'legacy' }), {
     gistId: '',
-    token: ''
+    token: '',
+    autoSync: false
   });
 });

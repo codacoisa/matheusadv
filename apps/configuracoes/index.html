@@ -15,9 +15,9 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=1">
-    <script src="./assets/gist-settings.js?v=1" defer></script>
-    <script src="./assets/app.js?v=1" defer></script>
+    <link rel="stylesheet" href="./assets/styles.css?v=2">
+    <script src="./assets/gist-settings.js?v=2" defer></script>
+    <script src="./assets/app.js?v=2" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -56,6 +56,10 @@
             <label>
               Token do GitHub
               <input id="gist-token" type="password" autocomplete="off" placeholder="Token com permissão de leitura e escrita em Gists">
+            </label>
+            <label class="check-row">
+              <input id="auto-sync" type="checkbox">
+              <span>Sincronizar automaticamente após alterações em qualquer módulo</span>
             </label>
             <p class="field-note">A credencial permanece somente no armazenamento local deste navegador e nunca é enviada ao repositório do OfficeJur.</p>
             <div class="actions">

@@ -88,6 +88,14 @@ input {
   font-weight: 500;
 }
 input:focus { outline: 3px solid rgba(179, 135, 49, .18); border-color: var(--gold); }
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  cursor: pointer;
+}
+.check-row input { width: 18px; min-height: 18px; accent-color: var(--navy); }
 .field-note { margin: -5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .button {

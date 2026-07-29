@@ -15,9 +15,9 @@
     <link rel="apple-touch-icon" href="../../assets/app-icon.png" data-officejur-href="office.appIconUrl">
     <script src="../../assets/office-config.js"></script>
     <script src="../../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=3">
-    <script src="./assets/gist-settings.js?v=1" defer></script>
-    <script src="./assets/app.js?v=5" defer></script>
+    <link rel="stylesheet" href="./assets/styles.css?v=4">
+    <script src="./assets/gist-settings.js?v=2" defer></script>
+    <script src="./assets/app.js?v=6" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -30,7 +30,6 @@
       </a>
       <div class="top-actions">
         <button id="sync-now" class="button secondary" type="button">Sincronizar</button>
-        <button id="open-settings" class="icon-button" type="button" title="Configurações" aria-label="Configurações">&#9881;</button>
         <office-app-switcher current="lab"></office-app-switcher>
       </div>
     </header>
@@ -132,39 +131,6 @@
         </div>
       </section>
     </main>
-
-    <div id="settings-modal" class="modal" hidden>
-      <section class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <header>
-          <div>
-            <strong id="settings-title">Ajustes do Controle de Pagamentos</strong>
-            <span>A conexão com o Gist é gerenciada nas Configurações do OfficeJur.</span>
-          </div>
-          <button id="close-settings" class="close-button" type="button" aria-label="Fechar">x</button>
-        </header>
-
-        <div class="settings-grid">
-          <div class="span-2">
-            <strong id="global-gist-status">Gist global não configurado.</strong>
-            <a class="button secondary dark" href="../../configuracoes/">Abrir configurações globais</a>
-          </div>
-          <label>Arquivo deste módulo
-            <input id="gist-file" placeholder="controle-pagamentos.json">
-          </label>
-          <label class="check-row">
-            <input id="auto-sync" type="checkbox">
-            <span>Sincronizar automaticamente com o Gist após alterações</span>
-          </label>
-        </div>
-
-        <div class="settings-actions">
-          <button id="save-settings" class="button primary" type="button">Salvar ajustes</button>
-          <button id="pull-gist" class="button secondary dark" type="button">Mesclar do Gist</button>
-          <button id="push-gist" class="button secondary dark" type="button">Sincronizar agora</button>
-        </div>
-        <p id="settings-status" class="settings-status"></p>
-      </section>
-    </div>
 
     <div id="payments-modal" class="modal" hidden>
       <section class="payments-card" role="dialog" aria-modal="true" aria-labelledby="payments-title">

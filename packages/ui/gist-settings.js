@@ -19,7 +19,8 @@
     );
     return {
       gistId: gistUrlMatch ? gistUrlMatch[1] : rawGistId,
-      token: String(source.token || '').trim()
+      token: String(source.token || '').trim(),
+      autoSync: !!source.autoSync
     };
   }
 
@@ -34,16 +35,17 @@
   function load(options) {
     const opts = options || {};
     const storage = opts.storage || localStorage;
-    const globalSettings = read(storage, STORAGE_KEY);
-    if (storage.getItem(STORAGE_KEY) !== null) {
-      return globalSettings;
-    }
-
     const legacyKeys = Array.isArray(opts.legacyKeys)
       ? opts.legacyKeys
       : opts.legacyKey
         ? [opts.legacyKey]
         : LEGACY_KEYS;
+    const globalSettings = read(storage, STORAGE_KEY);
+    if (storage.getItem(STORAGE_KEY) !== null) {
+      legacyKeys.forEach((key) => storage.removeItem(key));
+      return globalSettings;
+    }
+
     const candidates = legacyKeys.map((key) => read(storage, key));
     const legacySettings =
       candidates.find((settings) => settings.gistId && settings.token) ||
@@ -52,6 +54,7 @@
     if (legacySettings.gistId || legacySettings.token) {
       storage.setItem(STORAGE_KEY, JSON.stringify(legacySettings));
     }
+    legacyKeys.forEach((key) => storage.removeItem(key));
     return legacySettings;
   }
 

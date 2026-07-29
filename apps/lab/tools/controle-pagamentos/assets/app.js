@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'gm-payments-data-v1';
-  const SETTINGS_KEY = 'gm-payments-gist-settings-v1';
+  const SYNC_STATE_KEY = 'gm-payments-sync-state-v1';
   const FILE_NAME = 'controle-pagamentos.json';
   const SCHEMA = 'gm-payments-v1';
   const AUTO_SYNC_DELAY_MS = 1500;
@@ -62,15 +62,6 @@
     pieCaption: $('#pie-caption'),
     barChart: $('#bar-chart'),
     syncNow: $('#sync-now'),
-    openSettings: $('#open-settings'),
-    settingsModal: $('#settings-modal'),
-    closeSettings: $('#close-settings'),
-    gistFile: $('#gist-file'),
-    autoSync: $('#auto-sync'),
-    saveSettings: $('#save-settings'),
-    pullGist: $('#pull-gist'),
-    pushGist: $('#push-gist'),
-    settingsStatus: $('#settings-status'),
     paymentsModal: $('#payments-modal'),
     paymentsTitle: $('#payments-title'),
     paymentsSubtitle: $('#payments-subtitle'),
@@ -220,9 +211,9 @@
 
   function loadSettings() {
     try {
-      const moduleSettings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      const syncState = JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}');
       const globalSettings = gistSettings.load();
-      return normalizeSettings({ ...moduleSettings, ...globalSettings });
+      return normalizeSettings({ ...syncState, ...globalSettings });
     } catch (_) {
       return normalizeSettings({});
     }
@@ -233,19 +224,18 @@
     return {
       gistId: String(src.gistId || '').trim(),
       token: String(src.token || '').trim(),
-      fileName: String(src.fileName || FILE_NAME).trim() || FILE_NAME,
       autoSync: !!src.autoSync,
       lastSyncAt: String(src.lastSyncAt || '').trim(),
       lastSyncSignature: String(src.lastSyncSignature || '').trim()
     };
   }
 
-  function saveSettings() {
+  function saveSyncState() {
     state.settings = normalizeSettings(state.settings);
-    const moduleSettings = { ...state.settings };
-    delete moduleSettings.gistId;
-    delete moduleSettings.token;
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(moduleSettings));
+    localStorage.setItem(SYNC_STATE_KEY, JSON.stringify({
+      lastSyncAt: state.settings.lastSyncAt,
+      lastSyncSignature: state.settings.lastSyncSignature
+    }));
     renderStatus();
   }
 
@@ -265,6 +255,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
     render();
     if (options && options.skipAutoSync) return;
+    refreshGistCredentials();
     if (state.settings.autoSync && state.settings.gistId && state.settings.token) {
       scheduleAutoSync();
     }
@@ -704,15 +695,6 @@
     });
   }
 
-  function renderSettingsForm() {
-    refreshGistCredentials();
-    els.gistFile.value = state.settings.fileName;
-    els.autoSync.checked = state.settings.autoSync;
-    document.querySelector('#global-gist-status').textContent = state.settings.gistId
-      ? `Gist global configurado: ${state.settings.gistId}`
-      : 'Gist global não configurado.';
-  }
-
   function render() {
     renderStatus();
     renderPeople();
@@ -879,24 +861,6 @@
     persist();
   }
 
-  function readSettingsForm() {
-    const previous = state.settings;
-    const next = normalizeSettings({
-      gistId: previous.gistId,
-      fileName: els.gistFile.value,
-      token: previous.token,
-      autoSync: els.autoSync.checked,
-      lastSyncAt: previous.lastSyncAt,
-      lastSyncSignature: previous.lastSyncSignature
-    });
-    if (next.fileName !== previous.fileName) {
-      next.lastSyncAt = '';
-      next.lastSyncSignature = '';
-    }
-    state.settings = next;
-    saveSettings();
-  }
-
   async function githubRequest(path, options) {
     const response = await fetch(`https://api.github.com${path}`, {
       method: options.method || 'GET',
@@ -924,7 +888,7 @@
       throw new Error('Configure o Gist nas Configurações do OfficeJur.');
     }
     const gist = await githubRequest(`/gists/${encodeURIComponent(state.settings.gistId)}`, { method: 'GET' });
-    const file = gist.files ? gist.files[state.settings.fileName] : null;
+    const file = gist.files ? gist.files[FILE_NAME] : null;
     return { gist, file };
   }
 
@@ -981,8 +945,8 @@
       if (file && (mergedSignature === remoteSignature || mergedSignature === dataSignature(remoteData))) {
         state.settings.lastSyncAt = nowISO();
         state.settings.lastSyncSignature = mergedSignature;
-        saveSettings();
-        setSettingsStatus('Dados já estavam atualizados no Gist.', 'ok');
+        saveSyncState();
+        setSyncStatus('Dados já estavam atualizados no Gist.', 'ok');
         return;
       }
 
@@ -990,7 +954,7 @@
         method: 'PATCH',
         body: {
           files: {
-            [state.settings.fileName]: {
+            [FILE_NAME]: {
               content: JSON.stringify(gistPayload(mergedData), null, 2)
             }
           }
@@ -998,8 +962,8 @@
       });
       state.settings.lastSyncAt = nowISO();
       state.settings.lastSyncSignature = mergedSignature;
-      saveSettings();
-      setSettingsStatus('Dados sincronizados com o Gist.', 'ok');
+      saveSyncState();
+      setSyncStatus('Dados sincronizados com o Gist.', 'ok');
     })();
 
     try {
@@ -1013,35 +977,7 @@
     }
   }
 
-  async function pullFromGist() {
-    refreshGistCredentials();
-    if (!state.settings.gistId || !state.settings.token) {
-      throw new Error('Configure o Gist nas Configurações do OfficeJur.');
-    }
-    const { file } = await fetchGistFile();
-    if (!file) throw new Error('Arquivo não encontrado no Gist.');
-    await applyGistFile(file);
-    setSettingsStatus('Dados mesclados do Gist.', 'ok');
-  }
-
-  async function applyGistFile(file) {
-    const payload = await readGistFilePayload(file);
-    state.data = mergeData(state.data, currentPayload(payload));
-    state.settings.lastSyncAt = nowISO();
-    state.settings.lastSyncSignature = dataSignature(state.data);
-    saveSettings();
-    state.selectedId = state.data.people[0] ? state.data.people[0].id : '';
-    persist({ skipAutoSync: true });
-  }
-
-  async function saveSettingsSafely() {
-    readSettingsForm();
-    setSettingsStatus('Ajustes deste módulo salvos.', 'ok');
-  }
-
-  function setSettingsStatus(message, tone) {
-    els.settingsStatus.textContent = message || '';
-    els.settingsStatus.style.color = tone === 'err' ? 'var(--danger)' : tone === 'ok' ? 'var(--ok)' : '';
+  function setSyncStatus(message, tone) {
     renderStatus(message, tone);
   }
 
@@ -1091,17 +1027,6 @@
       state.year += 1;
       renderPerson();
     });
-    els.openSettings.addEventListener('click', () => {
-      renderSettingsForm();
-      els.settingsModal.hidden = false;
-      els.gistFile.focus();
-    });
-    els.closeSettings.addEventListener('click', () => {
-      els.settingsModal.hidden = true;
-    });
-    els.settingsModal.addEventListener('click', (event) => {
-      if (event.target === els.settingsModal) els.settingsModal.hidden = true;
-    });
     els.closePayments.addEventListener('click', closePaymentsModal);
     els.paymentsModal.addEventListener('click', (event) => {
       if (event.target === els.paymentsModal) closePaymentsModal();
@@ -1122,27 +1047,16 @@
     els.personDeleteModal.addEventListener('click', (event) => {
       if (event.target === els.personDeleteModal) closeDeletePersonDialog();
     });
-    els.saveSettings.addEventListener('click', () => {
-      runGistAction(saveSettingsSafely, 'Salvando configurações...');
-    });
-    els.pushGist.addEventListener('click', () => {
-      readSettingsForm();
-      runGistAction(pushToGist, 'Sincronizando dados...');
-    });
-    els.pullGist.addEventListener('click', () => {
-      readSettingsForm();
-      runGistAction(pullFromGist, 'Mesclando dados do Gist...');
-    });
     els.syncNow.addEventListener('click', () => runGistAction(pushToGist, 'Sincronizando...'));
   }
 
   async function runGistAction(action, loadingMessage) {
     try {
-      setSettingsStatus(loadingMessage, '');
+      setSyncStatus(loadingMessage, '');
       await action();
       render();
     } catch (error) {
-      setSettingsStatus(error && error.message ? error.message : 'Falha ao acessar o Gist.', 'err');
+      setSyncStatus(error && error.message ? error.message : 'Falha ao acessar o Gist.', 'err');
     }
   }
 

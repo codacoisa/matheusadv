@@ -910,9 +910,6 @@ dialog form {
   display: flex;
   gap: 9px;
 }
-.settings-actions {
-  align-items: flex-start;
-}
 .case-with-team {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2546,12 +2543,6 @@ textarea {
   background: #fff;
 }
 @media (max-width: 720px) {
-  .settings-actions > span {
-    flex-wrap: wrap;
-  }
-  .settings-actions > span:last-child {
-    justify-content: flex-end;
-  }
   .package-grid,
   .agreement-grid,
   .stage-row {

@@ -22,7 +22,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=23" />
+    <link rel="stylesheet" href="./assets/styles.css?v=24" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <script
       src="./assets/fontawesome-7.3.0.min.js"
@@ -34,8 +34,8 @@
     <script src="./assets/contracts.js?v=1" defer></script>
     <script src="./assets/ledger.js?v=1" defer></script>
     <script src="./assets/metrics.js?v=3" defer></script>
-    <script src="./assets/gist-settings.js?v=1" defer></script>
-    <script src="./assets/app.js?v=23" defer></script>
+    <script src="./assets/gist-settings.js?v=2" defer></script>
+    <script src="./assets/app.js?v=24" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -59,8 +59,6 @@
           title="Ajuda sobre sincronização"
           aria-label="Ajuda sobre sincronização"
           ><i class="fa-solid fa-circle-question"></i></a
-        ><button class="icon-btn" id="settings-btn" title="Configurações">
-          <i class="fa-solid fa-gear"></i></button
         ><button
           class="icon-btn mobile-menu-btn"
           id="mobile-menu-btn"
@@ -879,55 +877,6 @@
           ><button class="btn primary" value="default">
             Salvar equipe do caso
           </button>
-        </div>
-      </form>
-    </dialog>
-    <dialog id="settings-dialog">
-      <form method="dialog" id="settings-form">
-        <div class="modal-head">
-          <div>
-            <p class="eyebrow">SINCRONIZAÇÃO</p>
-            <h2>Ajustes do Financeiro</h2>
-            <p>
-              A conexão com o Gist é gerenciada nas Configurações do OfficeJur.
-            </p>
-          </div>
-          <button class="icon-btn dark" value="cancel" formnovalidate>
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-        <div class="form-grid">
-          <div class="span-2 notice">
-            <strong id="global-gist-status">Gist global não configurado.</strong>
-            <a class="btn secondary" href="../configuracoes/">Abrir configurações globais</a>
-          </div>
-          <label class="span-2"
-            >Arquivo deste módulo<input
-              name="fileName"
-              value="financeiro-juridico.json" /></label
-          ><label class="check span-2"
-            ><input name="autoSync" type="checkbox" /> Sincronizar
-            automaticamente</label
-          >
-        </div>
-        <p id="settings-status" class="notice"></p>
-        <div class="modal-actions split settings-actions">
-          <span>
-            <button
-              class="btn ghost"
-              type="button"
-              id="pull-gist"
-              title="Use esta opção quando já existe um banco de dados no Gist. Os dados serão baixados e mesclados aos dados deste navegador.">
-              Baixar/Mesclar
-            </button>
-          </span>
-          <span>
-            <button class="btn danger" type="button" id="delete-local-data">
-              <i class="fa-solid fa-trash"></i> Excluir</button
-            ><button class="btn primary" value="default" id="save-settings">
-              Salvar
-            </button>
-          </span>
         </div>
       </form>
     </dialog>

@@ -101,8 +101,8 @@
           <li><span>1</span><div><strong>Crie uma credencial para o equipamento</strong><p>Por segurança, prefira um token diferente para cada computador. Assim, um equipamento perdido pode ter seu token revogado sem interromper os demais.</p></div></li>
           <li><span>2</span><div><strong>Informe o mesmo Gist ID</strong><p>Abra a área central <strong>Configurações</strong> e cole o ID ou endereço criado no primeiro computador.</p></div></li>
           <li><span>3</span><div><strong>Informe e teste o token</strong><p>Cole o token autorizado e clique em <strong>Salvar e testar</strong>. Os módulos deste navegador passarão a usar essa conexão.</p></div></li>
-          <li><span>4</span><div><strong>Abra o módulo</strong><p>Ao abrir, o Financeiro baixa e mescla os dados existentes do Gist sem apagar eventuais registros locais. O botão <strong>Baixar/Mesclar</strong> continua disponível para repetir a operação manualmente.</p></div></li>
-          <li><span>5</span><div><strong>Salve e sincronize</strong><p>Ative a sincronização automática se desejar e clique em “Sincronizar” para confirmar a conexão.</p></div></li>
+          <li><span>4</span><div><strong>Abra o módulo</strong><p>Ao abrir, o Financeiro baixa e mescla os dados existentes do Gist sem apagar eventuais registros locais.</p></div></li>
+          <li><span>5</span><div><strong>Salve e sincronize</strong><p>Ative a sincronização automática na área central se desejar e clique em “Sincronizar” no Financeiro para confirmar a conexão.</p></div></li>
         </ol>
       </section>
 
@@ -117,9 +117,8 @@
         <h3>O que cada botão faz</h3>
         <div class="help-actions">
           <div><i class="fa-solid fa-rotate"></i><span><strong>Sincronizar</strong><small>Lê o Gist, mescla com este navegador e atualiza a cópia central.</small></span></div>
-          <div><i class="fa-solid fa-cloud-arrow-down"></i><span><strong>Baixar e mesclar</strong><small>Traz o conteúdo do Gist e combina com os dados locais sem enviar imediatamente.</small></span></div>
           <div><i class="fa-solid fa-gear"></i><span><strong>Configurações globais</strong><small>Cria, testa, substitui ou remove a conexão usada por todos os módulos.</small></span></div>
-          <div><i class="fa-solid fa-wand-magic-sparkles"></i><span><strong>Sincronização automática</strong><small>Agenda uma sincronização depois de cada alteração salva.</small></span></div>
+          <div><i class="fa-solid fa-wand-magic-sparkles"></i><span><strong>Sincronização automática</strong><small>É ativada na área central e agenda uma sincronização depois de cada alteração salva em qualquer módulo.</small></span></div>
         </div>
       </section>
 
@@ -142,7 +141,7 @@
           <details><summary>Status 403 ou “Resource not accessible”</summary><div>O token não possui permissão de gravação em Gists. Em um token refinado, confirme <strong>Account permissions → Gists → Read and write</strong>. Em um token clássico, confirme o escopo <code>gist</code>.</div></details>
           <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID ou endereço foi copiado integralmente e se o token pertence a uma conta com acesso ao Gist privado.</div></details>
           <details><summary>Arquivo JSON não encontrado</summary><div>Confirme que todos os computadores usam o mesmo nome: <code>financeiro-juridico.json</code>. Evite renomear ou excluir o arquivo diretamente no GitHub.</div></details>
-          <details><summary>As alterações não apareceram no outro computador</summary><div>No computador que fez a alteração, clique em “Sincronizar” e aguarde a confirmação. Depois, sincronize o segundo computador. Verifique também se ambos usam o mesmo Gist ID e nome de arquivo.</div></details>
+          <details><summary>As alterações não apareceram no outro computador</summary><div>No computador que fez a alteração, clique em “Sincronizar” e aguarde a confirmação. Depois, sincronize o segundo computador. Verifique também se ambos usam a mesma configuração global.</div></details>
           <details><summary>O token sumiu após limpar o navegador</summary><div>Isso é esperado: a credencial fica somente no armazenamento local. Reconfigure o equipamento na área central com o Gist ID e um token autorizado; ao abrir o Financeiro, ele fará a mesclagem automaticamente.</div></details>
           <details><summary>Preciso recuperar uma versão anterior</summary><div>Não edite o JSON manualmente. Abra o Gist no GitHub e consulte o histórico de revisões. Antes de restaurar qualquer versão, preserve uma cópia do estado atual e confirme a operação com a pessoa responsável pelo sistema.</div></details>
         </div>
