@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const SCHEMA = "gm-financeiro-arquivos-v2";
+  const SCHEMA = "officejur/financeiro-documentos-data";
+  const VERSION = 1;
   const MAX_FILE_SIZE = 3 * 1024 * 1024;
   const MAX_AVERAGE_PAGE_SIZE = 250 * 1024;
 
@@ -12,6 +13,7 @@
   function emptyData(updatedAt = new Date().toISOString()) {
     return {
       schema: SCHEMA,
+      version: VERSION,
       updatedAt,
       files: [],
       deletedFiles: [],
@@ -60,6 +62,8 @@
     const source = raw && typeof raw === "object" ? raw : {};
     if (source.schema && source.schema !== SCHEMA)
       throw new Error("Os arquivos não usam o formato atual do Financeiro.");
+    if (source.version !== undefined && Number(source.version) !== VERSION)
+      throw new Error("Os arquivos não usam a versão atual do Financeiro.");
     return {
       ...emptyData(String(source.updatedAt || new Date().toISOString())),
       files: (Array.isArray(source.files) ? source.files : [])
@@ -124,6 +128,7 @@
     const normalized = normalizeData(raw);
     return JSON.stringify({
       schema: normalized.schema,
+      version: normalized.version,
       files: normalized.files
         .slice()
         .sort((a, b) => a.id.localeCompare(b.id)),
@@ -197,6 +202,7 @@
 
   const api = {
     SCHEMA,
+    VERSION,
     MAX_FILE_SIZE,
     MAX_AVERAGE_PAGE_SIZE,
     emptyData,

@@ -1,10 +1,11 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'gm-payments-data-v1';
-  const SYNC_STATE_KEY = 'gm-payments-sync-state-v1';
+  const STORAGE_KEY = 'officejur::controle-pagamentos::data';
+  const SYNC_STATE_KEY = 'officejur::controle-pagamentos::sync-state';
   const FILE_NAME = 'controle-pagamentos.json';
-  const SCHEMA = 'gm-payments-v1';
+  const SCHEMA = 'officejur/controle-pagamentos-data';
+  const VERSION = 1;
   const AUTO_SYNC_DELAY_MS = 1500;
   const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const COLORS = ['#b38731', '#17213a', '#667085', '#d9bd7a', '#067647', '#9e3b2f', '#46627f', '#8c6f2f'];
@@ -179,6 +180,7 @@
     const src = data && typeof data === 'object' ? data : {};
     return {
       schema: SCHEMA,
+      version: VERSION,
       updatedAt: src.updatedAt || nowISO(),
       people: Array.isArray(src.people) ? src.people.map(normalizePerson) : [],
       deletedPeople: normalizeDeletedList(src.deletedPeople),
@@ -204,7 +206,7 @@
   }
 
   function currentStoredData(data) {
-    if (!data || data.schema !== SCHEMA) {
+    if (!data || data.schema !== SCHEMA || data.version !== VERSION) {
       throw new Error('Os dados locais não usam o formato atual do Controle de Pagamentos.');
     }
     return data;
@@ -382,6 +384,7 @@
     const normalized = normalizeData(data);
     return {
       schema: SCHEMA,
+      version: VERSION,
       people: normalized.people
         .slice()
         .sort((a, b) => a.id.localeCompare(b.id))
@@ -400,7 +403,7 @@
   }
 
   function currentPayload(payload) {
-    if (!payload || payload.schema !== SCHEMA || typeof payload.backupSignature !== 'string'
+    if (!payload || payload.schema !== SCHEMA || payload.version !== VERSION || typeof payload.backupSignature !== 'string'
       || !payload.data || typeof payload.data !== 'object') {
       throw new Error('O arquivo não usa o formato atual do Controle de Pagamentos.');
     }
@@ -885,6 +888,7 @@
     const normalized = normalizeData(data || state.data);
     return {
       schema: SCHEMA,
+      version: VERSION,
       exportedAt: nowISO(),
       backupSignature: dataSignature(normalized),
       data: normalized

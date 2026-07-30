@@ -5,20 +5,18 @@
   const gistSettings = window.OfficeJurGistSettings;
   const gistClient = window.OfficeJurGistClient;
   const financeFiles = window.FinanceFiles;
-  const SCHEMA = "gm-financeiro-v6";
-  const DATA_KEY = "gm-financeiro-data-v2",
-    SYNC_STATE_KEY = "gm-financeiro-sync-state-v1",
-    MP_KEY = "gm-financeiro-mp-v2",
-    MP_SESSION_KEY = "gm-financeiro-mp-session-key-v1",
-    MP_REQUEST_PREFIX = "gm-financeiro-mp-request-v1:",
-    FILE = "financeiro-juridico.json",
-    FILES_FILE = "financeiro-arquivos.json",
-    FILES_DB = "gm-financeiro-arquivos-db-v1",
+  const financeStorage = window.FinanceStorage;
+  const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
+    MP_KEY = "officejur::financeiro::mercado-pago::settings",
+    MP_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
+    MP_REQUEST_PREFIX = "officejur::financeiro::mercado-pago::request:",
+    FILES_FILE = "financeiro-documentos.json",
+    FILES_DB = "officejur-financeiro-documentos",
     FILES_STORE = "state",
     FILES_CONTENT_STORE = "content",
-    FILES_META_RECORD = "financeiro-arquivos-v2",
+    FILES_META_RECORD = "officejur/financeiro-documentos-data",
     GIST_RAW_MAX_SIZE = 10 * 1024 * 1024;
-  const DOCUMENT_HANDOFF_PREFIX = "gm-document-handoff-v1:",
+  const DOCUMENT_HANDOFF_PREFIX = "officejur::documentos::handoff:",
     DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
   const DOCUMENT_ROUTES = {
     procuracao: "../documentos/procuracao/",
@@ -139,6 +137,8 @@
     `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const iso = () => new Date().toISOString().slice(0, 10),
     now = () => new Date().toISOString();
+  const timestamp = (item) =>
+    String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");
   const monthOf = (d) => String(d || "").slice(0, 7),
     currentMonth = () => iso().slice(0, 7);
   const money = (v) =>
@@ -343,6 +343,7 @@
     "deletedTeam",
     "deletedEntries",
     "deletedCharges",
+    "deletedAccounts",
   ];
   function normalizeDeleted(list) {
     const map = new Map();
@@ -360,7 +361,6 @@
   }
   function emptyData() {
     return {
-      schema: SCHEMA,
       updatedAt: now(),
       clients: [],
       cases: [],
@@ -380,6 +380,7 @@
       deletedTeam: [],
       deletedEntries: [],
       deletedCharges: [],
+      deletedAccounts: [],
     };
   }
   function normalizeClient(item = {}) {
@@ -497,15 +498,22 @@
     deletedKeys.forEach((key) => (d[key] = normalizeDeleted(d[key])));
     return d;
   }
-  function currentData(raw) {
-    if (!raw || raw.schema !== SCHEMA)
-      throw new Error("Os dados não usam o formato atual do Financeiro.");
-    return raw;
-  }
   function load() {
-    const saved = localStorage.getItem(DATA_KEY);
-    if (!saved) return emptyData();
-    return normalize(currentData(JSON.parse(saved)));
+    const defaults = financeStorage.split(emptyData()),
+      domains = Object.fromEntries(
+        financeStorage.domainNames.map((name) => {
+          const saved = localStorage.getItem(
+            financeStorage.DOMAINS[name].storageKey,
+          );
+          return [
+            name,
+            saved
+              ? financeStorage.normalizeDomain(name, JSON.parse(saved))
+              : defaults[name],
+          ];
+        }),
+      );
+    return normalize(financeStorage.assemble(domains));
   }
   function openFilesDatabase() {
     return new Promise((resolve, reject) => {
@@ -752,9 +760,7 @@
   function captureMissingDeletions() {
     let previous;
     try {
-      previous = normalize(
-        currentData(JSON.parse(localStorage.getItem(DATA_KEY) || "{}")),
-      );
+      previous = load();
     } catch {
       return;
     }
@@ -765,6 +771,7 @@
         team: "deletedTeam",
         entries: "deletedEntries",
         charges: "deletedCharges",
+        accounts: "deletedAccounts",
       },
       deletedAt = now();
     Object.entries(collections).forEach(([collection, key]) => {
@@ -776,6 +783,21 @@
       });
     });
   }
+  function saveLocalData() {
+    const domains = financeStorage.split(data, data.updatedAt);
+    const referenceIssues = financeStorage.validateReferences(domains);
+    if (referenceIssues.length)
+      throw new Error(
+        `Os bancos financeiros possuem vínculos inválidos: ${referenceIssues[0]}`,
+      );
+    financeStorage.domainNames.forEach((name) =>
+      localStorage.setItem(
+        financeStorage.DOMAINS[name].storageKey,
+        JSON.stringify(domains[name]),
+      ),
+    );
+    return domains;
+  }
   function persist(skipSync = false) {
     if (dataLoadFailure)
       throw new Error(
@@ -783,7 +805,7 @@
       );
     captureMissingDeletions();
     data.updatedAt = now();
-    localStorage.setItem(DATA_KEY, JSON.stringify(data));
+    saveLocalData();
     render();
     if (!skipSync) scheduleAutoSync();
   }
@@ -794,10 +816,15 @@
     if (!dialog.open) dialog.showModal();
   }
   function downloadRawStorage() {
+    const rawDomains = Object.fromEntries(
+      financeStorage.domainNames.map((name) => {
+        const definition = financeStorage.DOMAINS[name];
+        return [definition.file, localStorage.getItem(definition.storageKey)];
+      }),
+    );
     const payload = {
         exportedAt: now(),
-        dataKey: DATA_KEY,
-        rawData: localStorage.getItem(DATA_KEY),
+        rawDomains,
         dataError: dataLoadFailure?.message || "",
         filesError: filesLoadFailure?.message || "",
       },
@@ -819,11 +846,27 @@
       1400,
     );
   }
+  function validateFileReferences(value) {
+    const clientIds = new Set(data.clients.map((item) => item.id)),
+      casesById = new Map(data.cases.map((item) => [item.id, item])),
+      issue = value.files.find(
+        (file) =>
+          !clientIds.has(file.clientId) ||
+          file.caseIds.some(
+            (caseId) => casesById.get(caseId)?.clientId !== file.clientId,
+          ),
+      );
+    if (issue)
+      throw new Error(
+        `O documento ${issue.id} possui vínculo com cliente ou caso inexistente.`,
+      );
+  }
   async function persistFiles(nextData, skipSync = false) {
     const candidate = {
       ...nextData,
       updatedAt: now(),
     };
+    validateFileReferences(financeFiles.normalizeData(candidate));
     try {
       filesData = await saveFilesData(candidate);
     } catch {
@@ -1215,7 +1258,7 @@
       totalSize = records.reduce((sum, item) => sum + item.size, 0);
     $("#client-files-title").textContent = `Pasta de ${client.name}`;
     $("#client-files-subtitle").textContent =
-      `${records.length} ${records.length === 1 ? "PDF armazenado" : "PDFs armazenados"} com índice em financeiro-arquivos.json`;
+      `${records.length} ${records.length === 1 ? "PDF armazenado" : "PDFs armazenados"} com índice em financeiro-documentos.json`;
     $("#client-file-case").innerHTML =
       '<option value="">Geral do cliente</option>' +
       cases
@@ -2475,7 +2518,12 @@
     return {
       gist,
       revision: snapshot.etag,
-      dataFile: gist.files?.[FILE],
+      domainFiles: Object.fromEntries(
+        financeStorage.domainNames.map((name) => [
+          name,
+          gist.files?.[financeStorage.DOMAINS[name].file],
+        ]),
+      ),
       filesFile: gist.files?.[FILES_FILE],
     };
   }
@@ -2490,94 +2538,18 @@
   async function readGistFile(file, parser, missingMessage) {
     return parser(JSON.parse(await readGistText(file, missingMessage)));
   }
-  function timestamp(item) {
-    return String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");
-  }
-  function mergeDeleted(a, b) {
-    return normalizeDeleted([...(a || []), ...(b || [])]);
-  }
-  function mergeRecords(a, b, deleted) {
-    const deletedMap = new Map(
-        deleted.map((item) => [item.id, item.deletedAt]),
-      ),
-      map = new Map();
-    [...(a || []), ...(b || [])].forEach((item) => {
-      if (!item?.id) return;
-      const current = map.get(item.id);
-      if (!current || timestamp(item) >= timestamp(current))
-        map.set(item.id, item);
-    });
-    return [...map.values()]
-      .filter(
-        (item) =>
-          !deletedMap.get(item.id) || deletedMap.get(item.id) < timestamp(item),
-      )
-      .sort((x, y) => String(x.id).localeCompare(String(y.id)));
-  }
-  function mergeData(leftData, rightData) {
-    const left = normalize(leftData),
-      right = normalize(rightData),
-      deletedClients = mergeDeleted(left.deletedClients, right.deletedClients),
-      deletedCases = mergeDeleted(left.deletedCases, right.deletedCases),
-      deletedPackages = mergeDeleted(
-        left.deletedPackages,
-        right.deletedPackages,
-      ),
-      deletedTeam = mergeDeleted(left.deletedTeam, right.deletedTeam),
-      deletedEntries = mergeDeleted(left.deletedEntries, right.deletedEntries),
-      deletedCharges = mergeDeleted(left.deletedCharges, right.deletedCharges);
-    return normalize({
-      ...left,
-      updatedAt: [left.updatedAt, right.updatedAt].sort().pop() || now(),
-      clients: mergeRecords(left.clients, right.clients, deletedClients),
-      cases: mergeRecords(left.cases, right.cases, deletedCases),
-      packages: mergeRecords(left.packages, right.packages, deletedPackages),
-      team: mergeRecords(left.team, right.team, deletedTeam),
-      entries: mergeRecords(left.entries, right.entries, deletedEntries),
-      charges: mergeRecords(left.charges, right.charges, deletedCharges),
-      deletedClients,
-      deletedCases,
-      deletedPackages,
-      deletedTeam,
-      deletedEntries,
-      deletedCharges,
-    });
-  }
-  function canonical(value) {
-    if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === "object")
-      return Object.keys(value)
-        .sort()
-        .reduce((out, key) => {
-          out[key] = canonical(value[key]);
-          return out;
-        }, {});
-    return value;
-  }
-  function dataSignature(value) {
-    const comparable = normalize(value),
-      copy = { ...comparable };
-    delete copy.updatedAt;
-    [
-      "clients",
-      "cases",
-      "packages",
-      "team",
-      "entries",
-      "charges",
-      "accounts",
-      ...deletedKeys,
-    ].forEach(
-      (key) =>
-        (copy[key] = [...(copy[key] || [])].sort((a, b) =>
-          String(a.id).localeCompare(String(b.id)),
-        )),
+  function dataSignatures(value) {
+    const domains = financeStorage.split(value);
+    return Object.fromEntries(
+      financeStorage.domainNames.map((name) => [
+        name,
+        financeStorage.signature(name, domains[name]),
+      ]),
     );
-    return JSON.stringify(canonical(copy));
   }
   function syncSignature() {
     return JSON.stringify({
-      data: dataSignature(data),
+      domains: dataSignatures(data),
       files: financeFiles.signature(filesData),
     });
   }
@@ -2603,19 +2575,23 @@
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
       await filesReady;
-      const { gist, dataFile, filesFile, revision: initialRevision } =
+      const { gist, domainFiles, filesFile, revision: initialRevision } =
         await fetchGistFiles();
-      let revision = initialRevision;
-      let remote = emptyData(),
+      let revision = initialRevision,
         remoteFiles = financeFiles.emptyData();
-      if (dataFile)
-        remote = normalize(
-          await readGistFile(
-            dataFile,
-            currentData,
-            "Não foi possível ler os dados financeiros completos.",
-          ),
-        );
+      const localDomains = financeStorage.split(data),
+        remoteDomains = {};
+      for (const name of financeStorage.domainNames) {
+        const file = domainFiles[name],
+          definition = financeStorage.DOMAINS[name];
+        remoteDomains[name] = file
+          ? await readGistFile(
+              file,
+              (raw) => financeStorage.normalizeDomain(name, raw),
+              `Não foi possível ler ${definition.file}.`,
+            )
+          : financeStorage.emptyDomain(name);
+      }
       if (filesFile) {
         remoteFiles = financeFiles.normalizeData(
           JSON.parse(
@@ -2626,28 +2602,44 @@
           ),
         );
       }
-      data = mergeData(data, remote);
+      const mergedDomains = Object.fromEntries(
+        financeStorage.domainNames.map((name) => [
+          name,
+          financeStorage.mergeDomain(
+            name,
+            localDomains[name],
+            remoteDomains[name],
+          ),
+        ]),
+      );
+      data = normalize(financeStorage.assemble(mergedDomains));
       filesData = financeFiles.mergeData(filesData, remoteFiles);
-      localStorage.setItem(DATA_KEY, JSON.stringify(data));
+      validateFileReferences(filesData);
+      saveLocalData();
       await saveFilesData(filesData);
       render();
       if (currentFilesClientId) renderClientFiles();
-      const dataChanged =
-          !dataFile || dataSignature(data) !== dataSignature(remote),
+      const changedDomains = financeStorage.domainNames.filter(
+          (name) =>
+            !domainFiles[name] ||
+            financeStorage.signature(name, mergedDomains[name]) !==
+              financeStorage.signature(name, remoteDomains[name]),
+        ),
         filesChanged =
           !filesFile ||
           financeFiles.signature(filesData) !==
             financeFiles.signature(remoteFiles);
-      if (!dataChanged && !filesChanged) {
+      if (!changedDomains.length && !filesChanged) {
         saveSyncState();
         toast("Dados e arquivos já estavam atualizados no Gist.");
         return;
       }
       const changedFiles = {};
-      if (dataChanged)
-        changedFiles[FILE] = {
-          content: JSON.stringify(data, null, 2),
+      changedDomains.forEach((name) => {
+        changedFiles[financeStorage.DOMAINS[name].file] = {
+          content: JSON.stringify(mergedDomains[name], null, 2),
         };
+      });
       const remoteById = new Map(remoteFiles.files.map((item) => [item.id, item]));
       for (const item of filesData.files) {
         const remoteItem = remoteById.get(item.id);
@@ -3412,6 +3404,11 @@
           }
         : entry,
     );
+    data.charges = data.charges.map((charge) =>
+      charge.clientId === id
+        ? { ...charge, clientId: "", updatedAt: deletedAt }
+        : charge,
+    );
     $("#client-dialog").close();
     persist();
     toast("Cliente excluído.");
@@ -3562,6 +3559,11 @@
       ) {
         markDeleted("deletedEntries", item.id);
         data.entries = data.entries.filter((x) => x.id !== item.id);
+        data.charges = data.charges.map((charge) =>
+          charge.entryId === item.id
+            ? { ...charge, entryId: "", updatedAt: now() }
+            : charge,
+        );
         persist();
         toast("Lançamento excluído.");
       }

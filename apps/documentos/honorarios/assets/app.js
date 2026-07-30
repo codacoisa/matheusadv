@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'gm-contrato-honorarios-draft-v1';
+const STORAGE_KEY = 'officejur::documentos::honorarios::draft';
 const form = document.getElementById('document-form');
 const preview = document.getElementById('preview');
 const loading = document.getElementById('preview-loading');
@@ -31,7 +31,7 @@ const LEFT = 19;
 const WIDTH = 172;
 const PEOPLE_LIMIT = 4;
 const PDF_DRAFT_MARKER = 'GM_HONORARIOS_DRAFT:';
-const DOCUMENT_HANDOFF_PREFIX = 'gm-document-handoff-v1:';
+const DOCUMENT_HANDOFF_PREFIX = 'officejur::documentos::handoff:';
 const DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
 
 const PERSON_FIELD_GROUPS = [
