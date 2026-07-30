@@ -6,6 +6,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "test:calculos": "node --test apps/calculos/tests/*.test.cjs",
     "test:browser": "playwright test",
     "test:browser:headed": "playwright test --headed"
   },

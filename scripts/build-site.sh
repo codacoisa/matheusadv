@@ -9,6 +9,7 @@ rm -rf "$SITE_DIR"
 
 mkdir -p "$SITE_DIR/documentos/assets"
 mkdir -p "$SITE_DIR/configuracoes"
+mkdir -p "$SITE_DIR/calculos"
 mkdir -p "$SITE_DIR/financeiro"
 mkdir -p "$SITE_DIR/lab/assets"
 mkdir -p "$SITE_DIR/validador-projudi"
@@ -29,6 +30,7 @@ cp "$ROOT_DIR/packages/ui/office-context.js" "$SITE_DIR/assets/office-context.js
 cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/assets/fontawesome-7.3.0.min.js"
 
 copy_static_app "$ROOT_DIR/apps/configuracoes" "$SITE_DIR/configuracoes"
+copy_static_app "$ROOT_DIR/apps/calculos" "$SITE_DIR/calculos"
 
 cp "$ROOT_DIR/apps/lab/index.html" "$SITE_DIR/lab/index.html"
 cp -R "$ROOT_DIR/apps/lab/assets/." "$SITE_DIR/lab/assets/"
@@ -75,6 +77,7 @@ inject_shared_ui() {
 for assets in \
   "$SITE_DIR/assets" \
   "$SITE_DIR/configuracoes/assets" \
+  "$SITE_DIR/calculos/assets" \
   "$SITE_DIR/documentos/assets" \
   "$SITE_DIR/financeiro/assets" \
   "$SITE_DIR/lab/assets" \

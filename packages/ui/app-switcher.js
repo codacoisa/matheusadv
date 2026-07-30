@@ -36,6 +36,14 @@
       icon: '<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/>'
     },
     {
+      id: 'calculos',
+      name: 'Cálculos',
+      description: 'Memórias jurídicas',
+      url: `${BASE_URL}calculos/`,
+      color: '#16805d',
+      icon: '<rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 6.5h8M8 11h2M14 11h2M8 15h2M14 15h2M8 19h8"/>'
+    },
+    {
       id: 'procuracao',
       name: 'Procuração',
       description: 'Gerador de procurações',

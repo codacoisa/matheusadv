@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test';
 const pages = [
   '',
   'configuracoes/',
+  'calculos/',
   'documentos/procuracao/',
   'documentos/hipossuficiencia/',
   'documentos/honorarios/',
@@ -60,6 +61,30 @@ test('geradores carregam a base compartilhada de documentos', async ({ page }) =
     return window.OfficeJurDocumentUtils.decodePdfDraft(encoded.slice(marker.length));
   });
   expect(roundTrip).toEqual({ client: 'João', city: 'Silvânia' });
+});
+
+test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async ({ page }) => {
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Iniciar cálculo' }).click();
+  await page.getByLabel('Forma estipulada').selectOption('fixed');
+  await page.getByLabel('Nome do cálculo').fill('Teste de pensão');
+  await page.getByLabel('Exequente / credor').fill('Credora de teste');
+  await page.getByLabel('Executado / devedor').fill('Devedor de teste');
+  await page.getByLabel('Número do processo').fill('0000000-00.2026.8.00.0000');
+  await page.getByLabel('Valor mensal (R$)').fill('500');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.getByRole('columnheader', { name: 'Abatimentos' })).toBeVisible();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Correção monetária').selectOption('none');
+  await page.getByLabel('Juros').selectOption('fixed');
+  await page.getByLabel('Juros simples mensais (%)').fill('0');
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.getByText('R$ 500,00', { exact: true }).last()).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Gerar PDF detalhado' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^oj-cal-.*\.pdf$/i);
+  await expect(page.locator('#toast')).toContainText('SHA-256 do arquivo');
 });
 
 test('configuração global do Gist permanece centralizada', async ({ page }) => {
