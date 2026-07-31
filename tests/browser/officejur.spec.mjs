@@ -180,7 +180,8 @@ test('geradores carregam a base compartilhada de documentos', async ({ page }) =
 
 test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async ({ page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: 'Iniciar cálculo' }).click();
+  const card = page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' });
+  await card.getByRole('button', { name: 'Iniciar cálculo' }).click();
   await page.getByLabel('Forma estipulada').selectOption('fixed');
   await page.getByLabel('Nome do cálculo').fill('Teste de pensão');
   await page.getByLabel('Exequente / credor').fill('Credora de teste');
@@ -201,6 +202,38 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   expect(download.suggestedFilename()).toMatch(/^oj-cal-.*\.pdf$/i);
   await expect(page.locator('#toast')).toHaveText('PDF gerado com sucesso.');
   await expect(page.locator('#toast')).not.toContainText(/SHA|hash/i);
+});
+
+test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page }) => {
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  const card = page.locator('.calculator-card').filter({ hasText: 'Verbas trabalhistas' });
+  await card.getByRole('button', { name: 'Iniciar cálculo' }).click();
+  await expect(page).toHaveURL(/calculos\/trabalhista\.html$/);
+
+  await page.getByLabel('Nome do cálculo').fill('Verbas de teste');
+  await page.getByLabel('Cliente').fill('Trabalhador de teste');
+  await page.getByLabel('Salário-base inicial (R$)').fill('3000');
+  await page.getByLabel(/Empregado ainda ativo/).check();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+
+  await expect(page.getByRole('columnheader', { name: 'Competência' })).toBeVisible();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Saldo salarial').check();
+  const claim = page.locator('.labor-claim').filter({ hasText: 'Saldo salarial' });
+  await claim.getByLabel('Dias', { exact: true }).fill('10');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+
+  await page.getByLabel('Correção monetária').selectOption('none');
+  await page.locator('#interestType').selectOption('none');
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.getByText('R$ 1.000,00', { exact: true }).last()).toBeVisible();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Gerar PDF' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^OJ-LAB-.*\.pdf$/i);
+  await expect(page.locator('#labor-toast')).toHaveText('PDF gerado.');
+  await expect(page.locator('#labor-toast')).not.toContainText(/SHA|hash/i);
 });
 
 test('configuração global do Gist permanece centralizada', async ({ page }) => {

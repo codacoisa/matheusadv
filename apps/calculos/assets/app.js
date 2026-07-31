@@ -20,7 +20,7 @@
     ["Revisão bancária", "Bancário", "Simule a evolução de contratos e encargos financeiros.", false, '<path d="m3 9 9-5 9 5M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18"/>'],
     ["Superendividamento", "Consumidor", "Estruture renda, mínimo existencial e plano de pagamento.", false, '<path d="M4 7h16v12H4zM4 10h16M8 15h3"/><path d="M17 3v4M15 5h4"/>'],
     ["Aluguéis vencidos", "Imobiliário", "Atualize aluguéis, multas e encargos locatícios.", false, '<path d="m3 11 9-7 9 7v9H3zM9 20v-6h6v6"/><circle cx="18" cy="7" r="3"/><path d="M18 5.5V7l1 1"/>'],
-    ["Verbas trabalhistas", "Trabalhista", "Calcule verbas rescisórias e reflexos.", false, '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 12h18M10 12v2h4v-2"/>'],
+    ["Verbas trabalhistas", "Trabalhista", "Calcule verbas rescisórias, adicionais, abatimentos e reflexos.", true, '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 12h18M10 12v2h4v-2"/>', "labor"],
     ["Correção do FGTS", "Trabalhista", "Compare depósitos e critérios de atualização.", false, '<path d="M5 11a7 7 0 0 1 13-3h3v7h-3a7 7 0 0 1-5 4.8V22H9v-2H6v-3H4a2 2 0 0 1-2-2v-4h3Z"/><circle cx="13" cy="11" r="1"/>'],
     ["Dosimetria da pena", "Penal", "Documente as três fases da dosimetria.", false, '<path d="m14 4 6 6M12 6l6 6M4 20l8-8M3 21h8M15 3l6 6"/>'],
     ["Progressão de regime", "Penal", "Apure marcos e frações para progressão.", false, '<path d="M3 20h5v-5h5v-5h5V5h3"/><path d="m17 3 4 2-2 4"/>'],
@@ -67,7 +67,7 @@
   }
 
   function catalogView() {
-    const cards = calculators.filter((item) => filter === "Todos" || item[1] === filter).map(([name, category, description, active, icon]) => `
+    const cards = calculators.filter((item) => filter === "Todos" || item[1] === filter).map(([name, category, description, active, icon, action = "new"]) => `
       <article class="calculator-card">
         ${active ? "" : '<span class="badge soon">Em breve</span>'}
         <div class="card-meta">
@@ -75,13 +75,13 @@
           <span class="badge">${escape(category)}</span>
         </div>
         <h3>${escape(name)}</h3><p>${escape(description)}</p>
-        <button class="${active ? "primary" : "secondary"}" data-action="${active ? "new" : "soon"}" ${active ? "" : "disabled"}>${active ? "Iniciar cálculo" : "Disponível em breve"}</button>
+        <button class="${active ? "primary" : "secondary"}" data-action="${active ? action : "soon"}" ${active ? "" : "disabled"}>${active ? "Iniciar cálculo" : "Disponível em breve"}</button>
       </article>`).join("");
     app.innerHTML = `
       <section class="hero"><div><p class="eyebrow">Documentos técnicos e auditáveis</p><h1>Cálculos Jurídicos</h1>
       <p>Prepare memórias de cálculo reproduzíveis, salve versões e gere demonstrativos detalhados em PDF.</p></div>
       <button class="secondary" data-action="saved">Meus cálculos <span class="badge">${data.records.length}</span></button></section>
-      <section><div class="catalog-head"><div><h2>Novo cálculo</h2><p class="hint">Escolha a matéria. Nesta primeira versão, a pensão alimentícia está disponível.</p></div></div>
+      <section><div class="catalog-head"><div><h2>Novo cálculo</h2><p class="hint">Escolha a matéria. Pensão alimentícia e verbas trabalhistas estão disponíveis.</p></div></div>
       <div class="filters" role="group" aria-label="Filtrar calculadoras">${categories.map((item) => `<button class="filter ${filter === item ? "active" : ""}" data-filter="${escape(item)}">${escape(item)}</button>`).join("")}</div>
       <div class="catalog">${cards}</div></section>`;
   }
@@ -91,9 +91,9 @@
     <p class="hint">Os cálculos podem ser reabertos, ajustados e exportados novamente.</p></div><button class="secondary" data-action="catalog">Novo cálculo</button></div>
     <div class="saved-list">${data.records.length ? data.records.map((record) => `
       <article class="saved-item"><div><span class="status ${record.status === "final" ? "final" : "draft"}">${record.status === "final" ? "Calculado" : "Rascunho"}</span>
-      <h3>${escape(record.name)}</h3><p>${escape(record.code)} • atualizado ${new Date(record.updatedAt).toLocaleString("pt-BR")}${record.result ? ` • ${money(record.result.totals.total)}` : ""}</p></div>
-      <div class="saved-actions"><button class="secondary small" data-action="edit" data-id="${record.id}">Editar</button>
-      ${record.result ? `<button class="primary small" data-action="pdf" data-id="${record.id}">PDF</button>` : ""}
+      <h3>${escape(record.name)}</h3><p>${escape(record.code || "Sem código")} • atualizado ${new Date(record.updatedAt).toLocaleString("pt-BR")}${record.result ? ` • ${money(record.result.totals.total)}` : ""}</p></div>
+      <div class="saved-actions"><button class="secondary small" data-action="${record.type === "labor" ? "edit-labor" : "edit"}" data-id="${record.id}">Editar</button>
+      ${record.result ? `<button class="primary small" data-action="${record.type === "labor" ? "pdf-labor" : "pdf"}" data-id="${record.id}">PDF</button>` : ""}
       <button class="danger small" data-action="delete" data-id="${record.id}">Excluir</button></div></article>`).join("") : '<div class="empty">Nenhum cálculo salvo ainda.</div>'}</div></section>`;
   }
 
@@ -317,6 +317,7 @@
     if (target.dataset.filter) { filter = target.dataset.filter; render(); return; }
     const action = target.dataset.action;
     if (action === "new") { current = blank(); step = 1; view = "wizard"; render(); }
+    if (action === "labor") { window.location.href = "./trabalhista.html"; }
     if (action === "catalog") { view = "catalog"; render(); }
     if (action === "saved") { view = "saved"; render(); }
     if (action === "back") {
@@ -333,6 +334,8 @@
       }
     }
     if (action === "edit") { current = structuredClone(data.records.find((item) => item.id === target.dataset.id)); step = 1; view = "wizard"; render(); }
+    if (action === "edit-labor") { window.location.href = `./trabalhista.html?id=${encodeURIComponent(target.dataset.id)}`; }
+    if (action === "pdf-labor") { window.location.href = `./trabalhista.html?id=${encodeURIComponent(target.dataset.id)}&pdf=1`; }
     if (action === "pdf") await makePdf(data.records.find((item) => item.id === target.dataset.id));
     if (action === "pdf-current") await makePdf(current);
     if (action === "indices") await loadIndices();

@@ -43,6 +43,7 @@
   async function correction(type, start, end) {
     if (type === "INPC") return sidra(1736, 44, start, end);
     if (type === "IPCA") return sidra(1737, 63, start, end);
+    if (type === "IPCA-E") return sidra(7062, 355, start, end, 7169);
     return {};
   }
   const brDate = (date) => `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;

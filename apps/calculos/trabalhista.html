@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#17213a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17213a" media="(prefers-color-scheme: dark)">
+  <meta name="msapplication-TileColor" content="#17213a">
+  <meta name="application-name" content="OfficeJur">
+  <meta name="apple-mobile-web-app-title" content="OfficeJur">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Cálculo trabalhista | OfficeJur</title>
+  <link rel="icon" href="../assets/app-icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="../assets/app-icon.png">
+  <script src="../assets/office-config.js"></script>
+  <script src="../assets/office-context.js" defer></script>
+  <script src="./assets/app-switcher.js" defer></script>
+  <script src="./assets/modal-scroll-lock.js" defer></script>
+  <script src="./assets/site-footer.js" defer></script>
+  <script src="../documentos/assets/jspdf.umd.min.js" defer></script>
+  <script src="./assets/core.js" defer></script>
+  <script src="./assets/storage.js" defer></script>
+  <script src="./assets/indices.js" defer></script>
+  <script src="./assets/labor-core.js" defer></script>
+  <script src="./assets/labor-pdf.js" defer></script>
+  <script src="./assets/labor-app.js" defer></script>
+  <link rel="stylesheet" href="./assets/styles.css">
+  <link rel="stylesheet" href="./assets/site-header.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="Voltar ao início do OfficeJur"><img src="../assets/logo-white.png" alt=""><span><strong>OfficeJur</strong><small>Cálculo trabalhista</small></span></a>
+    <div class="top-actions"><span class="sync-status">Dados locais</span><office-app-switcher current="calculos"></office-app-switcher></div>
+  </header>
+  <main id="labor-app" tabindex="-1"><section class="loading" aria-live="polite"><span class="spinner"></span> Preparando o cálculo trabalhista…</section></main>
+  <div id="labor-toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <office-site-footer repository="officejur"></office-site-footer>
+</body>
+</html>
