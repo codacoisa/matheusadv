@@ -2,10 +2,14 @@
   'use strict';
   const app = document.querySelector('#labor-app');
   const toast = document.querySelector('#labor-toast');
+  const syncStatus = document.querySelector('#sync-status');
   const labor = window.OfficeJurLaborCalculations;
   const storage = window.OfficeJurCalculationStorage;
   const indices = window.OfficeJurLegalIndices;
-  if (!app || !labor || !storage || !indices) return;
+  const gistSettings = window.OfficeJurGistSettings;
+  const gistClient = window.OfficeJurGistClient;
+  const syncFactory = window.OfficeJurCalculationSync;
+  if (!app || !labor || !storage || !indices || !gistSettings || !gistClient || !syncFactory) return;
 
   const today = new Date().toISOString().slice(0, 10);
   const fmt = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -23,9 +27,18 @@
     input: { admissionDate: today, terminationDate: '', prescriptionStart: '', startDate: today, endDate: today, calculationDate: today, baseSalary: 0, divisor: 220, salaryRows: [], claims: [], settings: { correctionType: 'none', interestType: 'none', fixedMonthlyRate: 0, preLegalMonthlyRate: 0, penaltyRate: 0, feeRate: 0 } },
   });
   let record = newRecord();
+  const sync = syncFactory.create({
+    storage,
+    gistSettings,
+    gistClient,
+    getData: () => data,
+    setData: value => { data = value; },
+    setStatus: message => { syncStatus.textContent = message; },
+    notify,
+  });
 
   function notify(message, error = false) { toast.textContent = message; toast.classList.toggle('error', error); toast.hidden = false; clearTimeout(notify.timer); notify.timer = setTimeout(() => { toast.hidden = true; }, 5000); }
-  function persist(status = record.status, quiet = false) { record.type = 'labor'; record.calculationVersion = labor.VERSION; record.status = status; record.updatedAt = new Date().toISOString(); data = storage.save({ ...data, records: [structuredClone(record), ...data.records.filter(item => item.id !== record.id)] }); if (!quiet) notify(status === 'final' ? 'Cálculo salvo localmente.' : 'Rascunho salvo localmente.'); }
+  function persist(status = record.status, quiet = false) { record.type = 'labor'; record.calculationVersion = labor.VERSION; record.status = status; record.updatedAt = new Date().toISOString(); data = storage.save({ ...data, records: [structuredClone(record), ...data.records.filter(item => item.id !== record.id)] }); void sync.toGist(); if (!quiet) notify(status === 'final' ? 'Cálculo salvo.' : 'Rascunho salvo.'); }
   function claimMap() { return new Map(record.input.claims.map(item => [item.type, item])); }
   function employmentEnd() { return record.input.active ? record.input.calculationDate : record.input.terminationDate; }
   function blankClaim(type) { return { id: `${type}-${uuid()}`, type, description: label(type), dueDate: employmentEnd() || record.input.calculationDate, status: 'unpaid', paidAmount: 0, base: type === 'insalubrity' ? 'minimum_wage' : 'salary', days: type === 'vacation' || type === 'notice' ? 30 : 0, hours: 0, percentage: type === 'periculosidade' ? 30 : type === 'night_shift' || type === 'insalubrity' ? 20 : type === 'on_call' ? 33.3333 : 50, quantity: 0, unitValue: 0, installments: 3, installmentValue: 0, dueAmount: 0, baseTypes: ['overtime', 'night_shift'] }; }
@@ -51,7 +64,7 @@
     </div>`;
   }
   function result() { const r = record.result; const cards = [['Principal líquido', r.totals.original], ['Correção', r.totals.correction], ['Juros', r.totals.interest], ['Multa', r.totals.penalty], ['Honorários', r.totals.fees], ['Total atualizado', r.totals.total]]; return `<div class="summary">${cards.map(([name, value], index) => `<div class="metric ${index === 5 ? 'total' : ''}"><span>${name}</span><strong>${fmt(value)}</strong></div>`).join('')}</div><h2>Totais por verba</h2><div class="table-wrap"><table><thead><tr><th>Verba</th><th>Devido</th><th>Pago</th><th>Saldo</th><th>Atualizado</th></tr></thead><tbody>${r.claimTotals.map(item => `<tr><td>${esc(item.label)}</td><td>${fmt(item.original)}</td><td>${fmt(item.paid)}</td><td>${fmt(item.outstanding)}</td><td>${fmt(item.updated)}</td></tr>`).join('')}</tbody></table></div><h2>Ledger de cálculo</h2><div class="table-wrap"><table><thead><tr><th>Data</th><th>Lançamento</th><th>Original</th><th>Corrigido</th><th>Juros</th><th>Total</th></tr></thead><tbody>${r.ledger.map(item => `<tr><td>${item.date.split('-').reverse().join('/')}</td><td>${esc(item.description)}</td><td>${fmt(item.original)}</td><td>${fmt(item.corrected)}</td><td>${fmt(item.interest)}</td><td>${fmt(item.total)}</td></tr>`).join('')}</tbody></table></div><p class="legal-note">${esc(r.methodology.legalReview)}</p>`; }
-  function render() { const content = [basic, salaries, claims, settings, result][step - 1](); app.innerHTML = `<section class="panel labor-wizard"><p class="eyebrow">Cálculos jurídicos</p><h1>Cálculo trabalhista</h1><p class="hint">${esc(record.code)} • versão ${esc(record.calculationVersion)} • dados locais</p><ol class="labor-steps">${stepList()}</ol><form id="labor-form">${content}<div class="wizard-actions"><button class="secondary" data-action="back" type="button" ${step === 1 ? 'disabled' : ''}>Voltar</button><div><button class="secondary" data-action="save" type="button">Salvar rascunho</button><button class="primary" type="submit">${step < 4 ? 'Próximo' : step === 4 ? 'Calcular' : 'Gerar PDF'}</button></div></div></form></section>`; }
+  function render() { const content = [basic, salaries, claims, settings, result][step - 1](); app.innerHTML = `<section class="panel labor-wizard"><p class="eyebrow">Cálculos jurídicos</p><h1>Cálculo trabalhista</h1><p class="hint">${esc(record.code)} • versão ${esc(record.calculationVersion)}</p><ol class="labor-steps">${stepList()}</ol><form id="labor-form">${content}<div class="wizard-actions"><button class="secondary" data-action="${step === 1 ? 'cancel' : 'back'}" type="button">${step === 1 ? 'Cancelar' : 'Voltar'}</button><div><button class="secondary" data-action="save" type="button">Salvar rascunho</button><button class="primary" type="submit">${step < 4 ? 'Próximo' : step === 4 ? 'Calcular' : 'Gerar PDF'}</button></div></div></form></section>`; }
   function captureBasic() { const values = new FormData(document.querySelector('#labor-form')); const i = record.input; ['client', 'role', 'caseNumber', 'party', 'partyType', 'admissionDate', 'terminationDate', 'calculationDate', 'prescriptionStart'].forEach(key => { i[key] = String(values.get(key) || ''); }); i.active = values.has('active'); i.prescription = values.has('prescription'); i.baseSalary = Number(values.get('baseSalary') || 0); i.divisor = Number(values.get('divisor') || 220); record.name = String(values.get('name') || '').trim(); if (!record.name || !i.client || !i.admissionDate || !i.calculationDate) throw new Error('Preencha nome, cliente, admissão e data-base.'); if (!i.active && !i.terminationDate) throw new Error('Informe a demissão ou marque que o empregado permanece ativo.'); const end = employmentEnd(); if (end < i.admissionDate) throw new Error('O fim do vínculo não pode anteceder a admissão.'); if (i.prescription && !i.prescriptionStart) throw new Error('Informe o início da prescrição.'); i.startDate = i.prescription && i.prescriptionStart > i.admissionDate ? i.prescriptionStart : i.admissionDate; if (i.startDate > end) throw new Error('O início da prescrição não pode ser posterior ao fim do período calculado.'); i.endDate = end; const old = new Map(i.salaryRows.map(row => [row.competence, row])); i.salaryRows = labor.createSalaryRows({ ...i, salaryRows: [...old.values()] }); if (record.indexSnapshot && (record.indexSnapshot.start !== i.startDate.slice(0, 7) || record.indexSnapshot.end !== i.calculationDate.slice(0, 7))) record.indexSnapshot = null; }
   function captureSalaries() { document.querySelectorAll('[data-salary]').forEach(element => { const row = record.input.salaryRows.find(item => item.competence === element.dataset.salary); const key = element.dataset.key; row[key] = numericKeys.has(key) ? Number(element.value || 0) : element.value; }); }
   function captureClaims() { document.querySelectorAll('[data-claim]').forEach(element => { const claim = claimMap().get(element.dataset.claim); if (!claim) return; const key = element.dataset.key; claim[key] = element.type === 'checkbox' ? element.checked : numericKeys.has(key) ? Number(element.value || 0) : element.value; }); record.input.claims.forEach(claim => { if (['family_salary', 'meal_voucher', 'transport_voucher'].includes(claim.type)) claim.value = Number(claim.quantity || 0) * Number(claim.unitValue || 0); if (claim.type === 'unemployment_insurance') claim.value = Number(claim.installments || 0) * Number(claim.installmentValue || 0); if (claim.type === 'commissions') claim.value = Number(claim.dueAmount || 0); if (claim.type === 'dsr') { const month = new Date(`${claim.dueDate}T00:00:00Z`); const ratio = Number(claim.days || 0) / new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 0)).getUTCDate(); claim.percentage = ratio * (claim.double ? 200 : 100); } }); }
@@ -61,8 +74,26 @@
   function makePdf() { const pdf = window.OfficeJurLaborPdf; if (!pdf?.create || !pdf.download) throw new Error('O gerador de PDF trabalhista não foi carregado.'); Promise.resolve(pdf.create(record)).then(file => { pdf.download(file); notify('PDF gerado.'); }).catch(error => notify(error.message || 'Falha ao gerar PDF.', true)); }
   function captureVisible() { if (step === 1) captureBasic(); if (step === 2) captureSalaries(); if (step === 3) captureClaims(); if (step === 4) captureSettings(); }
   app.addEventListener('change', event => { const type = event.target.dataset.toggleClaim; if (!type) return; captureClaims(); if (event.target.checked && !claimMap().has(type)) record.input.claims.push(blankClaim(type)); if (!event.target.checked) record.input.claims = record.input.claims.filter(claim => claim.type !== type); render(); });
-  app.addEventListener('click', async event => { const action = event.target.closest('[data-action]')?.dataset.action; if (!action) return; try { if (action === 'back') { captureVisible(); step = Math.max(1, step - 1); render(); } if (action === 'save') { captureVisible(); persist(); } if (action === 'indices') await loadIndices(); } catch (error) { notify(error.message || 'Não foi possível salvar esta etapa.', true); } });
+  app.addEventListener('click', async event => { const action = event.target.closest('[data-action]')?.dataset.action; if (!action) return; try { if (action === 'cancel') { window.location.href = './'; return; } if (action === 'back') { captureVisible(); step = Math.max(1, step - 1); render(); } if (action === 'save') { captureVisible(); persist(); } if (action === 'indices') await loadIndices(); } catch (error) { notify(error.message || 'Não foi possível salvar esta etapa.', true); } });
   app.addEventListener('submit', event => { event.preventDefault(); try { if (step < 4) { captureVisible(); step += 1; } else if (step === 4) calculate(); else makePdf(); render(); } catch (error) { notify(error.message || 'Não foi possível concluir esta etapa.', true); } });
-  const params = new URLSearchParams(window.location.search); const requested = params.get('id'); if (requested) { const found = data.records.find(item => item.id === requested && item.type === 'labor'); if (found) { record = structuredClone(found); record.code ||= code(); record.calculationVersion ||= labor.VERSION; record.input.settings ||= {}; step = record.result ? 5 : 1; pendingPdf = params.get('pdf') === '1' && !!record.result; } else notify('Cálculo trabalhista não encontrado.', true); }
-  render(); if (pendingPdf) setTimeout(() => makePdf(), 0);
+  function loadRequestedRecord() {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get('id');
+    if (!requested) return;
+    const found = data.records.find(item => item.id === requested && item.type === 'labor');
+    if (!found) { notify('Cálculo trabalhista não encontrado.', true); return; }
+    record = structuredClone(found);
+    record.code ||= code();
+    record.calculationVersion ||= labor.VERSION;
+    record.input.settings ||= {};
+    step = record.result ? 5 : 1;
+    pendingPdf = params.get('pdf') === '1' && !!record.result;
+  }
+  async function initialize() {
+    await sync.fromGist();
+    loadRequestedRecord();
+    render();
+    if (pendingPdf) setTimeout(() => makePdf(), 0);
+  }
+  void initialize();
 })();

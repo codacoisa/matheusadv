@@ -6,6 +6,10 @@
   const fmtDate = (value) => value ? value.split("-").reverse().join("/") : "—";
   const fmtInstantDate = (value) => value ? new Date(value).toLocaleDateString("pt-BR") : "—";
   const text = (value) => String(value ?? "—");
+  const pensionVersion = (value) => {
+    const version = String(value || "pension-1.0.0");
+    return /^\d/.test(version) ? `pension-${version}` : version;
+  };
 
   async function create(record) {
     const { jsPDF } = window.jspdf;
@@ -140,7 +144,7 @@
     doc.text("Demonstrativo de pensão alimentícia", margin, 29);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
-    doc.text(`Código ${record.code}  •  versão ${record.calculationVersion || result.calculationVersion}`, margin, 39);
+    doc.text(`Código ${record.code}  •  versão ${pensionVersion(record.calculationVersion || result.calculationVersion)}`, margin, 39);
     doc.text(`Atualizado em ${fmtInstantDate(record.updatedAt)}`, margin, 45);
     y = 62;
 
@@ -294,7 +298,7 @@
       doc.setTextColor(...colors.gray);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(6.8);
-      doc.text(`OfficeJur • ${record.code} • v${record.calculationVersion || result.calculationVersion} • atualizado ${fmtInstantDate(record.updatedAt)}`, margin, 291);
+      doc.text(`OfficeJur • ${record.code} • versão ${pensionVersion(record.calculationVersion || result.calculationVersion)} • atualizado ${fmtInstantDate(record.updatedAt)}`, margin, 291);
       doc.text(`Página ${page} de ${pages}`, 194, 291, { align: "right" });
     }
 
@@ -321,5 +325,5 @@
     setTimeout(() => URL.revokeObjectURL(url), 2_000);
   }
 
-  return { create, download };
+  return { create, download, formatVersion: pensionVersion };
 });

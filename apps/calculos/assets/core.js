@@ -6,7 +6,7 @@
   "use strict";
 
   const DAY = 86_400_000;
-  const CALCULATION_VERSION = "1.0.0";
+  const CALCULATION_VERSION = "pension-1.0.0";
   const round = (value, digits = 2) => {
     const factor = 10 ** digits;
     return Math.round((Number(value) + Number.EPSILON) * factor) / factor;

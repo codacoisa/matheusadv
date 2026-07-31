@@ -236,6 +236,57 @@ test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page })
   await expect(page.locator('#labor-toast')).not.toContainText(/SHA|hash/i);
 });
 
+test('assistentes de cálculo compartilham cancelamento e versões identificáveis', async ({ page }) => {
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await expect.poll(() => page.evaluate(() => window.OfficeJurCalculationPdf?.formatVersion('1.0.0')))
+    .toBe('pension-1.0.0');
+  expect(await page.evaluate(() => window.OfficeJurCalculationPdf.formatVersion('pension-1.0.0')))
+    .toBe('pension-1.0.0');
+  await page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' })
+    .getByRole('button', { name: 'Iniciar cálculo' }).click();
+  await expect(page.getByText(/versão pension-1\.0\.0/i)).toBeVisible();
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(page).toHaveURL(/calculos\/$/);
+
+  await page.locator('.calculator-card').filter({ hasText: 'Verbas trabalhistas' })
+    .getByRole('button', { name: 'Iniciar cálculo' }).click();
+  await expect(page.getByText(/versão labor-1\.0\.0/i)).toBeVisible();
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(page).toHaveURL(/calculos\/$/);
+});
+
+test('cálculo trabalhista usa a sincronização compartilhada do Gist', async ({ page }) => {
+  const requests = [];
+  await page.addInitScript(() => {
+    localStorage.setItem('officejur-gist-settings-v1', JSON.stringify({
+      gistId: 'test-gist',
+      token: 'token-de-teste',
+      autoSync: true,
+    }));
+  });
+  await page.route('https://api.github.com/gists/test-gist', async route => {
+    const request = route.request();
+    requests.push({ method: request.method(), body: request.postDataJSON?.() });
+    await route.fulfill({
+      contentType: 'application/json',
+      headers: { ETag: '"calculos-1"' },
+      body: JSON.stringify({ files: {} }),
+    });
+  });
+
+  await page.goto('calculos/trabalhista.html', { waitUntil: 'networkidle' });
+  await expect(page.locator('#sync-status')).toHaveText('Gist sincronizado');
+  await page.getByLabel('Nome do cálculo').fill('Rascunho sincronizado');
+  await page.getByLabel('Cliente').fill('Cliente de teste');
+  await page.getByLabel(/Empregado ainda ativo/).check();
+  await page.getByRole('button', { name: 'Salvar rascunho' }).click();
+
+  await expect.poll(() => requests.filter(item => item.method === 'PATCH').length).toBe(1);
+  const patch = requests.find(item => item.method === 'PATCH');
+  const content = JSON.parse(patch.body.files['officejur-calculos-juridicos.json'].content);
+  expect(content.records.some(record => record.type === 'labor' && record.name === 'Rascunho sincronizado')).toBe(true);
+});
+
 test('configuração global do Gist permanece centralizada', async ({ page }) => {
   await page.goto('configuracoes/', { waitUntil: 'networkidle' });
   await expect(page.getByLabel(/Gist ID|ID.*Gist/i)).toBeVisible();

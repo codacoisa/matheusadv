@@ -4,6 +4,7 @@
   const core = window.OfficeJurCalculations, storageApi = window.OfficeJurCalculationStorage;
   const indices = window.OfficeJurLegalIndices, pdf = window.OfficeJurCalculationPdf;
   const gistSettings = window.OfficeJurGistSettings, gistClient = window.OfficeJurGistClient;
+  const syncFactory = window.OfficeJurCalculationSync;
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const today = () => {
     const value = new Date();
@@ -11,7 +12,20 @@
   };
   const uid = () => crypto.randomUUID();
   const money = (value) => core.currency(Number(value || 0));
+  const pensionVersion = (value) => {
+    const version = String(value || core.CALCULATION_VERSION);
+    return /^\d/.test(version) ? `pension-${version}` : version;
+  };
   let data = storageApi.load(), view = "catalog", filter = "Todos", step = 1, current = null, busy = false;
+  const sync = syncFactory.create({
+    storage: storageApi,
+    gistSettings,
+    gistClient,
+    getData: () => data,
+    setData: (value) => { data = value; },
+    setStatus: (message) => { syncStatus.textContent = message; },
+    notify,
+  });
 
   const calculators = [
     ["Pensão alimentícia", "Familiar", "Apure parcelas vencidas, abatimentos, atualização, juros e encargos.", true, '<path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"/>'],
@@ -173,11 +187,11 @@
       ].map(([label, value], index) => `<div class="metric ${index === 5 ? "total" : ""}"><span>${label}</span><strong>${money(value)}</strong></div>`).join("")}</div>
       <div class="table-wrap"><table><thead><tr><th>Data</th><th>Lançamento</th><th>Original</th><th>Fator</th><th>Corrigido</th><th>Juros</th><th>Total</th></tr></thead><tbody>
       ${r.ledger.map((item) => `<tr><td>${item.date.split("-").reverse().join("/")}</td><td>${escape(item.description)}</td><td>${money(item.original)}</td><td>${item.correctionFactor.toFixed(8)}</td><td>${money(item.corrected)}</td><td>${item.interestRate.toFixed(6)}%<br>${money(item.interest)}</td><td><strong>${money(item.total)}</strong></td></tr>`).join("")}
-      </tbody></table></div><p class="audit"><strong>Hash dos dados:</strong> ${escape(current.dataHash)}<br><strong>Código:</strong> ${escape(current.code)} • <strong>Versão:</strong> ${escape(current.calculationVersion)}</p>`;
+      </tbody></table></div><p class="audit"><strong>Hash dos dados:</strong> ${escape(current.dataHash)}<br><strong>Código:</strong> ${escape(current.code)} • <strong>Versão:</strong> ${escape(pensionVersion(current.calculationVersion))}</p>`;
   }
 
   function wizardView() {
-    app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Família</p><h1>Pensão alimentícia</h1><p class="hint">${escape(current.code)} • versão ${escape(current.calculationVersion)}</p>
+    app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Família</p><h1>Pensão alimentícia</h1><p class="hint">${escape(current.code)} • versão ${escape(pensionVersion(current.calculationVersion))}</p>
       ${steps()}<form id="wizard-form">${step === 1 ? stepOne() : step === 2 ? stepTwo() : step === 3 ? stepThree() : stepFour()}
       <div class="wizard-actions"><button class="secondary" type="button" data-action="${step === 1 ? "catalog" : "back"}">${step === 1 ? "Cancelar" : "Voltar"}</button>
       <div>${step < 4 ? '<button class="secondary" type="button" data-action="save-draft">Salvar rascunho</button> ' : ""}
@@ -230,7 +244,7 @@
     record.status = status;
     const records = data.records.filter((item) => item.id !== record.id);
     data = storageApi.save({ ...data, records: [structuredClone(record), ...records] });
-    void syncToGist();
+    void sync.toGist();
   }
   async function calculate() {
     captureStepThree();
@@ -266,29 +280,10 @@
   }
 
   async function syncFromGist() {
-    const settings = gistSettings.load();
-    if (!settings.gistId || !settings.token) { syncStatus.textContent = "Dados locais"; return; }
-    syncStatus.textContent = "Sincronizando…";
-    try {
-      const snapshot = await gistClient.gistSnapshot(settings.gistId, settings.token);
-      const file = snapshot.gist.files?.[storageApi.FILE];
-      if (file) data = storageApi.save(storageApi.merge(data, JSON.parse(await gistClient.text(file))));
-      syncStatus.textContent = settings.autoSync ? "Gist sincronizado" : "Gist conectado";
-    } catch (error) { syncStatus.textContent = "Falha na sincronização"; notify(error.message, true); }
+    await sync.fromGist();
   }
   async function syncToGist() {
-    const settings = gistSettings.load();
-    if (!settings.autoSync || !settings.gistId || !settings.token) return;
-    syncStatus.textContent = "Salvando no Gist…";
-    try {
-      const snapshot = await gistClient.gistSnapshot(settings.gistId, settings.token);
-      const remoteFile = snapshot.gist.files?.[storageApi.FILE];
-      let merged = data;
-      if (remoteFile) merged = storageApi.merge(data, JSON.parse(await gistClient.text(remoteFile)));
-      data = storageApi.save(merged);
-      await gistClient.patch(settings.gistId, settings.token, { [storageApi.FILE]: { content: JSON.stringify(data, null, 2) } }, { etag: snapshot.etag });
-      syncStatus.textContent = "Gist sincronizado";
-    } catch (error) { syncStatus.textContent = "Pendente de sincronização"; notify(error.message, true); }
+    await sync.toGist();
   }
 
   app.addEventListener("change", (event) => {
@@ -333,7 +328,10 @@
         step = targetStep; render();
       }
     }
-    if (action === "edit") { current = structuredClone(data.records.find((item) => item.id === target.dataset.id)); step = 1; view = "wizard"; render(); }
+    if (action === "edit") {
+      current = structuredClone(data.records.find((item) => item.id === target.dataset.id));
+      step = 1; view = "wizard"; render();
+    }
     if (action === "edit-labor") { window.location.href = `./trabalhista.html?id=${encodeURIComponent(target.dataset.id)}`; }
     if (action === "pdf-labor") { window.location.href = `./trabalhista.html?id=${encodeURIComponent(target.dataset.id)}&pdf=1`; }
     if (action === "pdf") await makePdf(data.records.find((item) => item.id === target.dataset.id));
