@@ -163,6 +163,34 @@ const sharedDocumentAssets = [
   "wordmark.png",
 ];
 
+const sharedHeaderPages = [
+  "apps/calculos/index.html",
+  "apps/configuracoes/index.html",
+  "apps/configuracoes/ajuda.html",
+  "apps/financeiro/index.html",
+  "apps/financeiro/ajuda-mercado-pago.html",
+  "apps/lab/index.html",
+  "apps/lab/tools/central-guias/index.html",
+  "apps/lab/tools/controle-pagamentos/index.html",
+  "apps/validador-projudi/index.html",
+  "apps/documentos/ciencia-audiencia/index.html",
+  "apps/documentos/hipossuficiencia/index.html",
+  "apps/documentos/honorarios/index.html",
+  "apps/documentos/procuracao/index.html",
+];
+
+if (!existsSync("packages/ui/site-header.css")) {
+  console.error("Base visual compartilhada dos headers ausente.");
+  process.exit(1);
+}
+
+for (const path of sharedHeaderPages) {
+  if (!readFileSync(path, "utf8").includes("site-header.css")) {
+    console.error(`Página sem o header visual compartilhado: ${path}.`);
+    process.exit(1);
+  }
+}
+
 const institutionalAssetsRoot = "packages/ui/assets";
 const institutionalAssets = ["logo-white.png", "logo.png", "app-icon.png"];
 const officeConfigSource = readFileSync("config/office.js", "utf8");

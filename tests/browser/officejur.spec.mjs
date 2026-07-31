@@ -4,12 +4,14 @@ import { expect, test } from '@playwright/test';
 const pages = [
   '',
   'configuracoes/',
+  'configuracoes/ajuda.html',
   'calculos/',
   'documentos/procuracao/',
   'documentos/hipossuficiencia/',
   'documentos/honorarios/',
   'documentos/ciencia-audiencia/',
   'financeiro/',
+  'financeiro/ajuda-mercado-pago.html',
   'validador-projudi/',
   'lab/',
   'lab/controle-pagamentos/',
@@ -50,6 +52,72 @@ test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ 
   await expect(launcher).toBeFocused();
 });
 
+test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ page }) => {
+  await page.goto('', { waitUntil: 'networkidle' });
+  const switcher = page.locator('office-app-switcher').first();
+  await switcher.getByRole('button', { name: /Abrir menu de sistemas/ }).click();
+  const appNames = await switcher.locator('.name').allTextContents();
+  expect(appNames).toEqual([
+    'Início',
+    'Cálculos',
+    'Ciência',
+    'Configurações',
+    'Financeiro',
+    'Hipossuficiência',
+    'Honorários',
+    'Lab',
+    'Procuração',
+    'Validador',
+  ]);
+
+  const sections = page.locator('main > section');
+  await expect(sections.nth(0).locator('.label strong')).toHaveText([
+    'Ciência de Audiência',
+    'Contrato de Honorários',
+    'Hipossuficiência',
+    'Procuração',
+  ]);
+  await expect(sections.nth(1).locator('.label strong')).toHaveText([
+    'Cálculos Jurídicos',
+    'Financeiro Jurídico',
+    'Lab',
+    'Validador Projudi',
+  ]);
+  await expect(page.locator('main')).not.toContainText('Configurações');
+});
+
+test('headers dos aplicativos compartilham altura, marca e ações específicas', async ({ page }) => {
+  const headerPaths = pages.filter(appPath => appPath);
+  for (const appPath of headerPaths) {
+    await page.goto(appPath, { waitUntil: 'networkidle' });
+    const header = page.locator('.topbar').first();
+    await expect(header, `Header ausente em ${appPath}`).toBeVisible();
+    await expect(header).toHaveCSS('height', '68px');
+    await expect(header.locator('img').first()).toHaveCSS('width', '40px');
+    await expect(header.locator('office-app-switcher')).toHaveCount(1);
+  }
+
+  await page.goto('documentos/procuracao/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Importar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Gerar PDF' })).toBeVisible();
+  await page.goto('validador-projudi/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Limpar' })).toBeVisible();
+});
+
+test('header documental preserva todas as ações sem estourar a tela móvel', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('documentos/procuracao/', { waitUntil: 'networkidle' });
+  await expect(page.locator('.topbar')).toHaveCSS('height', '68px');
+  for (const action of ['Importar', 'Limpar', 'Imprimir', 'Gerar PDF']) {
+    await expect(page.getByRole('button', { name: action })).toBeVisible();
+  }
+  const viewport = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+});
+
 test('geradores carregam a base compartilhada de documentos', async ({ page }) => {
   await page.goto('documentos/procuracao/', { waitUntil: 'networkidle' });
   await expect.poll(() => page.evaluate(() => Object.keys(window.OfficeJurDocumentUtils || {}).sort()))
@@ -84,7 +152,8 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   await page.getByRole('button', { name: 'Gerar PDF detalhado' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^oj-cal-.*\.pdf$/i);
-  await expect(page.locator('#toast')).toContainText('SHA-256 do arquivo');
+  await expect(page.locator('#toast')).toHaveText('PDF gerado com sucesso.');
+  await expect(page.locator('#toast')).not.toContainText(/SHA|hash/i);
 });
 
 test('configuração global do Gist permanece centralizada', async ({ page }) => {

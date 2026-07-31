@@ -100,6 +100,14 @@
       icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>'
     }
   ];
+  // "Início" é o ponto de retorno do produto; os demais aplicativos seguem
+  // uma ordem previsível para leitores de tela e para quem usa o seletor.
+  const displayApps = [
+    APPS.find((app) => app.id === 'main'),
+    ...APPS
+      .filter((app) => app.id !== 'main')
+      .sort((first, second) => first.name.localeCompare(second.name, 'pt-BR'))
+  ];
 
   const dotsIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="5" r="1.7"/><circle cx="12" cy="5" r="1.7"/><circle cx="19" cy="5" r="1.7"/><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/><circle cx="5" cy="19" r="1.7"/><circle cx="12" cy="19" r="1.7"/><circle cx="19" cy="19" r="1.7"/></svg>';
 
@@ -288,7 +296,7 @@
       const currentId = this.getAttribute('current') || this.detectCurrentApp();
       const currentApp = APPS.find((app) => app.id === currentId);
       const root = this.attachShadow({ mode: 'open' });
-      const items = APPS.map((app) => {
+      const items = displayApps.map((app) => {
         const isCurrent = app.id === currentId;
         return `
           <a class="app" data-app="${escapeHtml(app.id)}" href="${escapeHtml(safeNavigationUrl(app.url))}" title="${escapeHtml(app.description)}" ${isCurrent ? 'aria-current="page"' : ''}>

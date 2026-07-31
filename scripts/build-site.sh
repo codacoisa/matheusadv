@@ -68,6 +68,7 @@ cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/config
 inject_shared_ui() {
   local assets="$1"
   cp "$ROOT_DIR/packages/ui/app-switcher.js" "$assets/app-switcher.js"
+  cp "$ROOT_DIR/packages/ui/site-header.css" "$assets/site-header.css"
   cp "$ROOT_DIR/packages/ui/gist-settings.js" "$assets/gist-settings.js"
   cp "$ROOT_DIR/packages/ui/gist-client.js" "$assets/gist-client.js"
   cp "$ROOT_DIR/packages/ui/modal-scroll-lock.js" "$assets/modal-scroll-lock.js"

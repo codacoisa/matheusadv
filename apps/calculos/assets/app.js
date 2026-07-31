@@ -14,18 +14,18 @@
   let data = storageApi.load(), view = "catalog", filter = "Todos", step = 1, current = null, busy = false;
 
   const calculators = [
-    ["Pensão alimentícia", "Familiar", "Apure parcelas vencidas, abatimentos, atualização, juros e encargos.", true, "§"],
-    ["Divórcio e partilha", "Familiar", "Organize bens, dívidas, meação e quinhões.", false, "÷"],
-    ["Atualização monetária", "Generalista", "Atualize créditos com índices e juros por períodos.", false, "%"],
-    ["Revisão bancária", "Bancário", "Simule a evolução de contratos e encargos financeiros.", false, "₿"],
-    ["Superendividamento", "Consumidor", "Estruture renda, mínimo existencial e plano de pagamento.", false, "↙"],
-    ["Aluguéis vencidos", "Imobiliário", "Atualize aluguéis, multas e encargos locatícios.", false, "⌂"],
-    ["Verbas trabalhistas", "Trabalhista", "Calcule verbas rescisórias e reflexos.", false, "⚒"],
-    ["Correção do FGTS", "Trabalhista", "Compare depósitos e critérios de atualização.", false, "F"],
-    ["Dosimetria da pena", "Penal", "Documente as três fases da dosimetria.", false, "⚖"],
-    ["Progressão de regime", "Penal", "Apure marcos e frações para progressão.", false, "→"],
-    ["Contribuições previdenciárias", "Previdenciário", "Apure contribuições e limites previdenciários.", false, "P"],
-    ["Revisão do PASEP", "Bancário", "Organize lançamentos e critérios revisionais.", false, "R"],
+    ["Pensão alimentícia", "Familiar", "Apure parcelas vencidas, abatimentos, atualização, juros e encargos.", true, '<path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"/>'],
+    ["Divórcio e partilha", "Familiar", "Organize bens, dívidas, meação e quinhões.", false, '<circle cx="8" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 20c.4-4 2-6 5-6 1.7 0 3 .6 4 1.8M21 20c-.4-4-1.7-6-4-6-1.5 0-2.7.5-3.6 1.5M12 3v18"/>'],
+    ["Atualização monetária", "Generalista", "Atualize créditos com índices e juros por períodos.", false, '<ellipse cx="7" cy="7" rx="4" ry="2.5"/><path d="M3 7v4c0 1.4 1.8 2.5 4 2.5s4-1.1 4-2.5V7M14 17l2.5 2.5L21 15M14 11h7v8"/>'],
+    ["Revisão bancária", "Bancário", "Simule a evolução de contratos e encargos financeiros.", false, '<path d="m3 9 9-5 9 5M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18"/>'],
+    ["Superendividamento", "Consumidor", "Estruture renda, mínimo existencial e plano de pagamento.", false, '<path d="M4 7h16v12H4zM4 10h16M8 15h3"/><path d="M17 3v4M15 5h4"/>'],
+    ["Aluguéis vencidos", "Imobiliário", "Atualize aluguéis, multas e encargos locatícios.", false, '<path d="m3 11 9-7 9 7v9H3zM9 20v-6h6v6"/><circle cx="18" cy="7" r="3"/><path d="M18 5.5V7l1 1"/>'],
+    ["Verbas trabalhistas", "Trabalhista", "Calcule verbas rescisórias e reflexos.", false, '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 12h18M10 12v2h4v-2"/>'],
+    ["Correção do FGTS", "Trabalhista", "Compare depósitos e critérios de atualização.", false, '<path d="M5 11a7 7 0 0 1 13-3h3v7h-3a7 7 0 0 1-5 4.8V22H9v-2H6v-3H4a2 2 0 0 1-2-2v-4h3Z"/><circle cx="13" cy="11" r="1"/>'],
+    ["Dosimetria da pena", "Penal", "Documente as três fases da dosimetria.", false, '<path d="m14 4 6 6M12 6l6 6M4 20l8-8M3 21h8M15 3l6 6"/>'],
+    ["Progressão de regime", "Penal", "Apure marcos e frações para progressão.", false, '<path d="M3 20h5v-5h5v-5h5V5h3"/><path d="m17 3 4 2-2 4"/>'],
+    ["Contribuições previdenciárias", "Previdenciário", "Apure contribuições e limites previdenciários.", false, '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><path d="M12 8v8M8 12h8"/>'],
+    ["Revisão do PASEP", "Bancário", "Organize lançamentos e critérios revisionais.", false, '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h6M9 16h4"/><circle cx="17" cy="17" r="3"/><path d="m19 19 2 2"/>'],
   ];
   const categories = ["Todos", ...new Set(calculators.map((item) => item[1]))];
 
@@ -70,8 +70,10 @@
     const cards = calculators.filter((item) => filter === "Todos" || item[1] === filter).map(([name, category, description, active, icon]) => `
       <article class="calculator-card">
         ${active ? "" : '<span class="badge soon">Em breve</span>'}
-        <span class="icon" aria-hidden="true">${escape(icon)}</span>
-        <span class="badge">${escape(category)}</span>
+        <div class="card-meta">
+          <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24">${icon}</svg></span>
+          <span class="badge">${escape(category)}</span>
+        </div>
         <h3>${escape(name)}</h3><p>${escape(description)}</p>
         <button class="${active ? "primary" : "secondary"}" data-action="${active ? "new" : "soon"}" ${active ? "" : "disabled"}>${active ? "Iniciar cálculo" : "Disponível em breve"}</button>
       </article>`).join("");
@@ -255,10 +257,10 @@
     finally { setBusy(false); }
   }
   async function makePdf(record) {
-    setBusy(true, "Gerando PDF e hashes…");
+    setBusy(true, "Gerando PDF…");
     try {
       const file = await pdf.create(record); pdf.download(file);
-      notify(`PDF gerado. SHA-256 do arquivo: ${file.fileHash}`);
+      notify("PDF gerado com sucesso.");
     } catch (error) { notify(`Não foi possível gerar o PDF: ${error.message}`, true); }
     finally { setBusy(false); render(); }
   }
