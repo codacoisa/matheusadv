@@ -52,6 +52,27 @@ test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ 
   await expect(launcher).toBeFocused();
 });
 
+test('páginas com tema institucional habilitam a barra de status no Safari', async ({ page }) => {
+  const themedPages = [
+    'calculos/',
+    'documentos/ciencia-audiencia/',
+    'documentos/hipossuficiencia/',
+    'documentos/honorarios/',
+    'financeiro/',
+  ];
+
+  for (const appPath of themedPages) {
+    await page.goto(appPath, { waitUntil: 'networkidle' });
+    await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute('content', 'light');
+    await expect(page.locator('meta[name="theme-color"][media="(prefers-color-scheme: light)"]'))
+      .toHaveAttribute('content', '#17213a');
+    await expect(page.locator('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]'))
+      .toHaveAttribute('content', '#17213a');
+    await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
+    await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute('content', 'black-translucent');
+  }
+});
+
 test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ page }) => {
   await page.goto('', { waitUntil: 'networkidle' });
   const switcher = page.locator('office-app-switcher').first();
@@ -61,13 +82,13 @@ test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ pag
     'Início',
     'Cálculos',
     'Ciência',
-    'Configurações',
     'Financeiro',
     'Hipossuficiência',
     'Honorários',
     'Lab',
     'Procuração',
     'Validador',
+    'Configurações',
   ]);
 
   const sections = page.locator('main > section');
@@ -116,6 +137,32 @@ test('header documental preserva todas as ações sem estourar a tela móvel', a
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+});
+
+test('Financeiro não reserva espaço acima do header compartilhado', async ({ page }) => {
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('financeiro/', { waitUntil: 'networkidle' });
+    const layout = await page.evaluate(() => {
+      const header = document.querySelector('.topbar');
+      const shell = document.querySelector('.shell');
+      return {
+        bodyPaddingTop: getComputedStyle(document.body).paddingTop,
+        headerHeight: header.getBoundingClientRect().height,
+        headerTop: header.getBoundingClientRect().top,
+        shellTop: shell.getBoundingClientRect().top,
+      };
+    });
+    expect(layout).toEqual({
+      bodyPaddingTop: '0px',
+      headerHeight: 68,
+      headerTop: 0,
+      shellTop: 68,
+    });
+  }
 });
 
 test('geradores carregam a base compartilhada de documentos', async ({ page }) => {

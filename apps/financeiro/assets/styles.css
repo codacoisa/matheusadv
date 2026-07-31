@@ -41,7 +41,7 @@ button {
   cursor: pointer;
 }
 .topbar {
-  height: 70px;
+  height: var(--officejur-header-height, 68px);
   background: var(--navy);
   color: #fff;
   display: flex;
@@ -92,7 +92,7 @@ button {
 .shell {
   display: grid;
   grid-template-columns: 230px 1fr;
-  min-height: calc(100vh - 70px);
+  min-height: calc(100vh - var(--officejur-header-height, 68px));
 }
 .sidebar {
   background: #fff;
@@ -102,8 +102,8 @@ button {
   flex-direction: column;
   justify-content: space-between;
   position: sticky;
-  top: 70px;
-  height: calc(100vh - 70px);
+  top: var(--officejur-header-height, 68px);
+  height: calc(100vh - var(--officejur-header-height, 68px));
 }
 nav {
   display: grid;
@@ -946,7 +946,7 @@ dialog form {
   }
   .sidebar {
     position: sticky;
-    top: 70px;
+    top: var(--officejur-header-height, 68px);
     height: auto;
     z-index: 10;
     padding: 8px;
@@ -1898,15 +1898,6 @@ html,
 body {
   overflow-x: hidden;
 }
-body {
-  padding-top: 70px;
-}
-.topbar {
-  position: fixed;
-  inset: 0 0 auto 0;
-  width: 100%;
-  z-index: 30;
-}
 dialog {
   width: min(880px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
@@ -2229,15 +2220,7 @@ textarea {
   box-shadow: 0 0 0 3px #b387311c;
 }
 @media (max-width: 720px) {
-  :root {
-    --mobile-topbar-height: calc(64px + env(safe-area-inset-top, 0px));
-  }
-  body {
-    padding-top: var(--mobile-topbar-height);
-  }
   .topbar {
-    height: var(--mobile-topbar-height);
-    padding: env(safe-area-inset-top, 0px) 12px 0;
     gap: 8px;
   }
   .brand {
@@ -2273,7 +2256,7 @@ textarea {
   .sidebar {
     display: flex;
     position: fixed;
-    top: var(--mobile-topbar-height);
+    top: var(--officejur-header-height, 68px);
     left: 0;
     bottom: 0;
     width: min(290px, 86vw);
