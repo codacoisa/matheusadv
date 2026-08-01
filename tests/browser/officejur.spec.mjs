@@ -25,6 +25,8 @@ const pages = [
   'configuracoes/',
   'configuracoes/ajuda.html',
   'calculos/',
+  'calculos/pensao/',
+  'calculos/trabalhista/',
   'documentos/procuracao/',
   'documentos/hipossuficiencia/',
   'documentos/honorarios/',
@@ -200,7 +202,7 @@ test('geradores carregam a base compartilhada de documentos', async ({ page }) =
 test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async ({ page }) => {
   await prepareCalculationPage(page);
   const card = page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' });
-  await card.getByRole('button', { name: 'Iniciar cálculo' }).click();
+  await card.getByRole('link', { name: 'Iniciar cálculo' }).click();
   await page.getByLabel('Forma estipulada').selectOption('fixed');
   await page.getByLabel('Nome do cálculo').fill('Teste de pensão');
   await page.getByLabel('Cliente').selectOption('client-test');
@@ -228,8 +230,8 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
 test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page }) => {
   await prepareCalculationPage(page);
   const card = page.locator('.calculator-card').filter({ hasText: 'Verbas trabalhistas' });
-  await card.getByRole('button', { name: 'Iniciar cálculo' }).click();
-  await expect(page).toHaveURL(/calculos\/trabalhista\.html$/);
+  await card.getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await expect(page).toHaveURL(/calculos\/trabalhista\/$/);
 
   await page.getByLabel('Nome do cálculo').fill('Verbas de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
@@ -260,18 +262,20 @@ test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page })
 
 test('assistentes de cálculo compartilham cancelamento e versões identificáveis', async ({ page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' })
+    .getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await expect(page).toHaveURL(/calculos\/pensao\/$/);
   await expect.poll(() => page.evaluate(() => window.OfficeJurCalculationPdf?.formatVersion('1.0.0')))
     .toBe('pension-1.0.0');
   expect(await page.evaluate(() => window.OfficeJurCalculationPdf.formatVersion('pension-1.0.0')))
     .toBe('pension-1.0.0');
-  await page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' })
-    .getByRole('button', { name: 'Iniciar cálculo' }).click();
   await expect(page.getByText(/versão pension-1\.0\.0/i)).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page).toHaveURL(/calculos\/$/);
 
   await page.locator('.calculator-card').filter({ hasText: 'Verbas trabalhistas' })
-    .getByRole('button', { name: 'Iniciar cálculo' }).click();
+    .getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await expect(page).toHaveURL(/calculos\/trabalhista\/$/);
   await expect(page.getByText(/versão labor-1\.0\.0/i)).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page).toHaveURL(/calculos\/$/);
@@ -297,7 +301,7 @@ test('cálculo trabalhista usa a sincronização compartilhada do Gist', async (
     });
   });
 
-  await prepareCalculationPage(page, 'calculos/trabalhista.html');
+  await prepareCalculationPage(page, 'calculos/trabalhista/');
   await expect(page.locator('#sync-status')).toHaveText('Gist sincronizado');
   await page.getByLabel('Nome do cálculo').fill('Rascunho sincronizado');
   await page.getByLabel('Cliente').selectOption('client-test');

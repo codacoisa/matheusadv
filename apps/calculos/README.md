@@ -2,6 +2,12 @@
 
 Módulo permanente do OfficeJur para memórias de cálculo reproduzíveis.
 
+## Organização
+
+- `pensao/`: página, assistente e PDF do cálculo de pensão alimentícia;
+- `trabalhista/`: assistente, motor e PDF dos cálculos trabalhistas;
+- `assets/`: catálogo, núcleo de cálculo compartilhado, armazenamento, sincronização, integração com o Financeiro, índices e estilos compartilhados.
+
 ## Calculadoras disponíveis
 
 - pensão alimentícia, com assistente em quatro etapas;

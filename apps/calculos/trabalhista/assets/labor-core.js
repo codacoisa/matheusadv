@@ -1,6 +1,6 @@
 ((root, factory) => {
   const core = typeof module === "object" && module.exports
-    ? require("./core.js")
+    ? require("../../assets/core.js")
     : root.OfficeJurCalculations;
   const api = factory(core);
   root.OfficeJurLaborCalculations = api;

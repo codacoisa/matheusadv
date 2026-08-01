@@ -30,7 +30,17 @@ cp "$ROOT_DIR/packages/ui/office-context.js" "$SITE_DIR/assets/office-context.js
 cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/assets/fontawesome-7.3.0.min.js"
 
 copy_static_app "$ROOT_DIR/apps/configuracoes" "$SITE_DIR/configuracoes"
-copy_static_app "$ROOT_DIR/apps/calculos" "$SITE_DIR/calculos"
+cp "$ROOT_DIR/apps/calculos/index.html" "$SITE_DIR/calculos/index.html"
+cp -R "$ROOT_DIR/apps/calculos/assets" "$SITE_DIR/calculos/assets"
+
+for source in "$ROOT_DIR/apps/calculos/"*; do
+  module="$(basename "$source")"
+  if [[ "$module" == "assets" || ! -f "$source/index.html" ]]; then
+    continue
+  fi
+  mkdir -p "$SITE_DIR/calculos/$module"
+  copy_static_app "$source" "$SITE_DIR/calculos/$module"
+done
 
 cp "$ROOT_DIR/apps/lab/index.html" "$SITE_DIR/lab/index.html"
 cp -R "$ROOT_DIR/apps/lab/assets/." "$SITE_DIR/lab/assets/"
