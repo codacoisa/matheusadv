@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const core = require("../assets/generic-core.js");
+const core = require("../generalista/assets/generalista-core.js");
 
 test("calcula débito e pagamento com correção e juros pró-rata", () => {
   const result = core.calculateGeneric({

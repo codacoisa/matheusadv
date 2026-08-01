@@ -1,0 +1,23 @@
+.generalista-criteria{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
+.generalista-criteria .field{align-content:start}
+.generalista-criteria .check{align-items:center;min-height:44px;margin:25px 0 0}
+.items-section{margin-top:28px}
+.card-title{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.card-title{margin-bottom:18px}.card-title h2{margin:0}.button-row{display:flex;flex-wrap:wrap;gap:8px}
+.link-button{min-height:auto;padding:0;color:var(--green);border:0;background:none}
+.party-list{display:grid;gap:10px}.party-row{display:grid;grid-template-columns:1fr 180px auto;gap:8px}
+.generalista-items{margin-top:0}.item-header,.item-row{display:grid;align-items:center;gap:10px;min-width:850px}
+.item-header{padding:0 8px 10px;color:var(--muted);font-size:12px;font-weight:800}
+.item-row{padding:12px 8px;border-top:1px solid var(--line)}
+.item-header,.item-row{grid-template-columns:58px 1.4fr 145px 120px 180px}.item-row input,.item-row select{min-width:0}
+.item-index{display:flex;align-items:center;gap:4px}.item-index>span{display:grid;width:32px;height:32px;place-items:center;border-radius:8px;color:var(--navy);background:var(--canvas);font-weight:800}
+.item-index .small{min-width:26px;width:26px;height:26px;padding:0;border-radius:50%;font-size:16px}
+.generalista-items.detailed .item-header,.generalista-items.detailed .item-row{min-width:1650px;grid-template-columns:58px 1.3fr 128px 110px 165px 130px 128px 128px 130px 100px 110px 128px 128px 120px}
+.compact{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:11px}.compact input{width:17px;min-height:17px}
+.index-actions{display:flex;align-items:center;gap:12px;margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+.extra-section+.extra-section{margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
+.extra-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:12px;margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--canvas)}
+.extra-row .field{grid-column:auto}.extra-row>.small{margin-bottom:1px}.empty-inline{margin-top:8px;color:var(--muted);font-size:13px}
+.summary{grid-template-columns:repeat(4,1fr)}.summary .metric:last-child{grid-column:span 2}.table-wrap{margin-bottom:24px}.legal-note{margin-top:24px}
+@media(max-width:900px){.summary{grid-template-columns:repeat(2,1fr)}.summary .metric:last-child{grid-column:span 2}.extra-row{grid-template-columns:repeat(2,minmax(0,1fr))}.extra-row>.small{justify-self:start}}
+@media(max-width:620px){.party-row,.extra-row{grid-template-columns:1fr}.generalista-criteria .check{margin:0}.index-actions,.card-title{align-items:stretch;flex-direction:column}.summary{grid-template-columns:1fr}.summary .metric:last-child{grid-column:auto}}

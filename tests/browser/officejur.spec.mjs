@@ -237,26 +237,42 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
   const icons = await page.locator('.calculator-card').evaluateAll(cards => cards.slice(0, 2).map(card => card.querySelector('.icon svg')?.innerHTML));
   expect(new Set(icons).size).toBe(2);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária simples' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  const wizard = page.locator('.panel.wizard-head');
+  await expect(wizard).toHaveCount(1);
+  await expect(wizard.locator('.eyebrow')).toHaveText('Generalista');
+  await expect(wizard.getByRole('heading', { name: 'Atualização monetária simples' })).toBeVisible();
+  await expect(wizard.locator('.hint').first()).toContainText(/OJ-GEN-.*• versão generic-1\.0\.0/);
+  await expect(page.getByText('Ajuda e sugestões')).toHaveCount(0);
+  await expect(page.locator('.generic-heading, .generic-wizard, .generic-card, .generic-summary')).toHaveCount(0);
+  await expect(page.locator('.wizard-step strong').filter({ hasText: /Passo\s+\d/ })).toHaveCount(0);
+  await expect(page.locator('.wizard-step').first().locator('strong')).toHaveText('Dados do cálculo');
+  await expect(page.locator('.wizard-step').first().locator('small')).toHaveText('critérios, valores e lançamentos');
   await expect(page.locator('.wizard-steps.steps-2')).toHaveCSS('display', 'grid');
   await expect(page.locator('.wizard-step.active')).toHaveCount(1);
+  await expect(page.locator('#generalista-form .wizard-actions > div')).toHaveCSS('gap', '10px');
   await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByLabel('Valor do item 1').fill('150');
   await page.getByRole('button', { name: 'Calcular' }).click();
   await expect(page.locator('.wizard-steps.steps-2 .wizard-step.done')).toHaveCount(1);
   await expect(page.locator('.wizard-steps .wizard-step.active')).toContainText('Resultado');
-  await expect(page.getByRole('heading', { name: 'Resultado do cálculo' })).toBeVisible();
+  await expect(page.locator('.summary')).toBeVisible();
   await expect(page.getByText('R$ 150,00', { exact: true }).last()).toBeVisible();
 });
 
 test('atualização monetária completa percorre parcelas e encargos adicionais', async ({ page }) => {
   await prepareCalculationPage(page);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária completa' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await expect(page.locator('.panel.wizard-head .eyebrow')).toHaveText('Generalista');
+  await expect(page.locator('.panel.wizard-head .hint').first()).toContainText(/OJ-GEN-.*• versão generic-1\.0\.0/);
+  await expect(page.locator('.wizard-step').nth(2).locator('strong')).toHaveText('Encargos');
+  await expect(page.locator('.wizard-step').nth(2).locator('small')).toHaveText('multas, honorários e custas');
   await expect(page.locator('.wizard-steps.steps-4')).toHaveCSS('display', 'grid');
   await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.locator('.wizard-steps.steps-4 .wizard-step.done')).toHaveCount(1);
+  await expect(page.locator('.generalista-items.detailed')).toHaveCSS('overflow-x', 'auto');
   await page.getByLabel('Descrição do item 1').fill('Parcela principal');
   await page.getByLabel('Valor do item 1').fill('100');
   await page.getByRole('button', { name: 'Próximo' }).click();
@@ -265,7 +281,7 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await page.getByRole('button', { name: /Adicionar honorários/ }).click();
   await page.getByLabel('Honorários (%)').fill('10');
   await page.getByRole('button', { name: 'Calcular' }).click();
-  await expect(page.getByRole('heading', { name: 'Resultado do cálculo' })).toBeVisible();
+  await expect(page.locator('.summary')).toBeVisible();
   await expect(page.getByText('R$ 112,20', { exact: true }).last()).toBeVisible();
 });
 
@@ -292,6 +308,10 @@ test('calculadoras usam o mesmo componente de passos em todas as larguras', asyn
 
     await page.setViewportSize({ width: 600, height: 900 });
     await expect.poll(() => steps.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
+    if (path.startsWith('calculos/facil') || path.startsWith('calculos/completo')) {
+      await expect(page.locator('.wizard-actions')).toHaveCSS('flex-direction', 'row');
+      await expect(page.locator('.wizard-actions > div')).toHaveCSS('gap', '10px');
+    }
   }
 });
 

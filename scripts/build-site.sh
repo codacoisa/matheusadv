@@ -34,7 +34,8 @@ cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/assets
 copy_static_app "$ROOT_DIR/apps/configuracoes" "$SITE_DIR/configuracoes"
 cp "$ROOT_DIR/apps/calculos/index.html" "$SITE_DIR/calculos/index.html"
 cp -R "$ROOT_DIR/apps/calculos/assets" "$SITE_DIR/calculos/assets"
-cp "$ROOT_DIR/apps/calculos/generic-app.js" "$SITE_DIR/calculos/generic-app.js"
+mkdir -p "$SITE_DIR/calculos/generalista"
+cp -R "$ROOT_DIR/apps/calculos/generalista/assets" "$SITE_DIR/calculos/generalista/assets"
 
 for source in "$ROOT_DIR/apps/calculos/"*; do
   module="$(basename "$source")"
