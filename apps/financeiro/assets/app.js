@@ -6,6 +6,7 @@
   const gistClient = window.OfficeJurGistClient;
   const financeFiles = window.FinanceFiles;
   const financeStorage = window.FinanceStorage;
+  const financeDataStore = window.FinanceDataStore;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
     MP_KEY = "officejur::financeiro::mercado-pago::settings",
     MP_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
@@ -498,23 +499,6 @@
     deletedKeys.forEach((key) => (d[key] = normalizeDeleted(d[key])));
     return d;
   }
-  function load() {
-    const defaults = financeStorage.split(emptyData()),
-      domains = Object.fromEntries(
-        financeStorage.domainNames.map((name) => {
-          const saved = localStorage.getItem(
-            financeStorage.DOMAINS[name].storageKey,
-          );
-          return [
-            name,
-            saved
-              ? financeStorage.normalizeDomain(name, JSON.parse(saved))
-              : defaults[name],
-          ];
-        }),
-      );
-    return normalize(financeStorage.assemble(domains));
-  }
   function openFilesDatabase() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(FILES_DB, 2);
@@ -726,13 +710,23 @@
   }
   let dataLoadFailure = null,
     filesLoadFailure = null,
-    data;
-  try {
-    data = load();
-  } catch (error) {
-    dataLoadFailure = error;
-    data = emptyData();
-  }
+    data = emptyData(),
+    lastPersistedData = structuredClone(data),
+    dataSaveInFlight = Promise.resolve(),
+    dataReadyState = false;
+  const dataReady = financeDataStore
+    .load({ financeStorage })
+    .then((domains) => {
+      data = normalize(financeStorage.assemble(domains));
+      lastPersistedData = structuredClone(data);
+      dataReadyState = true;
+      return data;
+    })
+    .catch((error) => {
+      dataLoadFailure = error;
+      dataReadyState = true;
+      throw error;
+    });
   let filesData = financeFiles.emptyData(),
     settings = loadSettings(),
     mp = loadMp(),
@@ -758,12 +752,7 @@
   setupAgreementEditor($("#case-agreement-editor"));
   setupAgreementEditor($("#package-agreement-editor"));
   function captureMissingDeletions() {
-    let previous;
-    try {
-      previous = load();
-    } catch {
-      return;
-    }
+    const previous = lastPersistedData;
     const collections = {
         clients: "deletedClients",
         cases: "deletedCases",
@@ -790,22 +779,29 @@
       throw new Error(
         `Os bancos financeiros possuem vínculos inválidos: ${referenceIssues[0]}`,
       );
-    financeStorage.domainNames.forEach((name) =>
-      localStorage.setItem(
-        financeStorage.DOMAINS[name].storageKey,
-        JSON.stringify(domains[name]),
-      ),
-    );
-    return domains;
+    const task = dataSaveInFlight
+      .catch(() => undefined)
+      .then(() => financeDataStore.save(domains, { financeStorage }))
+      .then((savedDomains) => {
+        lastPersistedData = normalize(financeStorage.assemble(savedDomains));
+        return savedDomains;
+      });
+    dataSaveInFlight = task;
+    return task;
   }
   function persist(skipSync = false) {
+    if (!dataReadyState)
+      throw new Error("Os dados financeiros ainda estão sendo carregados.");
     if (dataLoadFailure)
       throw new Error(
         "Os dados locais estão bloqueados para recuperação e não podem ser sobrescritos.",
       );
     captureMissingDeletions();
     data.updatedAt = now();
-    saveLocalData();
+    void saveLocalData().catch((error) => {
+      dataLoadFailure = error;
+      showStorageFailure(error);
+    });
     render();
     if (!skipSync) scheduleAutoSync();
   }
@@ -815,17 +811,25 @@
       error?.message || "O armazenamento local retornou um conteúdo inválido.";
     if (!dialog.open) dialog.showModal();
   }
-  function downloadRawStorage() {
-    const rawDomains = Object.fromEntries(
-      financeStorage.domainNames.map((name) => {
-        const definition = financeStorage.DOMAINS[name];
-        return [definition.file, localStorage.getItem(definition.storageKey)];
-      }),
-    );
+  async function downloadRawStorage() {
+    let rawDomains = {}, dataStoreError = "";
+    try {
+      const domains = await financeDataStore.rawDomains({ financeStorage });
+      rawDomains = Object.fromEntries(
+        financeStorage.domainNames.map((name) => [
+          financeStorage.DOMAINS[name].file,
+          JSON.stringify(domains[name]),
+        ]),
+      );
+    } catch (error) {
+      dataStoreError = error?.message || "erro desconhecido";
+    }
     const payload = {
         exportedAt: now(),
         rawDomains,
+        legacyRawDomains: financeDataStore.legacyRaw(localStorage, financeStorage),
         dataError: dataLoadFailure?.message || "",
+        dataStoreError,
         filesError: filesLoadFailure?.message || "",
       },
       blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -2574,6 +2578,8 @@
     if (!settings.gistId || !settings.token)
       throw new Error("Configure o Gist nas Configurações do OfficeJur.");
     syncInFlight = (async () => {
+      await dataReady;
+      await dataSaveInFlight;
       await filesReady;
       const { gist, domainFiles, filesFile, revision: initialRevision } =
         await fetchGistFiles();
@@ -2615,7 +2621,7 @@
       data = normalize(financeStorage.assemble(mergedDomains));
       filesData = financeFiles.mergeData(filesData, remoteFiles);
       validateFileReferences(filesData);
-      saveLocalData();
+      await saveLocalData();
       await saveFilesData(filesData);
       render();
       if (currentFilesClientId) renderClientFiles();
@@ -3862,7 +3868,8 @@
       }
   });
   $("#sync-now").onclick = () => pushGist().catch((e) => toast(e.message));
-  $("#download-raw-storage").onclick = downloadRawStorage;
+  $("#download-raw-storage").onclick = () =>
+    downloadRawStorage().catch((error) => showStorageFailure(error));
   document.addEventListener("click", (e) => {
     const action = e.target.closest("[data-client-document]"),
       currentMenu = e.target.closest(".document-menu");
@@ -3880,13 +3887,20 @@
         .querySelectorAll(".document-menu[open]")
         .forEach((menu) => menu.removeAttribute("open"));
   });
-  showView((location.hash || "#dashboard").slice(1));
-  render();
-  if (dataLoadFailure) showStorageFailure(dataLoadFailure);
-  if (!dataLoadFailure && settings.gistId && settings.token)
-    filesReady
-      .then(() => pushGist())
-      .catch((error) =>
-        toast(`Não foi possível sincronizar ao abrir: ${error.message}`),
-      );
+  dataReady
+    .then(() => {
+      showView((location.hash || "#dashboard").slice(1));
+      render();
+      if (settings.gistId && settings.token)
+        filesReady
+          .then(() => pushGist())
+          .catch((error) =>
+            toast(`Não foi possível sincronizar ao abrir: ${error.message}`),
+          );
+    })
+    .catch((error) => {
+      showView((location.hash || "#dashboard").slice(1));
+      render();
+      showStorageFailure(error);
+    });
 })();
