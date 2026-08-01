@@ -2,6 +2,7 @@
   "use strict";
   const app = document.querySelector("#app"), toast = document.querySelector("#toast"), syncStatus = document.querySelector("#sync-status");
   const core = window.OfficeJurCalculations, storageApi = window.OfficeJurCalculationStorage;
+  const financeApi = window.OfficeJurCalculationFinance;
   const indices = window.OfficeJurLegalIndices, pdf = window.OfficeJurCalculationPdf;
   const gistSettings = window.OfficeJurGistSettings, gistClient = window.OfficeJurGistClient;
   const syncFactory = window.OfficeJurCalculationSync;
@@ -16,7 +17,8 @@
     const version = String(value || core.CALCULATION_VERSION);
     return /^\d/.test(version) ? `pension-${version}` : version;
   };
-  let data = storageApi.load(), view = "catalog", filter = "Todos", step = 1, current = null, busy = false;
+  let data = storageApi.load(), financeData = financeApi?.empty() || { clients: [], cases: [], loaded: false },
+    view = "catalog", filter = "Todos", step = 1, current = null, busy = false;
   const sync = syncFactory.create({
     storage: storageApi,
     gistSettings,
@@ -52,6 +54,26 @@
     document.querySelectorAll("button").forEach((button) => { button.disabled = value; });
     if (value) syncStatus.textContent = label;
   }
+  function clientName(clientId) {
+    return financeApi?.clientLabel(financeApi.findClient(financeData, clientId)) || "Cliente não vinculado";
+  }
+  function caseName(caseId) {
+    return financeApi?.caseLabel(financeApi.findCase(financeData, caseId)) || "Caso não vinculado";
+  }
+  function clientOptions(selected) {
+    return `<option value="">Selecione um cliente</option>${(financeData.clients || []).map((client) =>
+      `<option value="${escape(client.id)}" ${String(selected || "") === String(client.id) ? "selected" : ""}>${escape(financeApi.clientLabel(client))}</option>`).join("")}`;
+  }
+  function caseOptions(clientId, selected) {
+    const cases = financeApi?.casesForClient(financeData, clientId) || [];
+    return `<option value="">Nenhum caso vinculado</option>${cases.map((item) =>
+      `<option value="${escape(item.id)}" ${String(selected || "") === String(item.id) ? "selected" : ""}>${escape(financeApi.caseLabel(item))}</option>`).join("")}`;
+  }
+  function financeNotice() {
+    if (!financeData.loaded) return '<div class="finance-notice error"><strong>Não foi possível ler o Financeiro.</strong><span>Atualize a página para tentar novamente.</span></div>';
+    if (!financeData.clients.length) return '<div class="finance-notice"><strong>Cadastre um cliente no Financeiro antes de criar o cálculo.</strong><a href="../financeiro/" target="_blank" rel="noopener">Abrir Financeiro</a></div>';
+    return "";
+  }
   function basisLabel(input) {
     if (input.basisType === "minimum_wage") return `${input.percentage}% do salário mínimo nacional vigente em cada vencimento`;
     if (input.basisType === "income") return `${input.percentage}% da base mensal informada (${money(input.referenceIncome)})`;
@@ -68,7 +90,7 @@
       type: "pension", name: `Pensão — ${now.split("-").reverse().join("/")}`,
       status: "draft", calculationVersion: core.CALCULATION_VERSION, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       input: {
-        creditor: "", debtor: "", caseNumber: "", notes: "", startDate: now, endDate: now, calculationDate: now,
+        clientId: "", clientName: "", caseId: "", caseName: "", creditor: "", debtor: "", caseNumber: "", notes: "", startDate: now, endDate: now, calculationDate: now,
         basisType: "minimum_wage", percentage: 30, fixedAmount: 0, referenceIncome: 0, includeThirteenth: false,
         installments: [], basisLabel: "",
         settings: {
@@ -103,12 +125,23 @@
   function savedView() {
     app.innerHTML = `<section class="panel"><div class="saved-head"><div><p class="eyebrow">Histórico e versões</p><h1>Meus cálculos</h1>
     <p class="hint">Os cálculos podem ser reabertos, ajustados e exportados novamente.</p></div><button class="secondary" data-action="catalog">Novo cálculo</button></div>
-    <div class="saved-list">${data.records.length ? data.records.map((record) => `
+    <div class="saved-toolbar"><label class="search-field" for="saved-search">Pesquisar por cliente ou nome do cálculo<input id="saved-search" type="search" value="${escape(savedSearch)}" placeholder="Pesquisar por cliente ou nome do cálculo"></label><select id="saved-type" aria-label="Filtrar por calculadora"><option value="Todos">Todas as calculadoras</option>${categories.filter((item) => item !== "Todos").map((item) => `<option ${savedType === item ? "selected" : ""}>${escape(item)}</option>`).join("")}</select></div>
+    <div class="saved-list">${filteredRecords().length ? filteredRecords().map((record) => `
       <article class="saved-item"><div><span class="status ${record.status === "final" ? "final" : "draft"}">${record.status === "final" ? "Calculado" : "Rascunho"}</span>
-      <h3>${escape(record.name)}</h3><p>${escape(record.code || "Sem código")} • atualizado ${new Date(record.updatedAt).toLocaleString("pt-BR")}${record.result ? ` • ${money(record.result.totals.total)}` : ""}</p></div>
+      <h3>${escape(clientName(record.input?.clientId))}</h3><p>${escape(record.name)}${record.input?.caseId ? ` • ${escape(caseName(record.input.caseId))}` : ""}<br>${escape(record.code || "Sem código")} • atualizado ${new Date(record.updatedAt).toLocaleString("pt-BR")}${record.result ? ` • ${money(record.result.totals.total)}` : ""}</p></div>
       <div class="saved-actions"><button class="secondary small" data-action="${record.type === "labor" ? "edit-labor" : "edit"}" data-id="${record.id}">Editar</button>
       ${record.result ? `<button class="primary small" data-action="${record.type === "labor" ? "pdf-labor" : "pdf"}" data-id="${record.id}">PDF</button>` : ""}
       <button class="danger small" data-action="delete" data-id="${record.id}">Excluir</button></div></article>`).join("") : '<div class="empty">Nenhum cálculo salvo ainda.</div>'}</div></section>`;
+  }
+
+  let savedSearch = "", savedType = "Todos";
+  function filteredRecords() {
+    const term = savedSearch.trim().toLocaleLowerCase("pt-BR");
+    return data.records.filter((record) => {
+      const matchesType = savedType === "Todos" || (record.type === "labor" ? "Trabalhista" : "Familiar") === savedType;
+      const haystack = [record.name, clientName(record.input?.clientId), caseName(record.input?.caseId)].join(" ").toLocaleLowerCase("pt-BR");
+      return matchesType && (!term || haystack.includes(term));
+    });
   }
 
   function steps() {
@@ -121,6 +154,8 @@
     const i = current.input;
     return `<div class="form-grid">
       ${field("Nome do cálculo", "name", current.name, "text", "full")}
+      <div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" name="clientId" required>${clientOptions(i.clientId)}</select></div>
+      <div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId" name="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>
       ${field("Exequente / credor", "creditor", i.creditor)}
       ${field("Executado / devedor", "debtor", i.debtor)}
       ${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}
@@ -137,6 +172,7 @@
       ${i.basisType === "income" ? field("Base mensal informada (R$)", "referenceIncome", i.referenceIncome, "number", "full") : ""}
       <label class="check field full"><input name="includeThirteenth" type="checkbox" ${i.includeThirteenth ? "checked" : ""}><span>Incluir parcela anual de 13º em dezembro, quando prevista no título.</span></label>
       <div class="field full"><label for="notes">Observações do título ou decisão</label><textarea id="notes" name="notes">${escape(i.notes)}</textarea></div>
+      ${financeNotice()}
     </div>`;
   }
 
@@ -209,7 +245,13 @@
     const formData = new FormData(form), i = current.input;
     const previousSignature = installmentSignature(i);
     current.name = String(formData.get("name") || "").trim();
-    ["creditor", "debtor", "caseNumber", "startDate", "endDate", "calculationDate", "basisType", "notes"].forEach((key) => { i[key] = String(formData.get(key) || ""); });
+    ["clientId", "caseId", "creditor", "debtor", "caseNumber", "startDate", "endDate", "calculationDate", "basisType", "notes"].forEach((key) => { i[key] = String(formData.get(key) || ""); });
+    const selectedCase = financeApi?.findCase(financeData, i.caseId);
+    if (i.caseId && (!selectedCase || String(selectedCase.clientId) !== String(i.clientId))) throw new Error("Selecione um caso pertencente ao cliente escolhido.");
+    if (!i.clientId || !financeApi?.findClient(financeData, i.clientId)) throw new Error("Vincule o cálculo a um cliente do Financeiro.");
+    i.clientName = financeApi.clientLabel(financeApi.findClient(financeData, i.clientId));
+    i.caseName = selectedCase ? financeApi.caseLabel(selectedCase) : "";
+    if (selectedCase?.number) i.caseNumber = String(selectedCase.number);
     i.percentage = Number(formData.get("percentage") || i.percentage || 0);
     i.fixedAmount = Number(formData.get("fixedAmount") || 0);
     i.referenceIncome = Number(formData.get("referenceIncome") || 0);
@@ -287,6 +329,21 @@
   }
 
   app.addEventListener("change", (event) => {
+    if (event.target.id === "clientId") {
+      try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { /* A later submit will validate the complete form. */ }
+      current.input.clientId = event.target.value;
+      current.input.caseId = "";
+      render();
+    }
+    if (event.target.id === "caseId") {
+      try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { /* A later submit will validate the complete form. */ }
+      current.input.caseId = event.target.value;
+      const selectedCase = financeApi?.findCase(financeData, event.target.value);
+      if (selectedCase?.number) current.input.caseNumber = String(selectedCase.number);
+      render();
+    }
+    if (event.target.id === "saved-type") { savedType = event.target.value; render(); }
+    if (event.target.id === "saved-search") { savedSearch = event.target.value; render(); }
     if (event.target.id === "basisType") {
       try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { current.input.basisType = event.target.value; }
       render();
@@ -362,5 +419,15 @@
     }
   });
 
-  void syncFromGist().finally(render);
+  async function initialize() {
+    try {
+      financeData = await financeApi?.load?.() || { clients: [], cases: [], loaded: false };
+    } catch (error) {
+      financeData = { clients: [], cases: [], loaded: false };
+      notify(`Não foi possível carregar os clientes do Financeiro: ${error.message}`, true);
+    }
+    await syncFromGist();
+    render();
+  }
+  void initialize();
 })();

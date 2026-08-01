@@ -1,6 +1,25 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
+async function prepareCalculationPage(page, path = 'calculos/') {
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('officejur-financeiro', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction('domains', 'readwrite');
+      const store = transaction.objectStore('domains');
+      const now = new Date().toISOString();
+      store.put({ name: 'clients', value: { schema: 'officejur/financeiro-clientes-data', version: 1, updatedAt: now, records: [{ id: 'client-test', type: 'pf', name: 'Cliente de teste', updatedAt: now }], deleted: [] } });
+      store.put({ name: 'cases', value: { schema: 'officejur/financeiro-casos-data', version: 1, updatedAt: now, records: [{ id: 'case-test', clientId: 'client-test', title: 'Ação de teste', number: '0000000-00.2026.8.00.0000', type: 'Judicial', status: 'active', updatedAt: now }], deleted: [] } });
+      transaction.oncomplete = () => { database.close(); resolve(); };
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }));
+  await page.goto(path, { waitUntil: 'networkidle' });
+}
+
 const pages = [
   '',
   'configuracoes/',
@@ -179,11 +198,13 @@ test('geradores carregam a base compartilhada de documentos', async ({ page }) =
 });
 
 test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async ({ page }) => {
-  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await prepareCalculationPage(page);
   const card = page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' });
   await card.getByRole('button', { name: 'Iniciar cálculo' }).click();
   await page.getByLabel('Forma estipulada').selectOption('fixed');
   await page.getByLabel('Nome do cálculo').fill('Teste de pensão');
+  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.getByLabel('Caso / processo (opcional)').selectOption('case-test');
   await page.getByLabel('Exequente / credor').fill('Credora de teste');
   await page.getByLabel('Executado / devedor').fill('Devedor de teste');
   await page.getByLabel('Número do processo').fill('0000000-00.2026.8.00.0000');
@@ -205,13 +226,14 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
 });
 
 test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page }) => {
-  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await prepareCalculationPage(page);
   const card = page.locator('.calculator-card').filter({ hasText: 'Verbas trabalhistas' });
   await card.getByRole('button', { name: 'Iniciar cálculo' }).click();
   await expect(page).toHaveURL(/calculos\/trabalhista\.html$/);
 
   await page.getByLabel('Nome do cálculo').fill('Verbas de teste');
-  await page.getByLabel('Cliente').fill('Trabalhador de teste');
+  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.getByLabel('Caso / processo (opcional)').selectOption('case-test');
   await page.getByLabel('Salário-base inicial (R$)').fill('3000');
   await page.getByLabel(/Empregado ainda ativo/).check();
   await page.getByRole('button', { name: 'Próximo' }).click();
@@ -275,15 +297,15 @@ test('cálculo trabalhista usa a sincronização compartilhada do Gist', async (
     });
   });
 
-  await page.goto('calculos/trabalhista.html', { waitUntil: 'networkidle' });
+  await prepareCalculationPage(page, 'calculos/trabalhista.html');
   await expect(page.locator('#sync-status')).toHaveText('Gist sincronizado');
   await page.getByLabel('Nome do cálculo').fill('Rascunho sincronizado');
-  await page.getByLabel('Cliente').fill('Cliente de teste');
+  await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByLabel(/Empregado ainda ativo/).check();
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
 
-  await expect.poll(() => requests.filter(item => item.method === 'PATCH').length).toBe(1);
-  const patch = requests.find(item => item.method === 'PATCH');
+  await expect.poll(() => requests.filter(item => item.method === 'PATCH' && item.body?.files?.['officejur-calculos-juridicos.json']).length).toBe(1);
+  const patch = requests.find(item => item.method === 'PATCH' && item.body?.files?.['officejur-calculos-juridicos.json']);
   const content = JSON.parse(patch.body.files['officejur-calculos-juridicos.json'].content);
   expect(content.records.some(record => record.type === 'labor' && record.name === 'Rascunho sincronizado')).toBe(true);
 });

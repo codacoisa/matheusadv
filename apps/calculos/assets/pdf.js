@@ -154,6 +154,8 @@
       ["Data-base", fmtDate(record.input.calculationDate)],
       ["Exequente", record.input.creditor || "Não informado"],
       ["Executado", record.input.debtor || "Não informado"],
+      ["Cliente", record.input.clientName || record.input.clientId || "Não informado"],
+      ["Caso", record.input.caseName || record.input.caseId || "Não vinculado"],
       ["Processo", record.input.caseNumber || "Não informado"],
       ["Período", `${fmtDate(record.input.startDate)} a ${fmtDate(record.input.endDate)}`],
     ]);

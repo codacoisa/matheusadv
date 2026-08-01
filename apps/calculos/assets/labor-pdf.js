@@ -226,6 +226,8 @@
       ["Data-base", date(input.calculationDate)],
       ["Reclamante", value(input.claimant || input.client || input.creditor || input.employee || input.parties?.find?.((party) => party.type === "claimant")?.name)],
       ["Reclamada", value(input.respondent || input.party || input.debtor || input.employer || input.parties?.find?.((party) => party.type === "respondent")?.name)],
+      ["Cliente", value(input.clientName || input.clientId)],
+      ["Caso", value(input.caseName || input.caseId, "Não vinculado")],
       ["Cargo", value(input.role || input.position)],
       ["Processo", value(input.caseNumber)],
       ["Admissão", date(input.admissionDate || employment.admissionDate || input.startDate)],
