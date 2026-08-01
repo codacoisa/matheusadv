@@ -3,14 +3,6 @@
 .generic-heading h1{font-size:clamp(36px,5vw,54px)}
 .generic-heading .hint{max-width:680px;margin:10px 0 0}
 .help-link{color:var(--green);font-size:16px;font-weight:800}
-.generic-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:10px 0 28px;padding:0;list-style:none}
-.generic-steps:has(.generic-step:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(220px,380px))}
-.generic-step{display:flex;align-items:center;gap:12px;color:#656a77}
-.generic-step>span{display:grid;width:68px;height:68px;flex:0 0 68px;place-items:center;border-radius:8px;color:#fff;background:#52545e;font-size:30px;font-weight:800}
-.generic-step strong{display:block;color:#3d404a;font-size:17px}
-.generic-step small{display:block;color:#596581;font-size:13px}
-.generic-step.active>span,.generic-step.done>span{background:#42c795}
-.generic-step.active strong{color:var(--navy)}
 .generic-card{margin-top:18px;border:1px solid #e1e3eb;border-radius:8px;padding:28px;background:#fff;box-shadow:0 2px 8px rgba(23,33,58,.03)}
 .generic-card h2{font-family:inherit;font-size:24px;color:#101828}
 .generic-card>.form-grid{margin-top:18px}
@@ -53,9 +45,6 @@
 .result-card .legal-note{margin-top:24px}
 .generic-wizard .wizard-actions{margin-top:24px}
 @media(max-width:900px){
-  .generic-steps{gap:10px}
-  .generic-step>span{width:48px;height:48px;flex-basis:48px;font-size:23px}
-  .generic-step strong{font-size:14px}
   .generic-summary{grid-template-columns:repeat(2,1fr)}
   .generic-summary .metric:last-child{grid-column:span 2}
   .extra-row{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -65,8 +54,6 @@
   .generic-wizard{padding:18px 10px}
   .generic-heading{flex-direction:column}
   .help-link{font-size:14px}
-  .generic-steps,.generic-steps:has(.generic-step:nth-child(2):last-child){grid-template-columns:1fr;gap:8px}
-  .generic-step{padding:6px 0}
   .generic-card{padding:18px 12px}
   .party-row{grid-template-columns:1fr}
   .generic-criteria .check{margin:0}
@@ -80,7 +67,7 @@
 }
 @media print{
   body{background:#fff}
-  .topbar,office-site-footer,.wizard-actions,.help-link,.generic-steps,.toast{display:none!important}
+  .topbar,office-site-footer,.wizard-actions,.help-link,.wizard-steps,.toast{display:none!important}
   main{width:100%;margin:0}
   .generic-wizard{padding:0;background:#fff}
   .generic-card{break-inside:avoid;box-shadow:none}

@@ -214,6 +214,8 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   await page.getByLabel('Número do processo').fill('0000000-00.2026.8.00.0000');
   await page.getByLabel('Valor mensal (R$)').fill('500');
   await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.locator('.wizard-steps.steps-4 .wizard-step.done')).toHaveCount(1);
+  await expect(page.locator('.wizard-steps .wizard-step.active')).toContainText('Parcelas');
   await expect(page.getByRole('columnheader', { name: 'Abatimentos' })).toBeVisible();
   await page.getByRole('button', { name: 'Próximo' }).click();
   await page.getByLabel('Correção monetária').selectOption('none');
@@ -235,11 +237,14 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
   const icons = await page.locator('.calculator-card').evaluateAll(cards => cards.slice(0, 2).map(card => card.querySelector('.icon svg')?.innerHTML));
   expect(new Set(icons).size).toBe(2);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária simples' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
-  await expect(page.locator('.generic-steps')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.wizard-steps.steps-2')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.wizard-step.active')).toHaveCount(1);
   await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByLabel('Valor do item 1').fill('150');
   await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.locator('.wizard-steps.steps-2 .wizard-step.done')).toHaveCount(1);
+  await expect(page.locator('.wizard-steps .wizard-step.active')).toContainText('Resultado');
   await expect(page.getByRole('heading', { name: 'Resultado do cálculo' })).toBeVisible();
   await expect(page.getByText('R$ 150,00', { exact: true }).last()).toBeVisible();
 });
@@ -247,10 +252,11 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
 test('atualização monetária completa percorre parcelas e encargos adicionais', async ({ page }) => {
   await prepareCalculationPage(page);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária completa' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
-  await expect(page.locator('.generic-steps')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.wizard-steps.steps-4')).toHaveCSS('display', 'grid');
   await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.locator('.wizard-steps.steps-4 .wizard-step.done')).toHaveCount(1);
   await page.getByLabel('Descrição do item 1').fill('Parcela principal');
   await page.getByLabel('Valor do item 1').fill('100');
   await page.getByRole('button', { name: 'Próximo' }).click();
@@ -261,6 +267,32 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await page.getByRole('button', { name: 'Calcular' }).click();
   await expect(page.getByRole('heading', { name: 'Resultado do cálculo' })).toBeVisible();
   await expect(page.getByText('R$ 112,20', { exact: true }).last()).toBeVisible();
+});
+
+test('calculadoras usam o mesmo componente de passos em todas as larguras', async ({ page }) => {
+  const flows = [
+    ['calculos/facil/', 'steps-2', 2],
+    ['calculos/completo/', 'steps-4', 4],
+    ['calculos/pensao/', 'steps-4', 4],
+    ['calculos/trabalhista/', 'steps-5', 5],
+  ];
+
+  for (const [path, modifier, count] of flows) {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await prepareCalculationPage(page, path);
+    const steps = page.locator(`.wizard-steps.${modifier}`);
+    const firstStep = steps.locator('.wizard-step').first();
+
+    await expect(steps).toHaveCount(1);
+    await expect(steps.locator('.wizard-step')).toHaveCount(count);
+    await expect(steps).toHaveCSS('gap', '10px');
+    await expect(firstStep.locator('span').first()).toHaveCSS('width', '34px');
+    await expect(firstStep.locator('span').first()).toHaveCSS('height', '34px');
+    await expect(firstStep).toHaveClass(/active/);
+
+    await page.setViewportSize({ width: 600, height: 900 });
+    await expect.poll(() => steps.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
+  }
 });
 
 test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page }) => {
@@ -276,6 +308,8 @@ test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page })
   await page.getByLabel(/Empregado ainda ativo/).check();
   await expect(page.locator('#labor-form .wizard-actions > div')).toHaveCSS('gap', '10px');
   await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.locator('.wizard-steps.steps-5 .wizard-step.done')).toHaveCount(1);
+  await expect(page.locator('.wizard-steps .wizard-step.active')).toContainText('Salários');
 
   await expect(page.getByRole('columnheader', { name: 'Competência' })).toBeVisible();
   await page.getByRole('button', { name: 'Próximo' }).click();

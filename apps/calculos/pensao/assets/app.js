@@ -88,7 +88,7 @@
 
   function steps() {
     const labels = [["Dados básicos", "partes e período"], ["Parcelas", "valores e abatimentos"], ["Critérios", "índices e encargos"], ["Resultado", "memória e PDF"]];
-    return `<div class="steps">${labels.map((item, index) => `<button class="step ${step === index + 1 ? "active" : ""}" data-step="${index + 1}" ${index + 1 > step ? "disabled" : ""}><span>${index + 1}</span><div><strong>${item[0]}</strong><small>${item[1]}</small></div></button>`).join("")}</div>`;
+    return `<div class="wizard-steps steps-4">${labels.map((item, index) => `<button class="wizard-step ${step === index + 1 ? "active" : ""} ${step > index + 1 ? "done" : ""}" data-step="${index + 1}" ${index + 1 > step ? "disabled" : ""}><span>${index + 1}</span><div><strong>${item[0]}</strong><small>${item[1]}</small></div></button>`).join("")}</div>`;
   }
   const field = (label, name, value, type = "text", cls = "") => `<div class="field ${cls}"><label class="required" for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${escape(value)}" required></div>`;
 
