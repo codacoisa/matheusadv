@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#17213a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17213a" media="(prefers-color-scheme: dark)">
+  <meta name="msapplication-TileColor" content="#17213a">
+  <meta name="application-name" content="OfficeJur">
+  <meta name="apple-mobile-web-app-title" content="OfficeJur">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>JusCalc Fácil | OfficeJur</title>
+  <link rel="icon" href="../../assets/app-icon.png" data-officejur-href="office.appIconUrl" type="image/png">
+  <link rel="apple-touch-icon" href="../../assets/app-icon.png" data-officejur-href="office.appIconUrl">
+  <script src="../../assets/office-config.js"></script>
+  <script src="../../assets/office-context.js" defer></script>
+  <script src="../assets/app-switcher.js?v=6" defer></script>
+  <script src="../assets/gist-settings.js?v=2" defer></script>
+  <script src="../assets/gist-client.js?v=2" defer></script>
+  <script src="../assets/sync.js?v=1" defer></script>
+  <script src="../assets/modal-scroll-lock.js?v=1" defer></script>
+  <script src="../assets/site-footer.js?v=5" defer></script>
+  <script src="../../financeiro/assets/storage.js?v=2" defer></script>
+  <script src="../../financeiro/assets/data-store.js?v=2" defer></script>
+  <script src="../assets/storage.js?v=1" defer></script>
+  <script src="../assets/finance-link.js?v=1" defer></script>
+  <script src="../assets/indices.js?v=1" defer></script>
+  <script src="../assets/generic-core.js?v=1" defer></script>
+  <script src="../generic-app.js?v=1" defer></script>
+  <link rel="stylesheet" href="../assets/styles.css?v=2">
+  <link rel="stylesheet" href="../assets/site-header.css?v=1">
+</head>
+<body data-calculator-mode="easy">
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="Voltar aos cálculos jurídicos"><img src="../../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt=""><span><strong>OfficeJur</strong><small>JusCalc Fácil</small></span></a>
+    <div class="top-actions"><span id="sync-status" class="sync-status">Dados locais</span><office-app-switcher current="calculos"></office-app-switcher></div>
+  </header>
+  <main id="generic-app" tabindex="-1"><section class="loading" aria-live="polite"><span class="spinner"></span> Preparando a calculadora…</section></main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <office-site-footer repository="officejur"></office-site-footer>
+</body>
+</html>

@@ -19,7 +19,9 @@ copy_static_app() {
   local source="$1"
   local destination="$2"
   cp "$source/"*.html "$destination/"
-  cp -R "$source/assets" "$destination/assets"
+  if [[ -d "$source/assets" ]]; then
+    cp -R "$source/assets" "$destination/assets"
+  fi
 }
 
 cp "$ROOT_DIR/apps/portal/index.html" "$SITE_DIR/index.html"
@@ -32,6 +34,7 @@ cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/assets
 copy_static_app "$ROOT_DIR/apps/configuracoes" "$SITE_DIR/configuracoes"
 cp "$ROOT_DIR/apps/calculos/index.html" "$SITE_DIR/calculos/index.html"
 cp -R "$ROOT_DIR/apps/calculos/assets" "$SITE_DIR/calculos/assets"
+cp "$ROOT_DIR/apps/calculos/generic-app.js" "$SITE_DIR/calculos/generic-app.js"
 
 for source in "$ROOT_DIR/apps/calculos/"*; do
   module="$(basename "$source")"

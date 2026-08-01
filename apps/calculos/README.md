@@ -10,6 +10,10 @@ Módulo permanente do OfficeJur para memórias de cálculo reproduzíveis.
 
 ## Calculadoras disponíveis
 
+- **JusCalc Fácil** — fluxo enxuto para atualização, juros, multas,
+  honorários e lançamentos de débito ou pagamento;
+- **JusCalc Completo** — fluxo em quatro etapas com dados do processo,
+  índices por parcela, multas, honorários e custas processuais;
 - pensão alimentícia, com assistente em quatro etapas;
 - verbas trabalhistas, com assistente em cinco etapas inspirado no fluxo de
   conferência por competências;

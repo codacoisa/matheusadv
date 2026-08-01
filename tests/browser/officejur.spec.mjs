@@ -25,6 +25,8 @@ const pages = [
   'configuracoes/',
   'configuracoes/ajuda.html',
   'calculos/',
+  'calculos/facil/',
+  'calculos/completo/',
   'calculos/pensao/',
   'calculos/trabalhista/',
   'documentos/procuracao/',
@@ -225,6 +227,35 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   expect(download.suggestedFilename()).toMatch(/^oj-cal-.*\.pdf$/i);
   await expect(page.locator('#toast')).toHaveText('PDF gerado com sucesso.');
   await expect(page.locator('#toast')).not.toContainText(/SHA|hash/i);
+});
+
+test('JusCalc Fácil calcula uma parcela e exibe a memória', async ({ page }) => {
+  await prepareCalculationPage(page);
+  await page.locator('.calculator-card').filter({ hasText: 'JusCalc Fácil' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
+  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.getByLabel('Valor do item 1').fill('150');
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.getByRole('heading', { name: 'Resultado do cálculo' })).toBeVisible();
+  await expect(page.getByText('R$ 150,00', { exact: true }).last()).toBeVisible();
+});
+
+test('JusCalc Completo percorre parcelas e encargos adicionais', async ({ page }) => {
+  await prepareCalculationPage(page);
+  await page.locator('.calculator-card').filter({ hasText: 'JusCalc Completo' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
+  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Descrição do item 1').fill('Parcela principal');
+  await page.getByLabel('Valor do item 1').fill('100');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: /Adicionar multa/ }).click();
+  await page.getByLabel('Multa (%)').fill('2');
+  await page.getByRole('button', { name: /Adicionar honorários/ }).click();
+  await page.getByLabel('Honorários (%)').fill('10');
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.getByRole('heading', { name: 'Resultado do cálculo' })).toBeVisible();
+  await expect(page.getByText('R$ 112,20', { exact: true }).last()).toBeVisible();
 });
 
 test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page }) => {
