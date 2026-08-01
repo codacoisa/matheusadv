@@ -5,7 +5,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : window, () => {
   'use strict';
 
-  const STORAGE_KEY = 'officejur-gist-settings-v1';
+  const STORAGE_KEY = 'officejur-gist-settings';
+  const VERSION = 1;
 
   function normalize(value) {
     const source = value && typeof value === 'object' ? value : {};
@@ -14,6 +15,7 @@
       /(?:gist\.github\.com\/(?:[^/]+\/)?|api\.github\.com\/gists\/)([a-f0-9]+)/i
     );
     return {
+      version: VERSION,
       gistId: gistUrlMatch ? gistUrlMatch[1] : rawGistId,
       token: String(source.token || '').trim(),
       autoSync: !!source.autoSync
@@ -47,5 +49,5 @@
     return settings;
   }
 
-  return { STORAGE_KEY, clear, load, normalize, save };
+  return { STORAGE_KEY, VERSION, clear, load, normalize, save };
 });

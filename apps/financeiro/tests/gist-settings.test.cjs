@@ -24,10 +24,11 @@ function memoryStorage(initial = {}) {
 
 test('lê exclusivamente a configuração global do Gist', () => {
   const storage = memoryStorage({
-    [gistSettings.STORAGE_KEY]: JSON.stringify({ gistId: 'global', token: 'token-global' })
+    [gistSettings.STORAGE_KEY]: JSON.stringify({ version: 1, gistId: 'global', token: 'token-global' })
   });
 
   assert.deepEqual(gistSettings.load({ storage }), {
+    version: 1,
     gistId: 'global',
     token: 'token-global',
     autoSync: false
@@ -47,14 +48,16 @@ test('salva e limpa somente a configuração global do Gist', () => {
       },
       { storage }
     ),
-    { gistId: 'abc', token: 'xyz', autoSync: true }
+    { version: 1, gistId: 'abc', token: 'xyz', autoSync: true }
   );
   assert.deepEqual(gistSettings.clear({ storage }), {
+    version: 1,
     gistId: '',
     token: '',
     autoSync: false
   });
   assert.deepEqual(JSON.parse(storage.getItem(gistSettings.STORAGE_KEY)), {
+    version: 1,
     gistId: '',
     token: '',
     autoSync: false
@@ -67,6 +70,6 @@ test('aceita o endereço completo de um Gist na configuração central', () => {
       gistId: 'https://gist.github.com/usuario/abcdef123456',
       token: 'token'
     }),
-    { gistId: 'abcdef123456', token: 'token', autoSync: false }
+    { version: 1, gistId: 'abcdef123456', token: 'token', autoSync: false }
   );
 });

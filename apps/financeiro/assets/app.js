@@ -827,7 +827,6 @@
     const payload = {
         exportedAt: now(),
         rawDomains,
-        legacyRawDomains: financeDataStore.legacyRaw(localStorage, financeStorage),
         dataError: dataLoadFailure?.message || "",
         dataStoreError,
         filesError: filesLoadFailure?.message || "",

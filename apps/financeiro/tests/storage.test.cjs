@@ -2,7 +2,6 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const storage = require("../assets/storage.js");
-const dataStore = require("../assets/data-store.js");
 
 function sampleData() {
   return {
@@ -58,10 +57,6 @@ test("separa cada domínio em arquivo e chave local próprios", () => {
     assert.equal(domains[name].schema, storage.DOMAINS[name].schema);
     assert.equal(domains[name].version, storage.DOMAINS[name].version);
     assert.ok(storage.DOMAINS[name].file.endsWith(".json"));
-    assert.match(
-      storage.DOMAINS[name].storageKey,
-      new RegExp(`^officejur::financeiro::.+::data$`),
-    );
   });
   assert.equal(domains.clients.records[0].id, "cliente-1");
   assert.equal(domains.cases.records[0].clientId, "cliente-1");
@@ -118,19 +113,4 @@ test("mescla um domínio registro por registro e respeita exclusões", () => {
     storage.signature("clients", merged),
     storage.signature("clients", storage.mergeDomain("clients", changed, base)),
   );
-});
-
-test("lê as chaves legadas como ponto de partida da migração", () => {
-  const domains = storage.split(sampleData());
-  const values = new Map(
-    storage.domainNames.map((name) => [
-      storage.DOMAINS[name].storageKey,
-      JSON.stringify(domains[name]),
-    ]),
-  );
-  const legacyStorage = { getItem: (key) => values.get(key) || null };
-
-  const migrated = dataStore.legacyDomains(legacyStorage, storage);
-
-  assert.deepEqual(migrated, domains);
 });

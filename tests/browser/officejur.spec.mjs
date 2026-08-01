@@ -52,43 +52,6 @@ test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ 
   await expect(launcher).toBeFocused();
 });
 
-test('Financeiro migra os domínios legados para IndexedDB', async ({ page }) => {
-  const legacyKey = 'officejur::financeiro::clientes::data';
-  await page.addInitScript(({ key }) => {
-    localStorage.setItem(key, JSON.stringify({
-      schema: 'officejur/financeiro-clientes-data',
-      version: 1,
-      updatedAt: '2026-08-01T12:00:00.000Z',
-      records: [{ id: 'cliente-migrado', name: 'Cliente migrado' }],
-      deleted: [],
-    }));
-  }, { key: legacyKey });
-
-  await page.goto('financeiro/', { waitUntil: 'networkidle' });
-  await expect(page.locator('body')).toContainText('Cliente migrado');
-  await expect.poll(() => page.evaluate(async ({ key }) => {
-    const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('officejur-financeiro');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const domain = await new Promise((resolve, reject) => {
-        const transaction = database.transaction('domains', 'readonly');
-        const request = transaction.objectStore('domains').get('clients');
-        request.onsuccess = () => resolve(request.result?.value || null);
-        request.onerror = () => reject(request.error);
-      });
-      return {
-        name: domain?.records?.[0]?.name,
-        legacyRemoved: localStorage.getItem(key) === null,
-      };
-    } finally {
-      database.close();
-    }
-  }, { key: legacyKey })).toEqual({ name: 'Cliente migrado', legacyRemoved: true });
-});
-
 test('páginas com tema institucional habilitam a barra de status no Safari', async ({ page }) => {
   const themedPages = [
     'calculos/',
@@ -295,7 +258,8 @@ test('assistentes de cálculo compartilham cancelamento e versões identificáve
 test('cálculo trabalhista usa a sincronização compartilhada do Gist', async ({ page }) => {
   const requests = [];
   await page.addInitScript(() => {
-    localStorage.setItem('officejur-gist-settings-v1', JSON.stringify({
+    localStorage.setItem('officejur-gist-settings', JSON.stringify({
+      version: 1,
       gistId: 'test-gist',
       token: 'token-de-teste',
       autoSync: true,
