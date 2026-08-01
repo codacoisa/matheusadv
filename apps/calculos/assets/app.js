@@ -14,8 +14,8 @@
   })[char]);
 
   const calculators = [
-    ["JusCalc Fácil", "Generalista", "Calculadora ágil e descomplicada para atualização, juros, multas e honorários.", "facil", '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M16 15h0"/>'],
-    ["JusCalc Completo", "Generalista", "Calculadora versátil com parcelas, índices variados, multas, honorários e custas.", "completo", '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h3M15 15h1M8 18h8"/>'],
+    ["Atualização monetária simples", "Generalista", "Fluxo ágil para atualização, juros, multas e honorários.", "facil", '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M16 15h0"/>'],
+    ["Atualização monetária completa", "Generalista", "Fluxo detalhado com parcelas, índices variados, multas, honorários e custas.", "completo", '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h3M15 15h1M8 18h8"/>'],
     ["Pensão alimentícia", "Familiar", "Apure parcelas vencidas, abatimentos, atualização, juros e encargos.", "pensao", '<path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"/>'],
     ["Divórcio e partilha", "Familiar", "Organize bens, dívidas, meação e quinhões.", null, '<circle cx="8" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 20c.4-4 2-6 5-6 1.7 0 3 .6 4 1.8M21 20c-.4-4-1.7-6-4-6-1.5 0-2.7.5-3.6 1.5M12 3v18"/>'],
     ["Atualização monetária", "Generalista", "Atualize créditos com índices e juros por períodos.", null, '<ellipse cx="7" cy="7" rx="4" ry="2.5"/><path d="M3 7v4c0 1.4 1.8 2.5 4 2.5s4-1.1 4-2.5V7M14 17l2.5 2.5L21 15M14 11h7v8"/>'],

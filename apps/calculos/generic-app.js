@@ -73,7 +73,7 @@
     return `<ol class="generic-steps">${labels.map((item, index) => `<li class="generic-step ${step === index + 1 ? "active" : ""} ${step > index + 1 ? "done" : ""}"><span>${index + 1}</span><div><strong>Passo ${index + 1}</strong><small>${item[0]}<br>${item[1]}</small></div></li>`).join("")}</ol>`;
   }
   function heading() {
-    return `<div class="generic-heading"><div><p class="eyebrow">Calculadoras</p><h1>${complete ? "Completo" : "Fácil"}</h1><p class="hint">${complete ? "Parcelas, índices variados, multas, honorários e custas em uma memória revisável." : "Atualização e juros com poucos campos, pronta para o cálculo do dia a dia."}</p></div><span class="help-link">? Ajuda e sugestões</span></div>`;
+    return `<div class="generic-heading"><div><p class="eyebrow">Cálculos Jurídicos</p><h1>Atualização monetária ${complete ? "completa" : "simples"}</h1><p class="hint">${complete ? "Parcelas, índices variados, multas, honorários e custas em uma memória revisável." : "Atualização e juros com poucos campos, pronta para o cálculo do dia a dia."}</p></div><span class="help-link">? Ajuda e sugestões</span></div>`;
   }
   function basicFields(includeParties = complete) {
     const i = current.input;

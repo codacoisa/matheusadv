@@ -229,9 +229,9 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   await expect(page.locator('#toast')).not.toContainText(/SHA|hash/i);
 });
 
-test('JusCalc Fácil calcula uma parcela e exibe a memória', async ({ page }) => {
+test('atualização monetária simples calcula uma parcela e exibe a memória', async ({ page }) => {
   await prepareCalculationPage(page);
-  await page.locator('.calculator-card').filter({ hasText: 'JusCalc Fácil' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária simples' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
   await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByLabel('Valor do item 1').fill('150');
@@ -240,9 +240,9 @@ test('JusCalc Fácil calcula uma parcela e exibe a memória', async ({ page }) =
   await expect(page.getByText('R$ 150,00', { exact: true }).last()).toBeVisible();
 });
 
-test('JusCalc Completo percorre parcelas e encargos adicionais', async ({ page }) => {
+test('atualização monetária completa percorre parcelas e encargos adicionais', async ({ page }) => {
   await prepareCalculationPage(page);
-  await page.locator('.calculator-card').filter({ hasText: 'JusCalc Completo' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária completa' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
   await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByRole('button', { name: 'Próximo' }).click();
