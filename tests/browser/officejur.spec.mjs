@@ -231,7 +231,11 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
 
 test('atualização monetária simples calcula uma parcela e exibe a memória', async ({ page }) => {
   await prepareCalculationPage(page);
+  await expect(page.locator('.calculator-card').filter({ hasText: 'Atualização monetária' })).toHaveCount(2);
+  const icons = await page.locator('.calculator-card').evaluateAll(cards => cards.slice(0, 2).map(card => card.querySelector('.icon svg')?.innerHTML));
+  expect(new Set(icons).size).toBe(2);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária simples' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await expect(page.locator('.generic-steps')).toHaveCSS('display', 'grid');
   await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByLabel('Valor do item 1').fill('150');
@@ -243,6 +247,7 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
 test('atualização monetária completa percorre parcelas e encargos adicionais', async ({ page }) => {
   await prepareCalculationPage(page);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária completa' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
+  await expect(page.locator('.generic-steps')).toHaveCSS('display', 'grid');
   await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByRole('button', { name: 'Próximo' }).click();
@@ -269,6 +274,7 @@ test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page })
   await page.getByLabel('Caso / processo (opcional)').selectOption('case-test');
   await page.getByLabel('Salário-base inicial (R$)').fill('3000');
   await page.getByLabel(/Empregado ainda ativo/).check();
+  await expect(page.locator('#labor-form .wizard-actions > div')).toHaveCSS('gap', '10px');
   await page.getByRole('button', { name: 'Próximo' }).click();
 
   await expect(page.getByRole('columnheader', { name: 'Competência' })).toBeVisible();

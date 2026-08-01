@@ -14,11 +14,10 @@
   })[char]);
 
   const calculators = [
-    ["Atualização monetária simples", "Generalista", "Fluxo ágil para atualização, juros, multas e honorários.", "facil", '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M16 15h0"/>'],
-    ["Atualização monetária completa", "Generalista", "Fluxo detalhado com parcelas, índices variados, multas, honorários e custas.", "completo", '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h3M15 15h1M8 18h8"/>'],
+    ["Atualização monetária simples", "Generalista", "Fluxo ágil para atualização, juros, multas e honorários.", "facil", '<circle cx="12" cy="12" r="8"/><path d="m9 15 6-6M9.5 9.5h.01M14.5 14.5h.01"/>'],
+    ["Atualização monetária completa", "Generalista", "Fluxo detalhado com parcelas, índices variados, multas, honorários e custas.", "completo", '<path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h4M8 18h8"/><path d="M17 2v4M15 4h4"/>'],
     ["Pensão alimentícia", "Familiar", "Apure parcelas vencidas, abatimentos, atualização, juros e encargos.", "pensao", '<path d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"/>'],
     ["Divórcio e partilha", "Familiar", "Organize bens, dívidas, meação e quinhões.", null, '<circle cx="8" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M3 20c.4-4 2-6 5-6 1.7 0 3 .6 4 1.8M21 20c-.4-4-1.7-6-4-6-1.5 0-2.7.5-3.6 1.5M12 3v18"/>'],
-    ["Atualização monetária", "Generalista", "Atualize créditos com índices e juros por períodos.", null, '<ellipse cx="7" cy="7" rx="4" ry="2.5"/><path d="M3 7v4c0 1.4 1.8 2.5 4 2.5s4-1.1 4-2.5V7M14 17l2.5 2.5L21 15M14 11h7v8"/>'],
     ["Revisão bancária", "Bancário", "Simule a evolução de contratos e encargos financeiros.", null, '<path d="m3 9 9-5 9 5M5 10v8M10 10v8M14 10v8M19 10v8M3 21h18"/>'],
     ["Superendividamento", "Consumidor", "Estruture renda, mínimo existencial e plano de pagamento.", null, '<path d="M4 7h16v12H4zM4 10h16M8 15h3"/><path d="M17 3v4M15 5h4"/>'],
     ["Aluguéis vencidos", "Imobiliário", "Atualize aluguéis, multas e encargos locatícios.", null, '<path d="m3 11 9-7 9 7v9H3zM9 20v-6h6v6"/><circle cx="18" cy="7" r="3"/><path d="M18 5.5V7l1 1"/>'],
