@@ -80,6 +80,7 @@ const DEFAULT_CLAUSES = [
   { id: 12, title: 'DA PROTEÇÃO DE DADOS', text: 'O tratamento de dados pessoais observará a Lei nº 13.709/2018, limitando-se ao necessário à execução deste contrato.' },
   { id: 13, title: 'DO COMPARTILHAMENTO DE DADOS', text: 'O CONTRATANTE autoriza o compartilhamento de seus dados pessoais com peritos, correspondentes jurídicos, tribunais, plataformas digitais e demais terceiros estritamente necessários à execução do objeto contratado, observadas as disposições da Lei nº 13.709/2018.' },
   { id: 14, title: 'DO SIGILO PROFISSIONAL', text: 'O CONTRATANTE compromete-se a não divulgar estratégias, documentos ou pareceres sem autorização prévia.' },
+  { id: 19, title: 'DO USO DE INTELIGÊNCIA ARTIFICIAL', text: 'O CONTRATANTE declara ciência e consente expressamente que a CONTRATADA utilize ferramentas de inteligência artificial, inclusive generativa, como apoio à execução dos serviços contratados, inclusive para pesquisa, análise, organização, revisão e elaboração de documentos e comunicações relacionadas ao objeto deste contrato. A utilização observará as cláusulas de proteção de dados, compartilhamento de dados e sigilo profissional deste instrumento; o CONTRATANTE está ciente de que os resultados podem conter imprecisões e não substituirão a análise dos advogados, que permanecerão responsáveis pelo conteúdo final e pelas orientações prestadas. O CONTRATANTE poderá solicitar, por escrito, que a IA não seja utilizada em atividade específica, hipótese em que a CONTRATADA avaliará alternativa compatível.' },
   { id: 15, title: 'DO SUBSTABELECIMENTO', text: 'A CONTRATADA poderá substabelecer os poderes recebidos, com ou sem reserva.' },
   { id: 16, title: 'DA VIGÊNCIA', text: 'A vigência perdurará até a conclusão da atuação definida no Quadro de Parâmetros da Contratação.' },
   { id: 17, title: 'DAS DISPOSIÇÕES GERAIS', text: 'A eventual tolerância ao descumprimento contratual não implica renúncia de direitos. As obrigações estendem-se aos sucessores das partes.' },
@@ -481,7 +482,7 @@ function autoSizeAllClauseTextareas() {
 
 function renderClausesUI(savedClauses = {}) {
   clausesList.replaceChildren();
-  DEFAULT_CLAUSES.forEach(clause => {
+  DEFAULT_CLAUSES.forEach((clause, index) => {
     const saved = savedClauses[clause.id] || {};
     const editing = saved.editing === true;
     const text = saved.text !== undefined ? saved.text : clause.text;
@@ -496,7 +497,7 @@ function renderClausesUI(savedClauses = {}) {
     checkbox.name = `clauses.${clause.id}.editing`;
     checkbox.checked = editing;
     const span = document.createElement('span');
-    span.textContent = `${clause.id}. ${clause.title}`;
+    span.textContent = `${index + 1}. ${clause.title}`;
     const small = document.createElement('small');
     small.textContent = 'Editar';
     span.appendChild(small);

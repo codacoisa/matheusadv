@@ -96,6 +96,46 @@ test('páginas com tema institucional habilitam a barra de status no Safari', as
   }
 });
 
+test('honorários exibe a cláusula de inteligência artificial na ordem correta', async ({ page }) => {
+  const runtimeErrors = [];
+  page.on('pageerror', error => runtimeErrors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'error') runtimeErrors.push(message.text());
+  });
+
+  await page.goto('documentos/honorarios/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Mostrar cláusulas contratuais (19)' })).toBeVisible();
+  await page.getByRole('button', { name: 'Mostrar cláusulas contratuais (19)' }).click();
+
+  const clauseTitles = await page.locator('.clause-head > span').evaluateAll(spans =>
+    spans.map(span => span.firstChild.textContent.trim()));
+  expect(clauseTitles).toEqual([
+    '1. DO OBJETO',
+    '2. DOS HONORÁRIOS',
+    '3. DO INADIMPLEMENTO E SUSPENSÃO DA ATUAÇÃO',
+    '4. DA CIÊNCIA, ADEQUAÇÃO E LIVRE PACTUAÇÃO',
+    '5. DAS DESPESAS',
+    '6. DAS OBRIGAÇÕES DO CONTRATANTE',
+    '7. DO ACORDO OU RECEBIMENTO DIRETO',
+    '8. DA EXCLUSIVIDADE',
+    '9. DA RESCISÃO',
+    '10. DA IRREVOGABILIDADE E IRRETRATABILIDADE',
+    '11. DO LEVANTAMENTO DE VALORES',
+    '12. DA PROTEÇÃO DE DADOS',
+    '13. DO COMPARTILHAMENTO DE DADOS',
+    '14. DO SIGILO PROFISSIONAL',
+    '15. DO USO DE INTELIGÊNCIA ARTIFICIAL',
+    '16. DO SUBSTABELECIMENTO',
+    '17. DA VIGÊNCIA',
+    '18. DAS DISPOSIÇÕES GERAIS',
+    '19. DO FORO',
+  ]);
+
+  const aiClause = page.locator('.clause-item').nth(14);
+  await expect(aiClause.locator('textarea')).toHaveValue('O CONTRATANTE declara ciência e consente expressamente que a CONTRATADA utilize ferramentas de inteligência artificial, inclusive generativa, como apoio à execução dos serviços contratados, inclusive para pesquisa, análise, organização, revisão e elaboração de documentos e comunicações relacionadas ao objeto deste contrato. A utilização observará as cláusulas de proteção de dados, compartilhamento de dados e sigilo profissional deste instrumento; o CONTRATANTE está ciente de que os resultados podem conter imprecisões e não substituirão a análise dos advogados, que permanecerão responsáveis pelo conteúdo final e pelas orientações prestadas. O CONTRATANTE poderá solicitar, por escrito, que a IA não seja utilizada em atividade específica, hipótese em que a CONTRATADA avaliará alternativa compatível.');
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ page }) => {
   await page.goto('', { waitUntil: 'networkidle' });
   const switcher = page.locator('office-app-switcher').first();
