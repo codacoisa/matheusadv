@@ -1896,7 +1896,7 @@ dialog form {
 }
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 dialog {
   width: min(880px, calc(100vw - 32px));
@@ -2029,7 +2029,7 @@ textarea {
   .sidebar {
     position: fixed;
     left: 0;
-    top: 70px;
+    top: var(--officejur-header-height, 68px);
     bottom: 0;
     width: 230px;
     height: auto;

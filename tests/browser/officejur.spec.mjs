@@ -188,6 +188,40 @@ test('Financeiro não reserva espaço acima do header compartilhado', async ({ p
   }
 });
 
+test('Financeiro mantém header e barra lateral alinhados durante o scroll', async ({ page }) => {
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('financeiro/', { waitUntil: 'networkidle' });
+    await page.evaluate(() => window.scrollTo(0, 240));
+
+    const layout = await page.evaluate(() => {
+      const header = document.querySelector('.topbar');
+      const sidebar = document.querySelector('.sidebar');
+      return {
+        documentOverflowX: getComputedStyle(document.documentElement).overflowX,
+        headerTop: Math.round(header.getBoundingClientRect().top),
+        headerBottom: Math.round(header.getBoundingClientRect().bottom),
+        sidebarTop: Math.round(sidebar.getBoundingClientRect().top),
+        viewportWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+
+    expect(layout.documentOverflowX).toBe('clip');
+    expect(layout.headerTop).toBe(0);
+    expect(layout.scrollWidth).toBe(layout.viewportWidth);
+    if (viewport.width > 720) {
+      expect(layout.headerBottom).toBe(68);
+      expect(layout.sidebarTop).toBe(68);
+    } else {
+      expect(layout.sidebarTop).toBe(68);
+    }
+  }
+});
+
 test('geradores carregam a base compartilhada de documentos', async ({ page }) => {
   await page.goto('documentos/procuracao/', { waitUntil: 'networkidle' });
   await expect.poll(() => page.evaluate(() => Object.keys(window.OfficeJurDocumentUtils || {}).sort()))
