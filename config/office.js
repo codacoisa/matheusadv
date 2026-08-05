@@ -12,9 +12,11 @@
   });
 
   const installation = Object.freeze({
-    baseUrl: 'https://gregorioemorais.github.io/officejur/',
-    origin: 'https://gregorioemorais.github.io',
-    repositoryUrl: 'https://github.com/gregorioemorais/officejur'
+    // URL pública completa da instalação; mantenha a barra final para resolver links relativos.
+    baseUrl: 'https://officejur.codacoisa.com.br/',
+    // Origem usada por integrações/CORS; informe apenas protocolo, domínio e porta, sem caminho ou barra final.
+    origin: 'https://officejur.codacoisa.com.br',
+    repositoryUrl: 'https://github.com/codacoisa/officejur'
   });
 
   const product = Object.freeze({
