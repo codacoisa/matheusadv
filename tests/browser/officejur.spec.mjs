@@ -81,6 +81,188 @@ test('lease expirado bloqueia Cálculos antes de expor os dados e limpa a cópia
   await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).toBeNull();
 });
 
+const localAccessBlockedRoutes = [
+  'calculos/',
+  'calculos/facil/',
+  'calculos/completo/',
+  'calculos/pensao/',
+  'calculos/trabalhista/',
+  'financeiro/',
+  'lab/controle-pagamentos/',
+];
+const blockedDescription = 'Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.';
+
+for (const route of localAccessBlockedRoutes) {
+  test(`${route} padroniza o acesso local bloqueado`, async ({ page }) => {
+    const runtimeErrors = [];
+    page.on('pageerror', error => runtimeErrors.push(error.message));
+    page.on('console', message => {
+      if (message.type() === 'error') runtimeErrors.push(message.text());
+    });
+    await page.goto(route, { waitUntil: 'networkidle' });
+    await page.evaluate(() => {
+      localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+        version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1,
+        graceExpiresAt: 0, resetForGistId: '', purgeId: 0,
+      }));
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+
+    const alert = page.getByRole('alert');
+    await expect(alert).toHaveCount(1);
+    const title = alert.getByRole('heading', { name: 'Acesso local bloqueado', level: 1 });
+    await expect(title).toBeVisible();
+    await expect(title).toBeFocused();
+    await expect(alert).toHaveAttribute('aria-labelledby', 'local-access-title');
+    await expect(alert).toHaveAttribute('aria-describedby', 'local-access-description');
+    await expect(alert).toContainText(blockedDescription);
+    const settings = alert.getByRole('link', { name: 'Abrir Configurações' });
+    await expect(settings).toHaveAttribute('href', /\/configuracoes\/$/);
+    await expect(page.locator('.topbar')).toHaveCSS('height', '68px');
+    await expect(page.locator('body')).toHaveClass(/local-access-blocked/);
+    await expect(page.locator('.local-access-status')).toHaveAttribute('role', 'status');
+    await expect(page.locator('.local-access-status')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.locator('.local-access-status')).toContainText('Acesso local bloqueado');
+    await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Sincronizar/ })).toHaveCount(0);
+    await expect(page.locator('main')).toHaveCount(1);
+    await expect(page.locator('.workspace, .shell, .sidebar, .people-pane, .detail-pane')).toHaveCount(0);
+    await expect(page.locator('office-app-switcher')).toBeVisible();
+    await expect(page.locator('office-site-footer')).toBeVisible();
+    if (route === 'financeiro/') {
+      await expect(page.locator('#mobile-menu-btn')).toBeHidden();
+      await expect(page.locator('office-site-footer')).not.toHaveAttribute('sidebar', '');
+    }
+    await page.evaluate(() => {
+      const container = document.querySelector('.local-access-page, .local-access-container');
+      window.OfficeJurLocalAccessBlocked.render({
+        container,
+        settingsHref: new URL('configuracoes/', location.href).pathname,
+        footer: document.querySelector('office-site-footer'),
+      });
+    });
+    await expect(page.getByRole('alert')).toHaveCount(1);
+    await page.waitForTimeout(100);
+    await expect(page.getByRole('alert')).toHaveCount(1);
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+    expect(runtimeErrors).toEqual([]);
+  });
+}
+
+test('estado bloqueado permanece responsivo nas referências visuais', async ({ page }) => {
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 },
+    { width: 320, height: 568 },
+  ];
+  for (const viewport of viewports) {
+    let visualReference;
+    for (const route of ['calculos/', 'financeiro/', 'lab/controle-pagamentos/']) {
+      await page.setViewportSize(viewport);
+      await page.goto(route, { waitUntil: 'networkidle' });
+      await page.evaluate(() => {
+        localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+          version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1,
+          graceExpiresAt: 0, resetForGistId: '', purgeId: 0,
+        }));
+      });
+      await page.reload({ waitUntil: 'networkidle' });
+      await expect(page.locator('.local-access-card')).toBeVisible();
+      const layout = await page.evaluate(() => {
+        const card = document.querySelector('.local-access-card');
+        const title = card.querySelector('h1');
+        const description = card.querySelector('p');
+        const cta = card.querySelector('.local-access-primary');
+        const cardStyle = getComputedStyle(card);
+        const titleStyle = getComputedStyle(title);
+        const descriptionStyle = getComputedStyle(description);
+        const ctaStyle = getComputedStyle(cta);
+        return ({
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        cardRect: card.getBoundingClientRect().toJSON(),
+        canvas: getComputedStyle(document.body).backgroundColor,
+        card: [cardStyle.padding, cardStyle.borderRadius, cardStyle.backgroundColor, cardStyle.boxShadow],
+        title: [titleStyle.fontFamily, titleStyle.fontSize, titleStyle.lineHeight, titleStyle.color],
+        description: [descriptionStyle.fontFamily, descriptionStyle.fontSize, descriptionStyle.lineHeight, descriptionStyle.color],
+        cta: [ctaStyle.minHeight, ctaStyle.marginTop, ctaStyle.borderRadius, ctaStyle.backgroundColor, ctaStyle.color],
+        footerWidth: document.querySelector('office-site-footer').getBoundingClientRect().width,
+      });
+      });
+      expect(layout.scrollWidth).toBe(layout.clientWidth);
+      expect(layout.cardRect.width).toBeLessThanOrEqual(viewport.width);
+      expect(layout.footerWidth).toBe(viewport.width);
+      const comparable = { ...layout, cardRect: { x: layout.cardRect.x, y: layout.cardRect.y, width: layout.cardRect.width } };
+      if (!visualReference) visualReference = comparable;
+      else expect(comparable).toEqual(visualReference);
+      if (viewport.width <= 420) {
+        await expect(page.getByRole('button', { name: 'Tentar novamente' })).toHaveCSS('min-width', '40px');
+      }
+    }
+  }
+});
+
+test('retry recarrega a página e o seletor continua operável no bloqueio', async ({ page }) => {
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+    version: 2, phase: 'purged', gistId: 'gist-teste', expiresAt: 0,
+    graceExpiresAt: 0, resetForGistId: '', purgeId: 1,
+  })));
+  await page.reload({ waitUntil: 'networkidle' });
+  const switcher = page.locator('office-app-switcher');
+  const launcher = switcher.getByRole('button', { name: /Abrir menu de sistemas/ });
+  await launcher.click();
+  await expect(switcher.getByRole('navigation', { name: 'Alternar sistema' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }),
+    page.getByRole('button', { name: 'Tentar novamente' }).click(),
+  ]);
+  await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
+});
+
+test('guard limpa o armazenamento protegido antes de cada aplicativo lê-lo', async ({ page }) => {
+  const cases = [
+    ['calculos/', 'officejur::calculos-juridicos::data'],
+    ['financeiro/', 'officejur::financeiro::sync-state'],
+    ['lab/controle-pagamentos/', 'officejur::controle-pagamentos::data'],
+    ['lab/controle-pagamentos/', 'officejur::controle-pagamentos::sync-state'],
+  ];
+  await page.addInitScript(({ protectedKeys }) => {
+    const originalGetItem = Storage.prototype.getItem;
+    const originalRemoveItem = Storage.prototype.removeItem;
+    window.__officejurProtectedStorageEvents = [];
+    Storage.prototype.getItem = function (key) {
+      if (protectedKeys.includes(key)) window.__officejurProtectedStorageEvents.push(`read:${key}`);
+      return originalGetItem.call(this, key);
+    };
+    Storage.prototype.removeItem = function (key) {
+      if (protectedKeys.includes(key)) window.__officejurProtectedStorageEvents.push(`remove:${key}`);
+      return originalRemoveItem.call(this, key);
+    };
+  }, { protectedKeys: [...new Set(cases.map(([, key]) => key))] });
+
+  for (const [route, protectedKey] of cases) {
+    await page.goto(route, { waitUntil: 'networkidle' });
+    await page.evaluate(({ key }) => {
+      localStorage.setItem(key, JSON.stringify({ secret: 'não deve ser lido' }));
+      localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+        version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1,
+        graceExpiresAt: 0, resetForGistId: '', purgeId: 0,
+      }));
+    }, { key: protectedKey });
+    await page.reload({ waitUntil: 'networkidle' });
+    const events = await page.evaluate(({ key }) =>
+      window.__officejurProtectedStorageEvents.filter((event) => event.endsWith(key)), { key: protectedKey });
+    expect(events[0]).toBe(`remove:${protectedKey}`);
+    await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
+  }
+});
+
 test('calculadora interna usa o guard antes de carregar um registro protegido', async ({ page }) => {
   await page.goto('calculos/pensao/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {

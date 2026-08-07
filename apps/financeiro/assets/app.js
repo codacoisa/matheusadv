@@ -613,7 +613,14 @@
     localAccessAllowed = false;
     data = emptyData();
     filesData = financeFiles.emptyData();
-    document.querySelector(".shell").innerHTML = '<main class="content" role="alert"><section class="card"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados e documentos locais foram removidos deste navegador. Atualize a credencial nas Configurações e tente sincronizar novamente.</p><a class="btn primary" href="../configuracoes/">Abrir Configurações</a></section></main>';
+    window.OfficeJurLocalAccessBlocked?.render({
+      container: document.querySelector(".shell"),
+      settingsHref: "../configuracoes/",
+      statusElement: document.querySelector("#sync-label"),
+      syncButton: document.querySelector("#sync-now"),
+      footer: document.querySelector("office-site-footer"),
+      mobileMenuButton: document.querySelector("#mobile-menu-btn"),
+    });
   }
   function loadSettings() {
     const defaults = {
@@ -740,6 +747,7 @@
   const dataReady = bootAccess
     .then((allowed) => {
       localAccessAllowed = allowed;
+      if (allowed) settings = loadSettings();
       return allowed ? financeDataStore.load({ financeStorage }) : financeStorage.split(emptyData());
     })
     .then((domains) => {
@@ -756,7 +764,13 @@
       throw error;
     });
   let filesData = financeFiles.emptyData(),
-    settings = loadSettings(),
+    settings = {
+      gistId: "",
+      token: "",
+      autoSync: false,
+      lastSyncAt: "",
+      lastSyncSignature: "",
+    },
     mp = loadMp(),
     syncTimer = 0,
     syncInFlight = null,

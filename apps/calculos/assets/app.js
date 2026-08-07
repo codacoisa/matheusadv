@@ -79,8 +79,13 @@
   function showBlocked() {
     localAccessAllowed = false;
     data = storage.normalize({});
-    app.innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.</p><a class="primary button" href="../configuracoes/">Abrir Configurações</a></section>';
-    syncStatus.textContent = "Acesso local bloqueado";
+    window.OfficeJurLocalAccessBlocked?.render({
+      container: app,
+      settingsHref: "../configuracoes/",
+      statusElement: syncStatus,
+      retryButton: document.querySelector("#sync-retry"),
+      footer: document.querySelector("office-site-footer"),
+    });
   }
 
   app.addEventListener("change", (event) => {

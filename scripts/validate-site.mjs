@@ -179,9 +179,71 @@ const sharedHeaderPages = [
   "apps/documentos/procuracao/index.html",
 ];
 
+const localAccessBlockedPages = [
+  "apps/calculos/index.html",
+  "apps/calculos/facil/index.html",
+  "apps/calculos/completo/index.html",
+  "apps/calculos/pensao/index.html",
+  "apps/calculos/trabalhista/index.html",
+  "apps/financeiro/index.html",
+  "apps/lab/tools/controle-pagamentos/index.html",
+];
+
+const localAccessBlockedReferences = new Map([
+  ["apps/calculos/index.html", "./assets/"],
+  ["apps/calculos/facil/index.html", "../assets/"],
+  ["apps/calculos/completo/index.html", "../assets/"],
+  ["apps/calculos/pensao/index.html", "../assets/"],
+  ["apps/calculos/trabalhista/index.html", "../assets/"],
+  ["apps/financeiro/index.html", "./assets/"],
+  ["apps/lab/tools/controle-pagamentos/index.html", "./assets/"],
+]);
+
+const localAccessBlockedSourceCopies = [
+  "apps/calculos/assets/app.js",
+  "apps/calculos/generalista/assets/generalista-app.js",
+  "apps/calculos/pensao/assets/app.js",
+  "apps/calculos/trabalhista/assets/labor-app.js",
+  "apps/financeiro/assets/app.js",
+  "apps/lab/tools/controle-pagamentos/assets/app.js",
+];
+
 if (!existsSync("packages/ui/site-header.css")) {
   console.error("Base visual compartilhada dos headers ausente.");
   process.exit(1);
+}
+
+for (const asset of ["local-access-blocked.js", "local-access-blocked.css"]) {
+  if (!existsSync(join("packages/ui", asset))) {
+    console.error(`Componente compartilhado de acesso local ausente: ${asset}.`);
+    process.exit(1);
+  }
+}
+
+for (const path of localAccessBlockedPages) {
+  const source = readFileSync(path, "utf8");
+  const assetPrefix = localAccessBlockedReferences.get(path);
+  for (const asset of ["local-access-blocked.js", "local-access-blocked.css"]) {
+    const reference = `${assetPrefix}${asset}`;
+    const publishedRelativePath = path.startsWith("apps/lab/tools/")
+      ? path.replace("apps/lab/tools/", "lab/")
+      : path.replace(/^apps\//, "");
+    const publishedPath = join(root, publishedRelativePath);
+    const published = readFileSync(publishedPath, "utf8");
+    const publishedAsset = resolve(dirname(publishedPath), reference);
+    if (!source.includes(reference) || !published.includes(reference) || !existsSync(publishedAsset)) {
+      console.error(`Referência inválida ao estado compartilhado (${asset}) em ${path}.`);
+      process.exit(1);
+    }
+  }
+}
+
+for (const path of localAccessBlockedSourceCopies) {
+  const source = readFileSync(path, "utf8");
+  if (!source.includes("OfficeJurLocalAccessBlocked") || source.includes("Acesso local bloqueado")) {
+    console.error(`Montagem local divergente do componente de acesso bloqueado: ${path}.`);
+    process.exit(1);
+  }
 }
 
 for (const path of sharedHeaderPages) {

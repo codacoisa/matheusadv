@@ -15,8 +15,8 @@
   let localAccessAllowed = true;
 
   const state = {
-    data: loadData(),
-    settings: loadSettings(),
+    data: normalizeData({}),
+    settings: normalizeSettings({}),
     selectedId: '',
     year: new Date().getFullYear(),
     tab: 'launches',
@@ -1041,7 +1041,11 @@
       localStorage.removeItem(SYNC_STATE_KEY);
       state.data = normalizeData({});
     }) ?? true;
-    if (localAccessAllowed) return true;
+    if (localAccessAllowed) {
+      state.data = loadData();
+      state.settings = loadSettings();
+      return true;
+    }
     showBlockedAccess();
     return false;
   }
@@ -1049,7 +1053,13 @@
   function showBlockedAccess() {
     localAccessAllowed = false;
     state.data = normalizeData({});
-    document.querySelector('main').innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados foram removidos deste navegador. Atualize a credencial e tente sincronizar novamente.</p><a class="button primary" href="../../configuracoes/">Abrir Configurações</a></section>';
+    window.OfficeJurLocalAccessBlocked?.render({
+      container: document.querySelector('main'),
+      settingsHref: '../../configuracoes/',
+      statusElement: els.storageStatus,
+      syncButton: els.syncNow,
+      footer: document.querySelector('office-site-footer'),
+    });
   }
 
   async function runGistAction(action, loadingMessage) {
