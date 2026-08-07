@@ -8,7 +8,9 @@
   const finance = window.OfficeJurCalculationFinance;
   const syncFactory = window.OfficeJurCalculationSync;
   const gistSettings = window.OfficeJurGistSettings;
-  const gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
+  const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
+  let localAccessAllowed = true;
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[char]);
@@ -69,7 +71,14 @@
     app.innerHTML = `<section class="panel"><div class="saved-head"><div><p class="eyebrow">Histórico e versões</p><h1>Meus cálculos</h1><p class="hint">Os cálculos podem ser reabertos, ajustados e exportados novamente.</p></div><button class="secondary" data-action="catalog">Novo cálculo</button></div><div class="saved-toolbar"><label class="search-field" for="saved-search">Pesquisar por cliente ou nome do cálculo<input id="saved-search" type="search" value="${escape(savedSearch)}" placeholder="Pesquisar por cliente ou nome do cálculo"></label><select id="saved-type" aria-label="Filtrar por calculadora"><option value="Todos">Todas as calculadoras</option>${categories.filter((item) => item !== "Todos").map((item) => `<option ${savedType === item ? "selected" : ""}>${escape(item)}</option>`).join("")}</select></div><div class="saved-list">${filteredRecords().length ? filteredRecords().map((record) => `<article class="saved-item"><div><span class="status ${record.status === "final" ? "final" : "draft"}">${record.status === "final" ? "Calculado" : "Rascunho"}</span><h3>${escape(clientName(record.input?.clientId))}</h3><p>${escape(record.name)}${record.input?.caseId ? ` • ${escape(caseName(record.input.caseId))}` : ""}<br>${escape(record.code || "Sem código")} • atualizado ${new Date(record.updatedAt).toLocaleString("pt-BR")}${record.result ? ` • ${escape(String(record.result.totals.total))}` : ""}</p></div><div class="saved-actions"><a class="secondary button small" href="./${routeOf(record)}/?id=${encodeURIComponent(record.id)}">Editar</a>${record.result ? `<a class="primary button small" href="./${routeOf(record)}/?id=${encodeURIComponent(record.id)}&pdf=1">PDF</a>` : ""}<button class="danger small" data-action="delete" data-id="${escape(record.id)}">Excluir</button></div></article>`).join("") : '<div class="empty">Nenhum cálculo salvo ainda.</div>'}</div></section>`;
   }
   function render() { if (view === "catalog") catalogView(); else savedView(); app.focus({ preventScroll: true }); }
-  function persist(value) { data = storage.save(value); void sync.toGist(); }
+  function persist(value) {
+    if (!localAccessAllowed) return;
+    data = storage.save(value); void sync.toGist();
+  }
+  function showBlocked() {
+    app.innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.</p><a class="primary button" href="../configuracoes/">Abrir Configurações</a></section>';
+    syncStatus.textContent = "Acesso local bloqueado";
+  }
 
   app.addEventListener("change", (event) => {
     if (event.target.id === "saved-type") { savedType = event.target.value; render(); }
@@ -90,10 +99,13 @@
     }
   });
   async function initialize() {
+    localAccessAllowed = await access?.guard("calculos", () => storage.clear()) ?? true;
+    if (!localAccessAllowed) { showBlocked(); return; }
     try { financeData = await finance?.load?.() || { clients: [], cases: [], loaded: false }; } catch (_) { financeData = { clients: [], cases: [], loaded: false }; }
     await sync.fromGist();
     render();
   }
-  const sync = syncFactory.create({ storage, gistSettings, gistClient, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  document.querySelector("#sync-retry")?.addEventListener("click", () => void sync.fromGist());
   void initialize();
 })();

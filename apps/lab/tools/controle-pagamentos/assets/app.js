@@ -10,7 +10,9 @@
   const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const COLORS = ['#b38731', '#17213a', '#667085', '#d9bd7a', '#067647', '#9e3b2f', '#46627f', '#8c6f2f'];
   const gistSettings = window.OfficeJurGistSettings;
-  const gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
+  const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
+  let localAccessAllowed = true;
 
   const state = {
     data: loadData(),
@@ -251,6 +253,7 @@
   }
 
   function persist(options) {
+    if (!localAccessAllowed) return;
     state.data = normalizeData({
       ...state.data,
       updatedAt: nowISO()
@@ -433,6 +436,8 @@
       els.storageStatus.style.color = tone === 'err' ? 'var(--danger)' : tone === 'ok' ? 'var(--ok)' : '';
       return;
     }
+    const warning = access?.warning?.();
+    if (warning) { els.storageStatus.textContent = warning; els.storageStatus.style.color = 'var(--danger)'; return; }
     const mode = settings.gistId ? 'Gist configurado' : 'Salvo neste navegador';
     const last = settings.lastSyncAt ? ` - última sincronização: ${new Date(settings.lastSyncAt).toLocaleString('pt-BR')}` : '';
     els.storageStatus.textContent = `${mode}${last}.`;
@@ -1029,22 +1034,34 @@
     els.syncNow.addEventListener('click', () => runGistAction(pushToGist, 'Sincronizando...'));
   }
 
+  async function bootstrapAccess() {
+    localAccessAllowed = await access?.guard('controle-pagamentos', () => {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SYNC_STATE_KEY);
+      state.data = normalizeData({});
+    }) ?? true;
+    if (localAccessAllowed) return true;
+    document.querySelector('main').innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados foram removidos deste navegador. Atualize a credencial e tente sincronizar novamente.</p><a class="button primary" href="../../configuracoes/">Abrir Configurações</a></section>';
+    return false;
+  }
+
   async function runGistAction(action, loadingMessage) {
     try {
       setSyncStatus(loadingMessage, '');
       await action();
       render();
     } catch (error) {
-      setSyncStatus(error && error.message ? error.message : 'Falha ao acessar o Gist.', 'err');
+      setSyncStatus(access?.warning?.() || (error && error.message ? error.message : 'Falha ao acessar o Gist.'), 'err');
     }
   }
 
   els.paymentMonth.value = currentMonthISO();
   els.paymentDate.value = todayISO();
-  bind();
-  state.selectedId = state.data.people[0] ? state.data.people[0].id : '';
-  render();
-  if (state.settings.gistId && state.settings.token) {
-    runGistAction(pushToGist, 'Sincronizando ao abrir...');
-  }
+  void bootstrapAccess().then((allowed) => {
+    if (!allowed) return;
+    bind();
+    state.selectedId = state.data.people[0] ? state.data.people[0].id : '';
+    render();
+    if (state.settings.gistId && state.settings.token) runGistAction(pushToGist, 'Sincronizando ao abrir...');
+  });
 })();

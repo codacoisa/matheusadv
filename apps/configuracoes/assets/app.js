@@ -3,6 +3,7 @@
 
   const gistSettings = window.OfficeJurGistSettings;
   const gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
   const officeName = window.OFFICEJUR_CONFIG?.office?.name || 'OfficeJur';
   const form = document.querySelector('#gist-form');
   const gistIdInput = document.querySelector('#gist-id');
@@ -59,6 +60,7 @@
     try {
       await gistClient.gist(settings.gistId, settings.token);
       gistSettings.save(settings);
+      access?.renew(settings.gistId);
       render(settings);
       setStatus('Configuração global salva e acesso confirmado.', 'ok');
     } catch (error) {
@@ -95,6 +97,7 @@
         })
       });
       const saved = gistSettings.save({ ...settings, gistId: gist.id });
+      access?.renew(saved.gistId);
       render(saved);
       setStatus('Gist secreto criado e definido como configuração global.', 'ok');
     } catch (error) {

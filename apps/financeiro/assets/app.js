@@ -3,7 +3,9 @@
   const officeConfig = window.OFFICEJUR_CONFIG?.office || {};
   const statementDescriptor = officeConfig.statementDescriptor || "OFFICEJUR";
   const gistSettings = window.OfficeJurGistSettings;
-  const gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
+  const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
+  let localAccessAllowed = true;
   const financeFiles = window.FinanceFiles;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
@@ -593,6 +595,20 @@
       database.close();
     }
   }
+  async function clearProtectedLocalData() {
+    await financeDataStore.clear();
+    await new Promise((resolve) => {
+      const request = indexedDB.deleteDatabase(FILES_DB);
+      request.onsuccess = request.onerror = request.onblocked = () => resolve();
+    });
+    localStorage.removeItem(SYNC_STATE_KEY);
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(DOCUMENT_HANDOFF_PREFIX)) localStorage.removeItem(key);
+    }
+    data = emptyData();
+    filesData = financeFiles.emptyData();
+  }
   function loadSettings() {
     const defaults = {
       gistId: "",
@@ -790,6 +806,7 @@
     return task;
   }
   function persist(skipSync = false) {
+    if (!localAccessAllowed) return;
     if (!dataReadyState)
       throw new Error("Os dados financeiros ainda estão sendo carregados.");
     if (dataLoadFailure)
@@ -865,6 +882,7 @@
       );
   }
   async function persistFiles(nextData, skipSync = false) {
+    if (!localAccessAllowed) return;
     const candidate = {
       ...nextData,
       updatedAt: now(),
@@ -2569,6 +2587,7 @@
     renderGistStatus();
   }
   async function pushGist() {
+    if (!localAccessAllowed) throw new Error("O acesso local aos dados sincronizados está bloqueado.");
     if (syncInFlight) {
       syncPending = true;
       return syncInFlight;
@@ -2700,6 +2719,11 @@
   }
   function renderGistStatus() {
     refreshGistCredentials();
+    const warning = access?.warning?.();
+    if (warning) {
+      $("#sync-label").innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(warning)}`;
+      return;
+    }
     $("#sync-label").innerHTML = settings.gistId
       ? '<i class="fa-solid fa-cloud"></i> Gist configurado'
       : '<i class="fa-solid fa-hard-drive"></i> Neste navegador';
@@ -3886,8 +3910,18 @@
         .querySelectorAll(".document-menu[open]")
         .forEach((menu) => menu.removeAttribute("open"));
   });
-  dataReady
-    .then(() => {
+  const bootAccess = access
+    ? access.guard("financeiro", clearProtectedLocalData).then((allowed) => {
+        localAccessAllowed = allowed;
+        if (!allowed) {
+          document.querySelector(".shell").innerHTML = '<main class="content" role="alert"><section class="card"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados e documentos locais foram removidos deste navegador. Atualize a credencial nas Configurações e tente sincronizar novamente.</p><a class="btn primary" href="../configuracoes/">Abrir Configurações</a></section></main>';
+        }
+        return allowed;
+      })
+    : Promise.resolve(true);
+  Promise.all([dataReady, bootAccess])
+    .then(([, allowed]) => {
+      if (!allowed) return;
       showView((location.hash || "#dashboard").slice(1));
       render();
       if (settings.gistId && settings.token)

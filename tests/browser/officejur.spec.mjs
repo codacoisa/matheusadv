@@ -63,6 +63,23 @@ for (const appPath of pages) {
   });
 }
 
+test('lease expirado bloqueia Cálculos antes de expor os dados e limpa a cópia local', async ({ page }) => {
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
+      schema: 'officejur/calculos-juridicos-data', version: 1, updatedAt: new Date().toISOString(),
+      records: [{ id: 'segredo', name: 'Cálculo confidencial', updatedAt: new Date().toISOString() }], deleted: []
+    }));
+    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      version: 1, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1, graceExpiresAt: 0, clearedModules: {}
+    }));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
+  await expect(page.locator('body')).not.toContainText('Cálculo confidencial');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).toBeNull();
+});
+
 test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ page }) => {
   await page.goto('', { waitUntil: 'networkidle' });
   const switcher = page.locator('office-app-switcher').first();

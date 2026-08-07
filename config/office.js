@@ -25,5 +25,8 @@
     copyrightStartYear: 2026
   });
 
-  window.OFFICEJUR_CONFIG = Object.freeze({ office, installation, product });
+  // Política da implantação: o navegador não pode ampliá-la por configurações locais.
+  const gistAccessLease = Object.freeze({ leaseHours: 3, graceMinutes: 180, minLeaseMinutes: 15, maxLeaseHours: 24 });
+
+  window.OFFICEJUR_CONFIG = Object.freeze({ office, installation, product, gistAccessLease });
 })();

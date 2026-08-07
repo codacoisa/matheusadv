@@ -34,20 +34,23 @@
           ...(authorization ? { Authorization: `Bearer ${authorization}` } : {}),
           ...requestedHeaders,
         },
-        signal: controller.signal,
+        signal: controller.signal, cache: "no-store",
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         if (response.status === 412)
-          throw new Error(
+          throw Object.assign(new Error(
             "O Gist foi alterado em outro navegador. Sincronize novamente para mesclar as versões.",
-          );
-        throw new Error(body.message || `GitHub respondeu com status ${response.status}.`);
+          ), { status: 412, category: "conflict" });
+        const rateLimited = response.status === 429 || response.headers.get("x-ratelimit-remaining") === "0";
+        const category = rateLimited ? "rate_limit" : response.status === 401 ? "auth" : [403, 404].includes(response.status) ? "access" : response.status >= 500 ? "server" : "http";
+        throw Object.assign(new Error(body.message || `GitHub respondeu com status ${response.status}.`), { status: response.status, category });
       }
       return response;
     } catch (error) {
       if (error?.name === "AbortError")
-        throw new Error("A conexão com o GitHub excedeu o tempo limite.");
+        throw Object.assign(new Error("A conexão com o GitHub excedeu o tempo limite."), { category: "timeout" });
+      if (!error?.category && error instanceof TypeError) error.category = "network";
       throw error;
     } finally {
       clearTimeout(timeout);

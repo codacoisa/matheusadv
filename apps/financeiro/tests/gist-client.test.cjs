@@ -31,6 +31,15 @@ test("não envia autorização vazia ao consultar um Gist público", async (cont
   assert.equal(headers.get("X-GitHub-Api-Version"), "2022-11-28");
 });
 
+test("classifica 401 como autenticação e não confunde rate limit com revogação", async (context) => {
+  const originalFetch = global.fetch;
+  context.after(() => { global.fetch = originalFetch; });
+  global.fetch = async () => new Response(JSON.stringify({ message: "Bad credentials" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(gistClient.gist("abc123", "segredo"), (error) => error.status === 401 && error.category === "auth" && !error.message.includes("segredo"));
+  global.fetch = async () => new Response(JSON.stringify({ message: "API rate limit exceeded" }), { status: 403, headers: { "Content-Type": "application/json", "x-ratelimit-remaining": "0" } });
+  await assert.rejects(gistClient.gist("abc123", "segredo"), (error) => error.category === "rate_limit");
+});
+
 test("baixa arquivo truncado sem expor token e aplica limite real", async (context) => {
   const originalFetch = global.fetch;
   context.after(() => {

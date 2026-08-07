@@ -56,6 +56,7 @@
     storage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
   }
+  function clear(storage = localStorage) { storage.removeItem(STORAGE_KEY); }
 
-  return { FILE, SCHEMA, STORAGE_KEY, VERSION, load, merge, normalize, save };
+  return { FILE, SCHEMA, STORAGE_KEY, VERSION, clear, load, merge, normalize, save };
 });

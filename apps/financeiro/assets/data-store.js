@@ -99,11 +99,17 @@
       database.close();
     }
   }
+  async function clear({ indexedDb = indexedDB } = {}) {
+    const database = await openDatabase(indexedDb);
+    try { await transaction(database, DOMAIN_STORE, "readwrite", (tx) => tx.objectStore(DOMAIN_STORE).clear()); }
+    finally { database.close(); }
+  }
 
   return {
     DATABASE,
     DOMAIN_STORE,
     VERSION,
+    clear,
     load,
     rawDomains,
     save,
