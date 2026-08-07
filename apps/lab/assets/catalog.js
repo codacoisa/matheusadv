@@ -14,5 +14,13 @@ window.OFFICEJUR_LAB_TOOLS = Object.freeze([
     href: './central-guias/',
     icon: 'folder-tree',
     status: 'Experimental'
+  },
+  {
+    id: 'documentos',
+    name: 'Documentos',
+    description: 'Organize arquivos locais por cliente e experimente a edição no navegador.',
+    href: './documentos/',
+    icon: 'file-pen',
+    status: 'Protótipo'
   }
 ]);

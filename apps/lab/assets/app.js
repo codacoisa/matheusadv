@@ -5,6 +5,7 @@
       const icons = {
         'credit-card': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18M7 15h3"></path></svg>',
         'folder-tree': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h7l2 2h9v12H3zM7 11h10M7 15h7"></path></svg>'
+        , 'file-pen': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5zM14 3v6h6M8 17l1.5-3.5L16 7l2 2-6.5 6.5L8 17zM14.5 8.5l2 2"></path></svg>'
       };
       const safeToolUrl = (value) => {
         try {

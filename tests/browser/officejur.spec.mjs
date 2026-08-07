@@ -39,6 +39,7 @@ const pages = [
   'lab/',
   'lab/controle-pagamentos/',
   'lab/central-guias/',
+  'lab/documentos/',
 ];
 
 for (const appPath of pages) {
@@ -128,6 +129,29 @@ test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ 
   await page.keyboard.press('Escape');
   await expect(launcher).toHaveAttribute('aria-expanded', 'false');
   await expect(launcher).toBeFocused();
+});
+
+test('Documentos começa vazio e exige vínculo com cliente', async ({ page }) => {
+  await page.goto('lab/documentos/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'Documentos', level: 1 })).toBeVisible();
+  await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.locator('#client-select')).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Salvar documento' })).toBeDisabled();
+});
+
+test('Documentos vincula cliente e salva CSV localmente', async ({ page }) => {
+  await prepareCalculationPage(page, 'lab/documentos/');
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await page.locator('#client-select').selectOption('client-test');
+  await page.locator('#document-name').fill('Planilha de teste');
+  await page.getByRole('button', { name: 'Salvar documento' }).click();
+  await expect(page.getByRole('button', { name: /Planilha de teste/ })).toBeVisible();
+  await page.locator('#csv-content').fill('Nome;Valor\nTeste;10');
+  await page.getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByText('Alterações salvas localmente.')).toBeVisible();
+  await expect(page.locator('#csv-preview')).toContainText('Teste');
 });
 
 test('páginas com tema institucional habilitam a barra de status no Safari', async ({ page }) => {
