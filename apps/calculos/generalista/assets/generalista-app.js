@@ -13,6 +13,7 @@
   const syncFactory = window.OfficeJurCalculationSync;
   const gistSettings = window.OfficeJurGistSettings;
   const gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
   const uid = () => crypto.randomUUID();
@@ -25,7 +26,8 @@
   const typeOptions = (selected = "debit") => `<option value="debit" ${selected === "debit" ? "selected" : ""}>Parcela de débito</option><option value="payment" ${selected === "payment" ? "selected" : ""}>Abatimento / pagamento</option>`;
   const field = (label, name, value, type = "text", cls = "", required = false) => `<div class="field ${cls}"><label class="${required ? "required" : ""}" for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${escape(value)}" ${required ? "required" : ""}></div>`;
 
-  let data = storage.load();
+  let data = storage.normalize({});
+  let localAccessAllowed = true;
   let financeData = finance?.empty?.() || { clients: [], cases: [], loaded: false };
   let step = 1;
   let current = blank();
@@ -39,6 +41,8 @@
     notify.timer = setTimeout(() => { toast.hidden = true; }, 6_000);
   }
   function persist(status = current.status) {
+    if (!localAccessAllowed) return;
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     current.status = status;
     current.updatedAt = new Date().toISOString();
     data = storage.save({ ...data, records: [...data.records.filter((item) => item.id !== current.id), current] });
@@ -195,7 +199,16 @@
     persist("final"); step = complete ? 4 : 2; notify("Cálculo concluído.");
   }
   function addExtra(kind) { captureVisible(); const list = kind === "penalty" ? current.input.penalties : kind === "fee" ? current.input.fees : current.input.costs; list.push(kind === "cost" ? { id: uid(), amount: 0, date: today(), description: "Custas processuais", correctionType: "none" } : { id: uid(), rate: 0, description: kind === "fee" ? "Honorários" : "Multa", type: "percent", onInterest: false }); render(); }
-  const sync = syncFactory.create({ storage, gistSettings, gistClient, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  function showBlocked() {
+    localAccessAllowed = false;
+    data = storage.normalize({});
+    app.innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados deste navegador foram removidos. Atualize a credencial e sincronize novamente.</p><a class="primary button" href="../../configuracoes/">Abrir Configurações</a></section>';
+    syncStatus.textContent = "Acesso local bloqueado";
+  }
+  access?.subscribe((lease) => {
+    if (lease.phase === "purging" || lease.phase === "purged") showBlocked();
+  });
   app.addEventListener("change", (event) => {
     if (event.target.id !== "feeType") return;
     try { captureEasy(); } catch (_) { /* a mudança de seletor não deve apagar o formulário incompleto */ }
@@ -236,8 +249,14 @@
     step = current.result ? (complete ? 4 : 2) : 1;
   }
   async function initialize() {
+    localAccessAllowed = await access?.guard("calculos", () => { storage.clear(); data = storage.normalize({}); }) ?? true;
+    if (!localAccessAllowed) { showBlocked(); return; }
+    data = storage.load();
     try { financeData = await finance?.load?.() || { clients: [], cases: [], loaded: false }; } catch (_) { financeData = { clients: [], cases: [], loaded: false }; }
-    await sync.fromGist(); loadRequestedRecord(); render();
+    await sync.fromGist();
+    if (!localAccessAllowed) { showBlocked(); return; }
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
+    loadRequestedRecord(); render();
   }
   void initialize();
 })();

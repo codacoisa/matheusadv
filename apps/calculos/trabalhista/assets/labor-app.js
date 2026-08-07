@@ -9,6 +9,7 @@
   const indices = window.OfficeJurLegalIndices;
   const gistSettings = window.OfficeJurGistSettings;
   const gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
   const syncFactory = window.OfficeJurCalculationSync;
   if (!app || !labor || !storage || !indices || !gistSettings || !gistClient || !syncFactory) return;
 
@@ -20,7 +21,8 @@
   const types = Object.keys(labor.TYPES);
   const label = type => labor.TYPES[type] || type;
   const numericKeys = new Set(['baseSalary', 'divisor', 'paidAmount', 'days', 'months', 'multiplier', 'hours', 'percentage', 'baseAmount', 'value', 'quantity', 'unitValue', 'installments', 'installmentValue', 'dueAmount']);
-  let data = storage.load();
+  let data = storage.normalize({});
+  let localAccessAllowed = true;
   let financeData = financeApi?.empty() || { clients: [], cases: [], loaded: false };
   let step = 1;
   let pendingPdf = false;
@@ -33,6 +35,7 @@
     storage,
     gistSettings,
     gistClient,
+    access,
     getData: () => data,
     setData: value => { data = value; },
     setStatus: message => { syncStatus.textContent = message; },
@@ -43,7 +46,7 @@
   function clientOptions(selected) { return `<option value="">Selecione um cliente</option>${(financeData.clients || []).map(client => `<option value="${esc(client.id)}" ${String(selected || '') === String(client.id) ? 'selected' : ''}>${esc(financeApi.clientLabel(client))}</option>`).join('')}`; }
   function caseOptions(clientId, selected) { const cases = financeApi?.casesForClient(financeData, clientId) || []; return `<option value="">Nenhum caso vinculado</option>${cases.map(item => `<option value="${esc(item.id)}" ${String(selected || '') === String(item.id) ? 'selected' : ''}>${esc(financeApi.caseLabel(item))}</option>`).join('')}`; }
   function financeNotice() { if (!financeData.loaded) return '<div class="finance-notice error"><strong>Não foi possível ler o Financeiro.</strong><span>Atualize a página para tentar novamente.</span></div>'; if (!financeData.clients.length) return '<div class="finance-notice"><strong>Cadastre um cliente no Financeiro antes de criar o cálculo.</strong><a href="../financeiro/" target="_blank" rel="noopener">Abrir Financeiro</a></div>'; return ''; }
-  function persist(status = record.status, quiet = false) { record.type = 'labor'; record.calculationVersion = labor.VERSION; record.status = status; record.updatedAt = new Date().toISOString(); data = storage.save({ ...data, records: [structuredClone(record), ...data.records.filter(item => item.id !== record.id)] }); void sync.toGist(); if (!quiet) notify(status === 'final' ? 'Cálculo salvo.' : 'Rascunho salvo.'); }
+  function persist(status = record.status, quiet = false) { if (!localAccessAllowed) return; try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; } record.type = 'labor'; record.calculationVersion = labor.VERSION; record.status = status; record.updatedAt = new Date().toISOString(); data = storage.save({ ...data, records: [structuredClone(record), ...data.records.filter(item => item.id !== record.id)] }); void sync.toGist(); if (!quiet) notify(status === 'final' ? 'Cálculo salvo.' : 'Rascunho salvo.'); }
   function claimMap() { return new Map(record.input.claims.map(item => [item.type, item])); }
   function employmentEnd() { return record.input.active ? record.input.calculationDate : record.input.terminationDate; }
   function blankClaim(type) { return { id: `${type}-${uuid()}`, type, description: label(type), dueDate: employmentEnd() || record.input.calculationDate, status: 'unpaid', paidAmount: 0, base: type === 'insalubrity' ? 'minimum_wage' : 'salary', days: type === 'vacation' || type === 'notice' ? 30 : 0, hours: 0, percentage: type === 'periculosidade' ? 30 : type === 'night_shift' || type === 'insalubrity' ? 20 : type === 'on_call' ? 33.3333 : 50, quantity: 0, unitValue: 0, installments: 3, installmentValue: 0, dueAmount: 0, baseTypes: ['overtime', 'night_shift'] }; }
@@ -95,11 +98,25 @@
     pendingPdf = params.get('pdf') === '1' && !!record.result;
   }
   async function initialize() {
+    localAccessAllowed = await access?.guard('calculos', () => { storage.clear(); data = storage.normalize({}); }) ?? true;
+    if (!localAccessAllowed) { showBlocked(); return; }
+    data = storage.load();
     try { financeData = await financeApi?.load?.() || { clients: [], cases: [], loaded: false }; } catch (error) { financeData = { clients: [], cases: [], loaded: false }; notify(`Não foi possível carregar os clientes do Financeiro: ${error.message}`, true); }
     await sync.fromGist();
+    if (!localAccessAllowed) { showBlocked(); return; }
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     loadRequestedRecord();
     render();
     if (pendingPdf) setTimeout(() => makePdf(), 0);
   }
+  function showBlocked() {
+    localAccessAllowed = false;
+    data = storage.normalize({});
+    app.innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados deste navegador foram removidos. Atualize a credencial e sincronize novamente.</p><a class="primary button" href="../../configuracoes/">Abrir Configurações</a></section>';
+    syncStatus.textContent = 'Acesso local bloqueado';
+  }
+  access?.subscribe(lease => {
+    if (lease.phase === 'purging' || lease.phase === 'purged') showBlocked();
+  });
   void initialize();
 })();

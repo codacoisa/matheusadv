@@ -254,6 +254,7 @@
 
   function persist(options) {
     if (!localAccessAllowed) return;
+    try { access?.canSync(state.settings.gistId); } catch (_) { showBlockedAccess(); return; }
     state.data = normalizeData({
       ...state.data,
       updatedAt: nowISO()
@@ -1041,8 +1042,14 @@
       state.data = normalizeData({});
     }) ?? true;
     if (localAccessAllowed) return true;
-    document.querySelector('main').innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados foram removidos deste navegador. Atualize a credencial e tente sincronizar novamente.</p><a class="button primary" href="../../configuracoes/">Abrir Configurações</a></section>';
+    showBlockedAccess();
     return false;
+  }
+
+  function showBlockedAccess() {
+    localAccessAllowed = false;
+    state.data = normalizeData({});
+    document.querySelector('main').innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados foram removidos deste navegador. Atualize a credencial e tente sincronizar novamente.</p><a class="button primary" href="../../configuracoes/">Abrir Configurações</a></section>';
   }
 
   async function runGistAction(action, loadingMessage) {
@@ -1057,6 +1064,9 @@
 
   els.paymentMonth.value = currentMonthISO();
   els.paymentDate.value = todayISO();
+  access?.subscribe((lease) => {
+    if (lease.phase === 'purging' || lease.phase === 'purged') showBlockedAccess();
+  });
   void bootstrapAccess().then((allowed) => {
     if (!allowed) return;
     bind();

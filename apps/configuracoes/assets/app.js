@@ -61,6 +61,7 @@
       await gistClient.gist(settings.gistId, settings.token);
       gistSettings.save(settings);
       access?.renew(settings.gistId);
+      if (access?.state().phase === 'purging') await access.purge();
       render(settings);
       setStatus('Configuração global salva e acesso confirmado.', 'ok');
     } catch (error) {
@@ -98,6 +99,7 @@
       });
       const saved = gistSettings.save({ ...settings, gistId: gist.id });
       access?.renew(saved.gistId);
+      if (access?.state().phase === 'purging') await access.purge();
       render(saved);
       setStatus('Gist secreto criado e definido como configuração global.', 'ok');
     } catch (error) {
@@ -107,11 +109,19 @@
     }
   }
 
-  function clearSettings() {
-    if (!confirm('Remover o Gist ID e o token global deste navegador? Os dados remotos não serão excluídos.')) return;
+  async function clearSettings() {
+    if (!confirm('Remover o Gist ID, o token e as cópias locais protegidas deste navegador? Os dados remotos não serão excluídos.')) return;
+    setBusy(true);
     const cleared = gistSettings.clear();
+    try { await access?.revoke(); }
+    catch (error) {
+      setStatus(error.message || 'Não foi possível concluir a limpeza local.', 'error');
+      setBusy(false);
+      return;
+    }
     render(cleared);
-    setStatus('Configuração global removida. O Gist remoto foi preservado.', 'ok');
+    setStatus('Configuração e cópias locais protegidas removidas. O Gist remoto foi preservado.', 'ok');
+    setBusy(false);
   }
 
   form.addEventListener('submit', saveAndTest);

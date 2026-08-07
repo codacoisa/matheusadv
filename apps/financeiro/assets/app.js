@@ -609,6 +609,12 @@
     data = emptyData();
     filesData = financeFiles.emptyData();
   }
+  function showBlockedAccess() {
+    localAccessAllowed = false;
+    data = emptyData();
+    filesData = financeFiles.emptyData();
+    document.querySelector(".shell").innerHTML = '<main class="content" role="alert"><section class="card"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados e documentos locais foram removidos deste navegador. Atualize a credencial nas Configurações e tente sincronizar novamente.</p><a class="btn primary" href="../configuracoes/">Abrir Configurações</a></section></main>';
+  }
   function loadSettings() {
     const defaults = {
       gistId: "",
@@ -730,9 +736,15 @@
     lastPersistedData = structuredClone(data),
     dataSaveInFlight = Promise.resolve(),
     dataReadyState = false;
-  const dataReady = financeDataStore
-    .load({ financeStorage })
+  const bootAccess = access ? access.guard("financeiro", clearProtectedLocalData) : Promise.resolve(true);
+  const dataReady = bootAccess
+    .then((allowed) => {
+      localAccessAllowed = allowed;
+      return allowed ? financeDataStore.load({ financeStorage }) : financeStorage.split(emptyData());
+    })
     .then((domains) => {
+      if (!localAccessAllowed) return emptyData();
+      try { access?.canSync(settings?.gistId); } catch (_) { return emptyData(); }
       data = normalize(financeStorage.assemble(domains));
       lastPersistedData = structuredClone(data);
       dataReadyState = true;
@@ -752,8 +764,10 @@
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "";
-  const filesReady = loadFilesState()
+  const filesReady = bootAccess.then((allowed) => allowed ? loadFilesState() : financeFiles.emptyData())
     .then((loaded) => {
+      if (!localAccessAllowed) return financeFiles.emptyData();
+      try { access?.canSync(settings?.gistId); } catch (_) { return financeFiles.emptyData(); }
       filesData = loaded;
       renderClients();
       if (currentFilesClientId) renderClientFiles();
@@ -807,6 +821,7 @@
   }
   function persist(skipSync = false) {
     if (!localAccessAllowed) return;
+    try { access?.canSync(settings.gistId); } catch (_) { showBlockedAccess(); return; }
     if (!dataReadyState)
       throw new Error("Os dados financeiros ainda estão sendo carregados.");
     if (dataLoadFailure)
@@ -883,6 +898,7 @@
   }
   async function persistFiles(nextData, skipSync = false) {
     if (!localAccessAllowed) return;
+    try { access?.canSync(settings.gistId); } catch (_) { showBlockedAccess(); return; }
     const candidate = {
       ...nextData,
       updatedAt: now(),
@@ -3910,18 +3926,14 @@
         .querySelectorAll(".document-menu[open]")
         .forEach((menu) => menu.removeAttribute("open"));
   });
-  const bootAccess = access
-    ? access.guard("financeiro", clearProtectedLocalData).then((allowed) => {
-        localAccessAllowed = allowed;
-        if (!allowed) {
-          document.querySelector(".shell").innerHTML = '<main class="content" role="alert"><section class="card"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados e documentos locais foram removidos deste navegador. Atualize a credencial nas Configurações e tente sincronizar novamente.</p><a class="btn primary" href="../configuracoes/">Abrir Configurações</a></section></main>';
-        }
-        return allowed;
-      })
-    : Promise.resolve(true);
+  access?.subscribe((lease) => {
+    if (lease.phase === "purging" || lease.phase === "purged") showBlockedAccess();
+  });
+  void bootAccess.then((allowed) => { if (!allowed) showBlockedAccess(); });
   Promise.all([dataReady, bootAccess])
     .then(([, allowed]) => {
-      if (!allowed) return;
+      if (!allowed || !localAccessAllowed) { showBlockedAccess(); return; }
+      try { access?.canSync(settings.gistId); } catch (_) { showBlockedAccess(); return; }
       showView((location.hash || "#dashboard").slice(1));
       render();
       if (settings.gistId && settings.token)

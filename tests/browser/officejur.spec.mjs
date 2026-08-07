@@ -80,6 +80,44 @@ test('lease expirado bloqueia Cálculos antes de expor os dados e limpa a cópia
   await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).toBeNull();
 });
 
+test('calculadora interna usa o guard antes de carregar um registro protegido', async ({ page }) => {
+  await page.goto('calculos/pensao/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
+      schema: 'officejur/calculos-juridicos-data', version: 1, updatedAt: new Date().toISOString(),
+      records: [{ id: 'segredo', type: 'pension', name: 'Pensão confidencial', updatedAt: new Date().toISOString() }], deleted: []
+    }));
+    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1, graceExpiresAt: 0, resetForGistId: '', purgeId: 0
+    }));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
+  await expect(page.locator('body')).not.toContainText('Pensão confidencial');
+});
+
+test('aba já aberta expira offline e coordena o bloqueio com outra aba', async ({ context, page }) => {
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
+      schema: 'officejur/calculos-juridicos-data', version: 1, updatedAt: new Date().toISOString(),
+      records: [{ id: 'segredo', name: 'Cálculo confidencial', updatedAt: new Date().toISOString() }], deleted: []
+    }));
+    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() + 500, graceExpiresAt: 0, resetForGistId: '', purgeId: 0
+    }));
+  });
+  const second = await context.newPage();
+  await Promise.all([
+    page.reload({ waitUntil: 'networkidle' }),
+    second.goto('calculos/', { waitUntil: 'networkidle' }),
+  ]);
+  await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado', { timeout: 5_000 });
+  await expect(second.getByRole('alert')).toContainText('Acesso local bloqueado', { timeout: 5_000 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).toBeNull();
+  await second.close();
+});
+
 test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ page }) => {
   await page.goto('', { waitUntil: 'networkidle' });
   const switcher = page.locator('office-app-switcher').first();
@@ -471,6 +509,15 @@ test('cálculo trabalhista usa a sincronização compartilhada do Gist', async (
       gistId: 'test-gist',
       token: 'token-de-teste',
       autoSync: true,
+    }));
+    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      version: 2,
+      phase: 'active',
+      gistId: 'test-gist',
+      expiresAt: Date.now() + 3 * 60 * 60 * 1000,
+      graceExpiresAt: 0,
+      resetForGistId: '',
+      purgeId: 0,
     }));
   });
   await page.route('https://api.github.com/gists/test-gist', async route => {

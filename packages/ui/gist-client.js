@@ -42,9 +42,12 @@
           throw Object.assign(new Error(
             "O Gist foi alterado em outro navegador. Sincronize novamente para mesclar as versões.",
           ), { status: 412, category: "conflict" });
-        const rateLimited = response.status === 429 || response.headers.get("x-ratelimit-remaining") === "0";
+        const message = String(body.message || "");
+        const rateLimited = response.status === 429
+          || response.headers.get("x-ratelimit-remaining") === "0"
+          || (response.status === 403 && (response.headers.has("retry-after") || /rate limit|secondary rate/i.test(message)));
         const category = rateLimited ? "rate_limit" : response.status === 401 ? "auth" : [403, 404].includes(response.status) ? "access" : response.status >= 500 ? "server" : "http";
-        throw Object.assign(new Error(body.message || `GitHub respondeu com status ${response.status}.`), { status: response.status, category });
+        throw Object.assign(new Error(message || `GitHub respondeu com status ${response.status}.`), { status: response.status, category });
       }
       return response;
     } catch (error) {
@@ -77,9 +80,9 @@
   }
 
   function revisionConflict() {
-    return new Error(
+    return Object.assign(new Error(
       "O Gist foi alterado em outro navegador. Sincronize novamente para mesclar as versões.",
-    );
+    ), { status: 412, category: "conflict" });
   }
 
   async function confirmRevision(id, token, expectedEtag) {

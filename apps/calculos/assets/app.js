@@ -9,7 +9,7 @@
   const syncFactory = window.OfficeJurCalculationSync;
   const gistSettings = window.OfficeJurGistSettings;
   const access = window.OfficeJurGistAccessLease?.create();
-  const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
+  const gistClient = window.OfficeJurGistClient;
   let localAccessAllowed = true;
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -31,7 +31,7 @@
     ["Revisão do PASEP", "Bancário", "Organize lançamentos e critérios revisionais.", null, '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h6M9 16h4"/><circle cx="17" cy="17" r="3"/><path d="m19 19 2 2"/>'],
   ];
   const categories = ["Todos", ...new Set(calculators.map((item) => item[1]))];
-  let data = storage.load();
+  let data = storage.normalize({});
   let financeData = finance?.empty?.() || { clients: [], cases: [], loaded: false };
   let filter = "Todos";
   let view = "catalog";
@@ -73,9 +73,12 @@
   function render() { if (view === "catalog") catalogView(); else savedView(); app.focus({ preventScroll: true }); }
   function persist(value) {
     if (!localAccessAllowed) return;
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     data = storage.save(value); void sync.toGist();
   }
   function showBlocked() {
+    localAccessAllowed = false;
+    data = storage.normalize({});
     app.innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.</p><a class="primary button" href="../configuracoes/">Abrir Configurações</a></section>';
     syncStatus.textContent = "Acesso local bloqueado";
   }
@@ -101,11 +104,17 @@
   async function initialize() {
     localAccessAllowed = await access?.guard("calculos", () => storage.clear()) ?? true;
     if (!localAccessAllowed) { showBlocked(); return; }
+    data = storage.load();
     try { financeData = await finance?.load?.() || { clients: [], cases: [], loaded: false }; } catch (_) { financeData = { clients: [], cases: [], loaded: false }; }
     await sync.fromGist();
+    if (!localAccessAllowed) { showBlocked(); return; }
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     render();
   }
   const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  access?.subscribe((lease) => {
+    if (lease.phase === "purging" || lease.phase === "purged") showBlocked();
+  });
   document.querySelector("#sync-retry")?.addEventListener("click", () => void sync.fromGist());
   void initialize();
 })();

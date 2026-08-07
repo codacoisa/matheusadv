@@ -73,3 +73,60 @@ test("purge iniciado por qualquer módulo remove todas as cópias protegidas", a
   assert.equal(storage.getItem("officejur::controle-pagamentos::data"), null);
   assert.equal(storage.getItem("officejur::documentos::handoff:abc"), null);
 });
+
+test("instalação já vinculada sem lease falha fechada antes de liberar dados", async () => {
+  const storage = memoryStorage();
+  storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
+  storage.setItem("officejur::calculos-juridicos::data", "segredo");
+  const lease = leaseApi.create({ storage });
+  assert.equal(lease.state().phase, "purging");
+  assert.equal(await lease.guard("calculos", () => {}), false);
+  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), null);
+  assert.equal(storage.getItem("officejur-gist-settings"), null);
+});
+
+test("resposta iniciada antes da expiração não ressuscita dados após a purga", async () => {
+  let time = 0;
+  let finish;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  const storage = memoryStorage();
+  const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 } });
+  lease.renew("gist-a");
+  const client = lease.gatedClient({ gist: async () => pending });
+  const request = client.gist("gist-a", "token");
+  time = 3 * 60 * 60 * 1000 + 1;
+  await lease.guard("calculos", () => {});
+  finish({ files: {} });
+  await assert.rejects(request, (error) => error.code === "lease-changed" && error.category === "access");
+  assert.equal(lease.state().phase, "purged");
+});
+
+test("troca concorrente de Gist preserva o novo vínculo e limpa rascunhos derivados", async () => {
+  const storage = memoryStorage();
+  storage.setItem("officejur::documentos::procuracao::draft", JSON.stringify({ __officejurGistProtected: true, person: "cliente" }));
+  storage.setItem("officejur::documentos::honorarios::draft", JSON.stringify({ people: [{ name: "Rascunho local" }] }));
+  const first = leaseApi.create({ storage });
+  const second = leaseApi.create({ storage });
+  first.renew("gist-a");
+  first.renew("gist-b");
+  await Promise.all([
+    first.guard("financeiro", () => {}),
+    second.guard("calculos", () => {}),
+  ]);
+  assert.equal(first.state().phase, "active");
+  assert.equal(first.state().gistId, "gist-b");
+  assert.equal(storage.getItem("officejur::documentos::procuracao::draft"), null);
+  assert.notEqual(storage.getItem("officejur::documentos::honorarios::draft"), null);
+});
+
+test("revogação explícita remove configurações e dados protegidos", async () => {
+  const storage = memoryStorage();
+  storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
+  storage.setItem("officejur::controle-pagamentos::data", "segredo");
+  const lease = leaseApi.create({ storage });
+  lease.renew("gist-a");
+  await lease.revoke();
+  assert.equal(lease.state().phase, "purged");
+  assert.equal(storage.getItem("officejur-gist-settings"), null);
+  assert.equal(storage.getItem("officejur::controle-pagamentos::data"), null);
+});

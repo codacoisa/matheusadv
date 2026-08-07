@@ -5,6 +5,7 @@
   const financeApi = window.OfficeJurCalculationFinance;
   const indices = window.OfficeJurLegalIndices, pdf = window.OfficeJurCalculationPdf;
   const gistSettings = window.OfficeJurGistSettings, gistClient = window.OfficeJurGistClient;
+  const access = window.OfficeJurGistAccessLease?.create();
   const syncFactory = window.OfficeJurCalculationSync;
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const today = () => {
@@ -17,12 +18,13 @@
     const version = String(value || core.CALCULATION_VERSION);
     return /^\d/.test(version) ? `pension-${version}` : version;
   };
-  let data = storageApi.load(), financeData = financeApi?.empty() || { clients: [], cases: [], loaded: false },
-    step = 1, current = blank(), busy = false;
+  let data = storageApi.normalize({}), financeData = financeApi?.empty() || { clients: [], cases: [], loaded: false },
+    localAccessAllowed = true, step = 1, current = blank(), busy = false;
   const sync = syncFactory.create({
     storage: storageApi,
     gistSettings,
     gistClient,
+    access,
     getData: () => data,
     setData: (value) => { data = value; },
     setStatus: (message) => { syncStatus.textContent = message; },
@@ -222,6 +224,8 @@
     });
   }
   function persist(record, status = record.status, touch = true) {
+    if (!localAccessAllowed) return;
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     if (touch) record.updatedAt = new Date().toISOString();
     record.status = status;
     const records = data.records.filter((item) => item.id !== record.id);
@@ -336,6 +340,9 @@
   });
 
   async function initialize() {
+    localAccessAllowed = await access?.guard("calculos", () => { storageApi.clear(); data = storageApi.normalize({}); }) ?? true;
+    if (!localAccessAllowed) { showBlocked(); return; }
+    data = storageApi.load();
     try {
       financeData = await financeApi?.load?.() || { clients: [], cases: [], loaded: false };
     } catch (error) {
@@ -343,6 +350,8 @@
       notify(`Não foi possível carregar os clientes do Financeiro: ${error.message}`, true);
     }
     await syncFromGist();
+    if (!localAccessAllowed) { showBlocked(); return; }
+    try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("id");
     if (requested) {
@@ -352,5 +361,14 @@
     }
     render();
   }
+  function showBlocked() {
+    localAccessAllowed = false;
+    data = storageApi.normalize({});
+    app.innerHTML = '<section class="panel" role="alert"><h1>Acesso local bloqueado</h1><p>Os dados sincronizados deste navegador foram removidos. Atualize a credencial e sincronize novamente.</p><a class="primary button" href="../../configuracoes/">Abrir Configurações</a></section>';
+    syncStatus.textContent = "Acesso local bloqueado";
+  }
+  access?.subscribe((lease) => {
+    if (lease.phase === "purging" || lease.phase === "purged") showBlocked();
+  });
   void initialize();
 })();

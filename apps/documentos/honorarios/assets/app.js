@@ -33,6 +33,8 @@ const PEOPLE_LIMIT = 4;
 const PDF_DRAFT_MARKER = 'GM_HONORARIOS_DRAFT:';
 const DOCUMENT_HANDOFF_PREFIX = 'officejur::documentos::handoff:';
 const DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
+const GIST_PROTECTED_MARKER = '__officejurGistProtected';
+let gistProtectedDraft = false;
 
 const PERSON_FIELD_GROUPS = [
   { fields: [
@@ -318,7 +320,7 @@ function joinQualifications(list) {
 }
 
 function saveDraft() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(getDraft()));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...getDraft(), ...(gistProtectedDraft ? { [GIST_PROTECTED_MARKER]: true } : {}) }));
 }
 
 function loadDraft() {
@@ -353,7 +355,9 @@ function consumeDocumentHandoff() {
 }
 
 function encodePdfDraft(draft) {
-  return window.OfficeJurDocumentUtils.encodePdfDraft(PDF_DRAFT_MARKER, draft);
+  const portable = { ...draft };
+  delete portable[GIST_PROTECTED_MARKER];
+  return window.OfficeJurDocumentUtils.encodePdfDraft(PDF_DRAFT_MARKER, portable);
 }
 
 function extractDraftFromPdfText(text) {
@@ -368,6 +372,7 @@ async function importDraftFromPdf(file) {
     alert('Não encontrei dados editáveis neste PDF. Importe um PDF gerado por esta página após a atualização do botão Importar.');
     return;
   }
+  gistProtectedDraft = false;
   renderClausesUI(draft.clauses || {});
   const anyEditing = Object.values(draft.clauses || {}).some(clause => clause.editing);
   setClausesToggle(anyEditing);
@@ -1085,6 +1090,7 @@ importFile.addEventListener('change', async () => {
 document.getElementById('clear').addEventListener('click', () => {
   if (!confirm('Limpar todos os campos deste contrato?')) return;
   localStorage.removeItem(STORAGE_KEY);
+  gistProtectedDraft = false;
   form.reset();
   renderClausesUI({});
   setClausesToggle(false);
@@ -1113,6 +1119,7 @@ async function init() {
     },
     clauses: {},
   } : loadDraft();
+  gistProtectedDraft = Boolean(transferredPerson || draft[GIST_PROTECTED_MARKER] === true);
   renderClausesUI(draft.clauses || {});
   const anyEditing = Object.values(draft.clauses || {}).some(c => c.editing);
   setClausesToggle(anyEditing);

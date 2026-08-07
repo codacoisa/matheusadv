@@ -23,6 +23,7 @@ const SIGNATURE_BOTTOM = 268;
 const PDF_DRAFT_MARKER = 'GM_PROCURACAO_DRAFT:';
 const DOCUMENT_HANDOFF_PREFIX = 'officejur::documentos::handoff:';
 const DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
+const GIST_PROTECTED_MARKER = '__officejurGistProtected';
 
 const PERSON_FIELD_GROUPS = [
   { fields: [
@@ -226,6 +227,7 @@ function normalizeDraft(draft = {}, options = {}) {
       ...(draft.document || {}),
     },
   };
+  if (draft[GIST_PROTECTED_MARKER] === true) normalized[GIST_PROTECTED_MARKER] = true;
   if (options.useTodayDate || !normalized.document.date) normalized.document.date = todayISO();
   return normalized;
 }
@@ -422,6 +424,7 @@ function consumeDocumentHandoff() {
 
 function encodePdfDraft(draft) {
   const normalized = normalizeDraft(draft, { useTodayDate: false });
+  delete normalized[GIST_PROTECTED_MARKER];
   return window.OfficeJurDocumentUtils.encodePdfDraft(PDF_DRAFT_MARKER, normalized);
 }
 
@@ -442,6 +445,7 @@ async function importDraftFromPdf(file) {
     alert('Não encontrei dados editáveis neste PDF. Importe um PDF gerado por esta página após a atualização do botão Importar.');
     return;
   }
+  delete draft[GIST_PROTECTED_MARKER];
   state.mode = draft.mode;
   state.draft = draft;
   renderPeopleUI(draft.people);
@@ -958,7 +962,7 @@ window.addEventListener('beforeunload', () => {
 async function init() {
   const transferredPerson = consumeDocumentHandoff();
   const draft = transferredPerson
-    ? normalizeDraft({ mode: 'normal', people: [transferredPerson] }, { useTodayDate: true })
+    ? normalizeDraft({ mode: 'normal', people: [transferredPerson], [GIST_PROTECTED_MARKER]: true }, { useTodayDate: true })
     : loadDraft();
   state.mode = draft.mode;
   state.draft = draft;

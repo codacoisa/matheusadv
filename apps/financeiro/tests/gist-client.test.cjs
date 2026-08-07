@@ -38,6 +38,8 @@ test("classifica 401 como autenticação e não confunde rate limit com revogaç
   await assert.rejects(gistClient.gist("abc123", "segredo"), (error) => error.status === 401 && error.category === "auth" && !error.message.includes("segredo"));
   global.fetch = async () => new Response(JSON.stringify({ message: "API rate limit exceeded" }), { status: 403, headers: { "Content-Type": "application/json", "x-ratelimit-remaining": "0" } });
   await assert.rejects(gistClient.gist("abc123", "segredo"), (error) => error.category === "rate_limit");
+  global.fetch = async () => new Response(JSON.stringify({ message: "You have exceeded a secondary rate limit" }), { status: 403, headers: { "Content-Type": "application/json", "retry-after": "60" } });
+  await assert.rejects(gistClient.gist("abc123", "segredo"), (error) => error.category === "rate_limit");
 });
 
 test("baixa arquivo truncado sem expor token e aplica limite real", async (context) => {
@@ -139,7 +141,7 @@ test("recusa atualização quando a revisão remota mudou", async (context) => {
       { "dados.json": { content: "{}" } },
       { etag: snapshot.etag },
     ),
-    /alterado em outro navegador/,
+    (error) => error.status === 412 && error.category === "conflict" && /alterado em outro navegador/.test(error.message),
   );
   assert.equal(call, 2);
 });
