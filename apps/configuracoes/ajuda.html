@@ -48,14 +48,14 @@
         <div><p class="eyebrow">SINCRONIZAÇÃO COM GITHUB GIST</p><h1>Configure seus computadores com segurança</h1><p>Este guia explica todo o processo: criar a credencial no GitHub, conectar o primeiro navegador, adicionar outros computadores e entender como o sistema protege as alterações de cada pessoa.</p></div>
       </header>
 
-      <div class="help-alert important"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Antes de começar</strong><p>Escolha uma pessoa responsável pela conta do GitHub e pelo Gist. Use um Gist secreto e nunca envie o token por e-mail, WhatsApp ou captura de tela. Atenção: “secreto” significa apenas que o Gist não aparece em buscas; quem obtiver sua URL poderá visualizá-lo.</p></div></div>
+      <div class="help-alert important"><i class="fa-solid fa-circle-exclamation"></i><div><strong>Antes de começar</strong><p>Escolha uma pessoa responsável pela conta do GitHub e pelo Gist. Nunca envie o token por e-mail, WhatsApp ou captura de tela.</p></div></div>
       <div class="help-alert important"><i class="fa-solid fa-shield-halved"></i><div><strong>Revogação local por prazo</strong><p>Uma sincronização autenticada renova um lease local de até 3 horas. Falhas definitivas de acesso abrem uma janela de graça com nova tentativa; rede, timeout, servidor e limite de API não removem dados. Ao expirar, o navegador bloqueia e limpa cópias protegidas. É uma proteção local de melhor esforço: ela não apaga o Gist remoto nem substitui a revogação do token no GitHub.</p></div></div>
 
       <section id="entenda" class="help-section">
         <p class="eyebrow">VISÃO GERAL</p><h2>Como a sincronização funciona</h2>
-        <p>O sistema mantém uma cópia dos dados neste navegador e usa um <strong>Gist secreto global do OfficeJur</strong> como ponto central para compartilhar as informações entre computadores. O Financeiro mantém arquivos próprios para clientes, casos, pacotes, equipe, lançamentos, cobranças, contas e documentos; outros módulos, como o Controle de Pagamentos, também possuem seus arquivos.</p>
+        <p>O sistema mantém uma cópia dos dados neste navegador e usa um <strong>Gist global do OfficeJur</strong> como ponto central para compartilhar as informações entre computadores. Cada módulo mantém seus próprios dados em um arquivo separado, e novos módulos podem aderir à mesma configuração quando estiverem preparados para sincronização.</p>
         <div class="help-flow">
-          <div><i class="fa-solid fa-laptop"></i><strong>Computador A</strong><small>Dados locais</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div class="central"><i class="fa-brands fa-github"></i><strong>Gist secreto</strong><small>Cópia central</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div><i class="fa-solid fa-computer"></i><strong>Computador B</strong><small>Dados locais</small></div>
+          <div><i class="fa-solid fa-laptop"></i><strong>Computador A</strong><small>Dados locais</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div class="central"><i class="fa-brands fa-github"></i><strong>Gist</strong><small>Cópia central</small></div><span><i class="fa-solid fa-arrow-right-arrow-left"></i></span><div><i class="fa-solid fa-computer"></i><strong>Computador B</strong><small>Dados locais</small></div>
         </div>
         <ul class="help-checks">
           <li><i class="fa-solid fa-check"></i><span>Ao sincronizar, o sistema primeiro lê o conteúdo atual do Gist.</span></li>
@@ -86,8 +86,8 @@
         <ol class="help-steps">
           <li><span>1</span><div><strong>Abra a área central</strong><p>No portal ou no seletor de apps, abra <strong>Configurações</strong>. Gist ID e token são administrados somente nessa área.</p></div></li>
           <li><span>2</span><div><strong>Cole o token</strong><p>No campo “Token do GitHub”, cole a credencial criada na etapa anterior.</p></div></li>
-          <li><span>3</span><div><strong>Conecte um Gist existente</strong><p>Se já houver um Gist secreto, informe seu ID ou endereço e clique em <strong>Salvar e testar</strong>.</p></div></li>
-          <li><span>4</span><div><strong>Ou crie um novo Gist</strong><p>Com o token informado, clique em <strong>Criar novo Gist secreto</strong>. O sistema criará a estrutura global e preencherá o ID automaticamente.</p></div></li>
+          <li><span>3</span><div><strong>Conecte um Gist existente</strong><p>Se já houver um Gist, informe seu ID ou endereço e clique em <strong>Salvar e sincronizar</strong>.</p></div></li>
+          <li><span>4</span><div><strong>Ou crie um novo Gist</strong><p>Com o token informado, clique em <strong>Criar novo Gist (começar do zero)</strong>. O sistema criará a estrutura global e preencherá o ID automaticamente.</p></div></li>
           <li><span>5</span><div><strong>Guarde o Gist ID</strong><p>O ID é a sequência final do endereço do Gist. Exemplo: em <code>gist.github.com/usuario/abc123</code>, o ID é <code>abc123</code>. Ele será usado nos outros computadores.</p></div></li>
         </ol>
         <div class="help-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Configuração concluída</strong><p>Quando o topo mostrar “Gist configurado”, use o botão “Sincronizar” para confirmar que os dados já estão atualizados.</p></div></div>
@@ -99,7 +99,7 @@
         <ol class="help-steps">
           <li><span>1</span><div><strong>Crie uma credencial para o equipamento</strong><p>Por segurança, prefira um token diferente para cada computador. Assim, um equipamento perdido pode ter seu token revogado sem interromper os demais.</p></div></li>
           <li><span>2</span><div><strong>Informe o mesmo Gist ID</strong><p>Abra a área central <strong>Configurações</strong> e cole o ID ou endereço criado no primeiro computador.</p></div></li>
-          <li><span>3</span><div><strong>Informe e teste o token</strong><p>Cole o token autorizado e clique em <strong>Salvar e testar</strong>. Os módulos deste navegador passarão a usar essa conexão.</p></div></li>
+          <li><span>3</span><div><strong>Informe e sincronize o token</strong><p>Cole o token autorizado e clique em <strong>Salvar e sincronizar</strong>. Os módulos deste navegador passarão a usar essa conexão.</p></div></li>
           <li><span>4</span><div><strong>Abra o módulo</strong><p>Ao abrir, o Financeiro baixa e mescla os dados existentes do Gist sem apagar eventuais registros locais.</p></div></li>
           <li><span>5</span><div><strong>Salve e sincronize</strong><p>Ative a sincronização automática na área central se desejar e clique em “Sincronizar” no Financeiro para confirmar a conexão.</p></div></li>
         </ol>
@@ -124,12 +124,12 @@
       <section id="seguranca" class="help-section">
         <p class="eyebrow">SEGURANÇA</p><h2>Proteja os dados e as credenciais</h2>
         <ul class="help-checks security">
-          <li><i class="fa-solid fa-shield"></i><span>Use um Gist <strong>secreto</strong> e proteja sua URL. Nunca o transforme em Gist público.</span></li>
+          <li><i class="fa-solid fa-shield"></i><span>Use o tipo de Gist definido pela política do escritório e não compartilhe o endereço com pessoas não autorizadas.</span></li>
           <li><i class="fa-solid fa-key"></i><span>Crie tokens com somente a permissão de Gists e, sempre que possível, um token por equipamento.</span></li>
           <li><i class="fa-solid fa-clock"></i><span>Defina validade e renove o token quando o GitHub indicar expiração.</span></li>
           <li><i class="fa-solid fa-ban"></i><span>Não compartilhe tokens em mensagens, documentos, capturas de tela ou gerenciadores não autorizados.</span></li>
           <li><i class="fa-solid fa-laptop-file"></i><span>O token fica no armazenamento local do navegador. Limpar os dados do navegador remove a configuração daquele equipamento.</span></li>
-          <li><i class="fa-solid fa-lock"></i><span>Um Gist secreto não é privado nem usa criptografia ponta a ponta: qualquer pessoa com a URL pode visualizar seu conteúdo. Não armazene documentos sigilosos nele. A conta do GitHub deve usar senha forte e autenticação em dois fatores.</span></li>
+          <li><i class="fa-solid fa-lock"></i><span>O Gist não usa criptografia ponta a ponta: qualquer pessoa com acesso ao conteúdo pode visualizá-lo. Não armazene documentos sigilosos nele. A conta do GitHub deve usar senha forte e autenticação em dois fatores.</span></li>
         </ul>
         <div class="help-alert important"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Limites da revogação local</strong><p>A proteção alcança somente as cópias marcadas e os bancos do OfficeJur nesta origem do navegador. Ela não remove o Gist, PDFs já exportados, downloads, backups do sistema, capturas de tela nem conteúdo já copiado para outro aplicativo. Uma pessoa com controle do equipamento pode alterar o relógio ou o armazenamento do navegador; por isso, revogue também o token no GitHub e aplique os controles do sistema operacional.</p></div></div>
         <div class="help-alert"><i class="fa-solid fa-rotate"></i><div><strong>Primeiro acesso após uma atualização</strong><p>Uma instalação que já possua Gist configurado, mas ainda não tenha um lease registrado, falha de forma fechada. Antes de abrir os módulos, teste novamente o Gist em Configurações; caso contrário, as cópias locais protegidas serão removidas e deverão ser recuperadas pela sincronização remota.</p></div></div>
@@ -140,7 +140,7 @@
         <div class="help-faq">
           <details open><summary>“Bad credentials” ou status 401</summary><div>O token está incorreto, expirou ou foi revogado. Gere um novo token, substitua-o na área central <strong>Configurações</strong> e teste novamente.</div></details>
           <details><summary>Status 403 ou “Resource not accessible”</summary><div>O token não possui permissão de gravação em Gists. Em um token refinado, confirme <strong>Account permissions → Gists → Read and write</strong>. Em um token clássico, confirme o escopo <code>gist</code>.</div></details>
-          <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID ou endereço foi copiado integralmente e se o token pertence à conta proprietária do Gist secreto.</div></details>
+          <details><summary>Status 404 ou Gist não encontrado</summary><div>Confira se o Gist ID ou endereço foi copiado integralmente e se o token pertence à conta que tem acesso ao Gist.</div></details>
           <details><summary>Arquivo JSON não encontrado</summary><div>Cada domínio usa um nome fixo dentro do Gist. O Financeiro cria automaticamente os arquivos ausentes de clientes, casos, pacotes, equipe, lançamentos, cobranças, contas e documentos na próxima sincronização. Evite renomeá-los ou excluí-los diretamente no GitHub.</div></details>
           <details><summary>As alterações não apareceram no outro computador</summary><div>No computador que fez a alteração, clique em “Sincronizar” e aguarde a confirmação. Depois, sincronize o segundo computador. Verifique também se ambos usam a mesma configuração global.</div></details>
           <details><summary>O token sumiu após limpar o navegador</summary><div>Isso é esperado: a credencial fica somente no armazenamento local. Reconfigure o equipamento na área central com o Gist ID e um token autorizado; ao abrir o Financeiro, ele fará a mesclagem automaticamente.</div></details>

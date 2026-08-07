@@ -753,6 +753,10 @@ test('configuração global do Gist permanece centralizada', async ({ page }) =>
   await page.goto('configuracoes/', { waitUntil: 'networkidle' });
   await expect(page.getByLabel(/Gist ID|ID.*Gist/i)).toBeVisible();
   await expect(page.getByLabel(/token/i)).toBeVisible();
+  await expect(page.locator('h1')).toHaveText('Gist do OfficeJur');
+  await expect(page.getByRole('button', { name: 'Salvar e sincronizar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Criar novo Gist (começar do zero)' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText(/Gist secreto|Salvar e testar|arquivos JSON próprios|controle-pagamentos\.json/i);
   await expect(page.locator('body')).not.toContainText(/Configurar Gist.*Financeiro/i);
 });
 

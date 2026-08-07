@@ -79,7 +79,7 @@
       return;
     }
     setBusy(true);
-    setStatus('Criando Gist secreto...');
+    setStatus('Criando Gist...');
     try {
       const gist = await gistClient.json('/gists', settings.token, {
         method: 'POST',
@@ -91,7 +91,7 @@
               content: JSON.stringify({
                 schema: 'officejur-gist-v1',
                 createdAt: new Date().toISOString(),
-                description: 'Gist secreto compartilhado pelos módulos do OfficeJur.'
+                description: 'Gist compartilhado pelos módulos do OfficeJur.'
               }, null, 2)
             }
           }
@@ -101,7 +101,7 @@
       access?.renew(saved.gistId);
       if (access?.state().phase === 'purging') await access.purge();
       render(saved);
-      setStatus('Gist secreto criado e definido como configuração global.', 'ok');
+      setStatus('Gist criado e definido como configuração global.', 'ok');
     } catch (error) {
       setStatus(error.message || 'Não foi possível criar o Gist.', 'error');
     } finally {
