@@ -118,13 +118,20 @@ input:focus { outline: 3px solid rgba(179, 135, 49, .18); border-color: var(--go
 }
 .check-row input { width: 18px; min-height: 18px; accent-color: var(--navy); }
 .field-note { margin: -5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
 .button {
+  width: 100%;
   min-height: 42px;
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 9px 14px;
   font: inherit;
+  line-height: 1.2;
   font-weight: 800;
   cursor: pointer;
 }
@@ -138,12 +145,18 @@ input:focus { outline: 3px solid rgba(179, 135, 49, .18); border-color: var(--go
 
 .side { display: grid; gap: 16px; }
 .info-card { padding: 22px; }
-.info-card h2 { font-size: 22px; }
+.info-card h2 { font-size: 22px; line-height: 1.12; }
+.info-card > p:not(.eyebrow) {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
 .info-card ul { display: grid; gap: 15px; margin: 20px 0 0; padding: 0; list-style: none; }
 .info-card li { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
 .info-card li strong { color: var(--ink); }
 .info-card code { width: fit-content; border-radius: 5px; padding: 3px 6px; color: #344054; background: #f2f4f7; font-size: 11px; }
-.security > p:not(.eyebrow) { margin: 14px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.security > p:not(.eyebrow) { margin-top: 14px; }
 .guide-link {
   display: inline-flex;
   align-items: center;
@@ -161,5 +174,5 @@ input:focus { outline: 3px solid rgba(179, 135, 49, .18); border-color: var(--go
   main { width: min(100% - 28px, 1120px); padding-top: 36px; }
   .topbar { padding-inline: 14px; }
   .panel { padding: 20px; }
-  .actions { display: grid; }
+  .actions { grid-template-columns: 1fr; }
 }

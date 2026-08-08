@@ -758,6 +758,17 @@ test('configuração global do Gist permanece centralizada', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Criar novo Gist (começar do zero)' })).toBeVisible();
   await expect(page.locator('main')).not.toContainText(/Gist secreto|Salvar e testar|arquivos JSON próprios|controle-pagamentos\.json/i);
   await expect(page.locator('body')).not.toContainText(/Configurar Gist.*Financeiro/i);
+
+  const actionLayout = await page.locator('.actions').evaluate(element => {
+    const buttons = [...element.querySelectorAll('.button')];
+    const tops = buttons.map(button => Math.round(button.getBoundingClientRect().top));
+    return {
+      display: getComputedStyle(element).display,
+      sameRow: new Set(tops).size === 1,
+      fits: element.scrollWidth <= element.clientWidth,
+    };
+  });
+  expect(actionLayout).toEqual({ display: 'grid', sameRow: true, fits: true });
 });
 
 test('componentes compartilhados rejeitam URLs com protocolos inseguros', async ({ page }) => {
