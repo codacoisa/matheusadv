@@ -55,6 +55,21 @@ test("valida PDF sem chamar destroy no documento retornado", async () => {
   assert.equal(await parsePdf(PDF_BYTES), 1);
 });
 
+test("valida PDF sem Uint8Array.prototype.toHex", async () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(Uint8Array.prototype, "toHex");
+  delete Uint8Array.prototype.toHex;
+
+  try {
+    const moduleUrl = new URL(`../src/validation.js?compat=${Date.now()}`, import.meta.url);
+    const { parsePdf: parsePdfWithoutNativeToHex } = await import(moduleUrl);
+    assert.equal(await parsePdfWithoutNativeToHex(PDF_BYTES), 1);
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(Uint8Array.prototype, "toHex", originalDescriptor);
+    }
+  }
+});
+
 test("mantém a validação PDF/P7S livre do erro de destroy", async () => {
   const originalVerify = SignedData.prototype.verify;
   SignedData.prototype.verify = async () => true;

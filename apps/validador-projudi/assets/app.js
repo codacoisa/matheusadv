@@ -51621,6 +51621,15 @@ function initCryptoEngine() {
 initCryptoEngine();
 
 // src/validation.js
+if (typeof Uint8Array.prototype.toHex !== "function") {
+  Object.defineProperty(Uint8Array.prototype, "toHex", {
+    configurable: true,
+    writable: true,
+    value() {
+      return Array.from(this, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+  });
+}
 setEngine("WebCrypto", crypto, new CryptoEngine({ name: "WebCrypto", crypto, subtle: crypto.subtle }));
 function configurePdfWorker(url) {
   GlobalWorkerOptions.workerSrc = url;

@@ -8,6 +8,18 @@ import {
   setEngine
 } from "pkijs";
 
+// pdfjs-dist 6 uses Uint8Array#toHex for PDF fingerprints, but Node 24 does
+// not implement it yet.
+if (typeof Uint8Array.prototype.toHex !== "function") {
+  Object.defineProperty(Uint8Array.prototype, "toHex", {
+    configurable: true,
+    writable: true,
+    value() {
+      return Array.from(this, byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+  });
+}
+
 setEngine("WebCrypto", crypto, new CryptoEngine({ name: "WebCrypto", crypto, subtle: crypto.subtle }));
 
 export function configurePdfWorker(url) {
