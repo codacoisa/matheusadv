@@ -54,10 +54,21 @@ export async function parsePdf(pdfBytes) {
     isEvalSupported: false,
     useWorkerFetch: false
   });
-  const document = await loadingTask.promise;
-  const pages = document.numPages;
-  await document.destroy();
-  return pages;
+  let parsingFailed = false;
+
+  try {
+    const document = await loadingTask.promise;
+    return document.numPages;
+  } catch (error) {
+    parsingFailed = true;
+    throw error;
+  } finally {
+    try {
+      await loadingTask.destroy();
+    } catch (error) {
+      if (!parsingFailed) throw error;
+    }
+  }
 }
 
 export async function parseP7s(buffer) {

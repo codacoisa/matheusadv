@@ -13,7 +13,7 @@ await build({
   outfile: resolve(assets, "app.js"),
   bundle: true,
   format: "esm",
-  minify: true,
+  minify: false,
   sourcemap: false,
   target: ["es2022"],
   legalComments: "eof"
