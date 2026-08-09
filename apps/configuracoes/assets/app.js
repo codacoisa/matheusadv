@@ -30,11 +30,24 @@
     tokenInput.value = settings.token;
     autoSyncInput.checked = settings.autoSync;
     const configured = !!(settings.gistId && settings.token);
-    connectionDot.classList.toggle('configured', configured);
-    connectionTitle.textContent = configured ? 'Gist global configurado' : 'Gist não configurado';
-    connectionDetail.textContent = configured
-      ? `Todos os módulos sincronizáveis usarão o Gist ${settings.gistId}.`
-      : 'Os módulos continuarão salvando apenas neste navegador.';
+    const lease = access?.state();
+    connectionDot.classList.toggle('configured', configured && ['active', 'grace'].includes(lease?.phase || 'active'));
+    if (!configured) {
+      connectionTitle.textContent = 'Gist não configurado';
+      connectionDetail.textContent = 'Os módulos continuarão salvando apenas neste navegador.';
+    } else if (lease?.phase === 'grace') {
+      connectionTitle.textContent = 'Acesso ao Gist em período de graça';
+      connectionDetail.textContent = 'A última verificação foi recusada. Salve e teste a configuração para confirmar o acesso.';
+    } else if (['stale', 'unverified'].includes(lease?.phase)) {
+      connectionTitle.textContent = 'Configuração presente; verificação pendente';
+      connectionDetail.textContent = `O Gist ${settings.gistId} será revalidado antes de liberar os dados locais.`;
+    } else if (['purging', 'purged'].includes(lease?.phase)) {
+      connectionTitle.textContent = 'Acesso revogado ou cópia local removida';
+      connectionDetail.textContent = 'Teste e salve uma configuração válida para restabelecer o acesso.';
+    } else {
+      connectionTitle.textContent = 'Gist global configurado e confirmado';
+      connectionDetail.textContent = `Todos os módulos sincronizáveis usarão o Gist ${settings.gistId}.`;
+    }
   }
 
   function setStatus(message, tone = '') {
@@ -127,5 +140,6 @@
   form.addEventListener('submit', saveAndTest);
   createButton.addEventListener('click', createGist);
   clearButton.addEventListener('click', clearSettings);
+  access?.subscribe(() => render());
   render();
 })();

@@ -14,16 +14,19 @@ function memoryStorage() {
   };
 }
 
-test("renova somente após sucesso e expira mesmo sem rede", async () => {
+test("expiração vira stale sem apagar configuração ou dados", async () => {
   let time = 0;
-  const lease = leaseApi.create({ storage: memoryStorage(), clock: { now: () => time }, policy: { leaseHours: 3 } });
+  const storage = memoryStorage();
+  storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
+  storage.setItem("officejur::calculos-juridicos::data", "segredo");
+  const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 } });
   lease.renew("gist-a");
   assert.equal(lease.state().phase, "active");
   time = 3 * 60 * 60 * 1000 + 1;
-  let cleared = 0;
-  assert.equal(await lease.guard("calculos", () => { cleared += 1; }), false);
-  assert.equal(cleared, 1);
-  assert.equal(lease.state().phase, "purged");
+  assert.equal(lease.state().phase, "stale");
+  assert.equal(await lease.guard("calculos", () => {}), false);
+  assert.equal(storage.getItem("officejur-gist-settings") !== null, true);
+  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), "segredo");
 });
 
 test("401 inicia graça, rate limit e rede não", () => {
@@ -54,51 +57,75 @@ test("novo Gist exige limpeza local e token do mesmo Gist recupera durante a gra
   assert.equal(cleared, 1);
 });
 
-test("purge iniciado por qualquer módulo remove todas as cópias protegidas", async () => {
+test("revalidação autenticada após expiração libera dados sem expô-los antes", async () => {
   let time = 0;
   const storage = memoryStorage();
+  storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
   storage.setItem("officejur::calculos-juridicos::data", "calculo");
-  storage.setItem("officejur::financeiro::sync-state", "financeiro");
-  storage.setItem("officejur::controle-pagamentos::data", "pagamentos");
-  storage.setItem("officejur::documentos::handoff:abc", "handoff");
-  const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 } });
+  let calls = 0;
+  const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 }, client: { gist: async () => { calls += 1; } } });
   lease.renew("gist-a");
   time = 3 * 60 * 60 * 1000 + 1;
-  let cleared = 0;
-  assert.equal(await lease.guard("financeiro", () => { cleared += 1; }), false);
-  assert.equal(cleared, 1);
-  assert.equal(lease.state().phase, "purged");
-  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), null);
-  assert.equal(storage.getItem("officejur::financeiro::sync-state"), null);
-  assert.equal(storage.getItem("officejur::controle-pagamentos::data"), null);
-  assert.equal(storage.getItem("officejur::documentos::handoff:abc"), null);
+  assert.equal(lease.state().phase, "stale");
+  assert.equal(await lease.guard("financeiro", () => {}), true);
+  assert.equal(calls, 1);
+  assert.equal(lease.state().phase, "active");
+  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), "calculo");
 });
 
-test("instalação já vinculada sem lease falha fechada antes de liberar dados", async () => {
+test("instalação vinculada sem lease revalida antes de liberar dados", async () => {
   const storage = memoryStorage();
   storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
   storage.setItem("officejur::calculos-juridicos::data", "segredo");
-  const lease = leaseApi.create({ storage });
-  assert.equal(lease.state().phase, "purging");
-  assert.equal(await lease.guard("calculos", () => {}), false);
-  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), null);
-  assert.equal(storage.getItem("officejur-gist-settings"), null);
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const lease = leaseApi.create({ storage, client: { gist: () => pending } });
+  assert.equal(lease.state().phase, "unverified");
+  const guarded = lease.guard("calculos", () => {});
+  assert.equal(lease.state().phase, "unverified");
+  release({});
+  assert.equal(await guarded, true);
+  assert.equal(lease.state().phase, "active");
+  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), "segredo");
 });
 
-test("resposta iniciada antes da expiração não ressuscita dados após a purga", async () => {
+test("falhas transitórias mantêm bloqueio e configuração para retry", async () => {
   let time = 0;
-  let finish;
-  const pending = new Promise((resolve) => { finish = resolve; });
   const storage = memoryStorage();
-  const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 } });
+  storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
+  const errors = ["network", "timeout", "server", "rate_limit"];
+  for (const category of errors) {
+    const lease = leaseApi.create({ storage, clock: { now: () => time }, client: { gist: async () => { throw { category }; } } });
+    lease.renew("gist-a");
+    time += 4 * 60 * 60 * 1000;
+    assert.equal(await lease.guard("calculos", () => {}), false);
+    assert.equal(lease.state().phase, "stale");
+    assert.notEqual(storage.getItem("officejur-gist-settings"), null);
+  }
+});
+
+test("401 concede a graça integral, independente do lease vencido", () => {
+  let time = 0;
+  const lease = leaseApi.create({ storage: memoryStorage(), clock: { now: () => time }, policy: { leaseHours: 3, graceMinutes: 180 } });
   lease.renew("gist-a");
-  const client = lease.gatedClient({ gist: async () => pending });
-  const request = client.gist("gist-a", "token");
-  time = 3 * 60 * 60 * 1000 + 1;
-  await lease.guard("calculos", () => {});
-  finish({ files: {} });
-  await assert.rejects(request, (error) => error.code === "lease-changed" && error.category === "access");
-  assert.equal(lease.state().phase, "purged");
+  time = 4 * 60 * 60 * 1000;
+  lease.fail({ category: "auth", status: 401 });
+  assert.equal(lease.state().phase, "grace");
+  assert.equal(lease.state().graceExpiresAt, time + 180 * 60 * 1000);
+});
+
+test("heartbeat e duas abas compartilham uma única revalidação", async () => {
+  const storage = memoryStorage();
+  storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
+  let calls = 0;
+  const client = { gist: async () => { calls += 1; } };
+  const first = leaseApi.create({ storage, client });
+  const second = leaseApi.create({ storage, client });
+  first.renew("gist-a");
+  await Promise.all([first.heartbeat(), second.heartbeat(), first.heartbeat()]);
+  assert.equal(calls, 1);
+  assert.equal(first.state().phase, "active");
+  assert.equal(second.state().phase, "active");
 });
 
 test("troca concorrente de Gist preserva o novo vínculo e limpa rascunhos derivados", async () => {

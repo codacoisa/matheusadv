@@ -3,6 +3,14 @@
 
   const TITLE = "Acesso local bloqueado";
   const DESCRIPTION = "Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.";
+  const PENDING_DESCRIPTION = "Os dados sincronizados estão protegidos e aguardam a revalidação autenticada do Gist. Eles não serão exibidos até a confirmação do acesso.";
+
+  function descriptionForLease() {
+    try {
+      const lease = JSON.parse(localStorage.getItem("officejur::gist-access-lease") || "{}");
+      return ["stale", "unverified"].includes(lease.phase) ? PENDING_DESCRIPTION : DESCRIPTION;
+    } catch (_) { return DESCRIPTION; }
+  }
 
   function setStatus(statusElement) {
     if (!statusElement) return;
@@ -76,7 +84,7 @@
     title.textContent = TITLE;
     const description = document.createElement("p");
     description.id = "local-access-description";
-    description.textContent = DESCRIPTION;
+    description.textContent = descriptionForLease();
     const settings = document.createElement("a");
     settings.className = "local-access-primary";
     settings.href = settingsHref;
@@ -94,5 +102,5 @@
     return section;
   }
 
-  window.OfficeJurLocalAccessBlocked = { render, TITLE, DESCRIPTION };
+  window.OfficeJurLocalAccessBlocked = { render, TITLE, DESCRIPTION, PENDING_DESCRIPTION };
 })();

@@ -7,9 +7,12 @@
 
   const STORAGE_KEY = "officejur::gist-access-lease";
   const LOCK_KEY = "officejur::gist-access-lease::purge-lock";
-  const VERSION = 2;
+  const VERIFY_LOCK_KEY = "officejur::gist-access-lease::verify-lock";
+  const VERSION = 3;
+  const HEARTBEAT_DEDUPLICATION_MS = 5 * 60_000;
   const DEFAULT_POLICY = Object.freeze({ leaseHours: 3, graceMinutes: 180, minLeaseMinutes: 15, maxLeaseHours: 24 });
-  const PHASES = new Set(["active", "grace", "unverified", "purging", "purged"]);
+  const PHASES = new Set(["active", "grace", "stale", "unverified", "purging", "purged"]);
+  const verificationFlights = new WeakMap();
   const PROTECTED_STORAGE_KEYS = Object.freeze([
     "officejur::calculos-juridicos::data",
     "officejur::calculos-juridicos::sync-state",
@@ -42,7 +45,7 @@
     });
   }
   function empty(phase = "active") {
-    return { version: VERSION, phase, gistId: "", expiresAt: 0, graceExpiresAt: 0, resetForGistId: "", purgeId: 0 };
+    return { version: VERSION, phase, gistId: "", expiresAt: 0, graceExpiresAt: 0, resetForGistId: "", purgeId: 0, verifiedAt: 0 };
   }
   function hasConfiguredGist(storage) {
     try { return Boolean(JSON.parse(storage.getItem("officejur-gist-settings") || "{}").gistId); }
@@ -63,6 +66,7 @@
         expiresAt: Math.max(0, Number(saved.expiresAt) || 0),
         graceExpiresAt: Math.max(0, Number(saved.graceExpiresAt) || 0),
         purgeId: Math.max(0, Number(saved.purgeId) || 0),
+        verifiedAt: Math.max(0, Number(saved.verifiedAt) || 0),
       };
     } catch (_) {
       return empty(hasConfiguredGist(storage) ? "unverified" : "active");
@@ -128,7 +132,8 @@
     const clock = options.clock || { now: () => Date.now() };
     const indexedDb = options.indexedDb || globalThis.indexedDB;
     const configuredPolicy = policy(options.policy || globalThis.OFFICEJUR_CONFIG?.gistAccessLease);
-    const browser = typeof window !== "undefined";
+    const browser = options.browser ?? typeof window !== "undefined";
+    const rawClient = options.client || globalThis.OfficeJurGistClient;
     const channel = browser && typeof BroadcastChannel === "function" ? new BroadcastChannel("officejur-gist-access") : null;
     const listeners = new Set();
     const clearers = new Map();
@@ -150,39 +155,46 @@
     const transitionExpired = () => {
       const current = nowMs(clock);
       if (state.phase === "active" && state.gistId && state.expiresAt && current >= state.expiresAt) {
-        state.phase = "purging"; emit();
+        state.phase = "stale"; emit();
       } else if (state.phase === "grace" && current >= state.graceExpiresAt) {
-        state.phase = "purging"; emit();
-      } else if (state.phase === "unverified") {
         state.phase = "purging"; emit();
       }
       return state;
     };
-    const deadline = () => state.phase === "active" ? state.expiresAt : state.phase === "grace" ? state.graceExpiresAt : 0;
+    const deadline = () => {
+      if (state.phase === "grace") return state.graceExpiresAt;
+      if (state.phase !== "active") return 0;
+      // Renova bem antes do prazo, mas nunca mais de uma vez por hora em leases longos.
+      const lead = Math.min(60 * 60_000, Math.max(5 * 60_000, configuredPolicy.leaseMinutes * 20_000));
+      return Math.max(nowMs(clock), state.expiresAt - lead);
+    };
     function schedule() {
       clearTimeout(timer);
       const at = deadline();
       if (!at) return;
       const delay = Math.max(0, Math.min(at - nowMs(clock), 2_147_000_000));
-      timer = setTimeout(() => { void purge().catch(() => {}); }, delay);
+      timer = setTimeout(() => {
+        if (state.phase === "grace") void purge().catch(() => {});
+        else void heartbeat().catch(() => {});
+      }, delay);
       timer?.unref?.();
     }
-    async function withFallbackLock(operation) {
+    async function withFallbackLock(operation, lockKey = LOCK_KEY) {
       if (!browser) return operation();
       const token = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
       for (let attempt = 0; attempt < 20; attempt += 1) {
         let held = null;
-        try { held = JSON.parse(storage.getItem(LOCK_KEY) || "null"); } catch (_) { /* lock inválido é substituído */ }
+        try { held = JSON.parse(storage.getItem(lockKey) || "null"); } catch (_) { /* lock inválido é substituído */ }
         if (!held?.expiresAt || held.expiresAt <= Date.now()) {
-          storage.setItem(LOCK_KEY, JSON.stringify({ token, expiresAt: Date.now() + 10_000 }));
+          storage.setItem(lockKey, JSON.stringify({ token, expiresAt: Date.now() + 10_000 }));
           await wait(25);
-          try { held = JSON.parse(storage.getItem(LOCK_KEY) || "null"); } catch (_) { held = null; }
+          try { held = JSON.parse(storage.getItem(lockKey) || "null"); } catch (_) { held = null; }
           if (held?.token === token) {
             try { return await operation(); }
             finally {
               try {
-                const current = JSON.parse(storage.getItem(LOCK_KEY) || "null");
-                if (current?.token === token) storage.removeItem(LOCK_KEY);
+                const current = JSON.parse(storage.getItem(lockKey) || "null");
+                if (current?.token === token) storage.removeItem(lockKey);
               } catch (_) { /* o lock expira sozinho */ }
             }
           }
@@ -194,6 +206,10 @@
     const withPurgeLock = (operation) => {
       if (browser && navigator.locks?.request) return navigator.locks.request("officejur-gist-purge", operation);
       return withFallbackLock(operation);
+    };
+    const withVerificationLock = (operation) => {
+      if (browser && navigator.locks?.request) return navigator.locks.request("officejur-gist-verify", operation);
+      return withFallbackLock(operation, VERIFY_LOCK_KEY);
     };
     async function clearRegistered() {
       await Promise.all([...clearers.values()].map((clear) => Promise.resolve().then(clear)));
@@ -246,18 +262,71 @@
       if (state.phase === "purging") void purge().catch(() => {});
       return state;
     }
+    function configuredSettings() {
+      try {
+        const saved = JSON.parse(storage.getItem("officejur-gist-settings") || "{}");
+        return { gistId: normalizeId(saved.gistId), token: String(saved.token || "").trim() };
+      } catch (_) { return { gistId: "", token: "" }; }
+    }
+    async function revalidate(reason = "required") {
+      expireIfNeeded();
+      if (!["stale", "unverified"].includes(state.phase)) return state;
+      const expected = configuredSettings();
+      if (!expected.gistId || !expected.token || (state.gistId && state.gistId !== expected.gistId)) return state;
+      if (!rawClient?.gist) return state;
+      const existing = verificationFlights.get(storage);
+      if (existing) return existing;
+      const flight = withVerificationLock(async () => {
+        refresh();
+        transitionExpired();
+        if (!["stale", "unverified"].includes(state.phase)) return state;
+        const current = configuredSettings();
+        if (!current.gistId || !current.token || current.gistId !== expected.gistId) return state;
+        const purgeId = state.purgeId;
+        try {
+          await rawClient.gist(current.gistId, current.token);
+          refresh();
+          if (state.purgeId !== purgeId || state.phase === "purged" || state.resetForGistId || configuredSettings().gistId !== current.gistId) return state;
+          return renew(current.gistId);
+        } catch (error) {
+          // Somente uma negativa autenticada é revogação. Falhas transitórias mantêm
+          // a configuração para nova tentativa, sem expor as cópias locais.
+          fail(error);
+          return state;
+        }
+      }).finally(() => verificationFlights.delete(storage));
+      verificationFlights.set(storage, flight);
+      return flight;
+    }
+    async function heartbeat(force = true) {
+      expireIfNeeded();
+      if (!force && state.phase === "active" && nowMs(clock) - state.verifiedAt < HEARTBEAT_DEDUPLICATION_MS) return state;
+      if (state.phase === "active") {
+        state.phase = "stale";
+        emit();
+      }
+      return revalidate("heartbeat");
+    }
+    if (browser) {
+      const recover = () => { void heartbeat(false).catch(() => {}); };
+      addEventListener("online", recover);
+      addEventListener("focus", recover);
+      globalThis.document?.addEventListener?.("visibilitychange", () => {
+        if (globalThis.document.visibilityState === "visible") recover();
+      });
+    }
     function renew(gistId) {
       const id = normalizeId(gistId);
       if (!id) return state;
       refresh();
       const current = nowMs(clock);
-      if (state.gistId && state.gistId !== id) {
+      if (state.gistId && state.gistId !== id && state.phase !== "purged") {
         state = { ...state, phase: "purging", resetForGistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0 };
         emit();
         void purge().catch(() => {});
         return state;
       }
-      state = { ...state, version: VERSION, phase: "active", gistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0, resetForGistId: "" };
+      state = { ...state, version: VERSION, phase: "active", gistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0, resetForGistId: "", verifiedAt: current };
       emit();
       return state;
     }
@@ -274,7 +343,7 @@
       if (!state.gistId || ["unverified", "purging", "purged"].includes(state.phase)) return state;
       if (state.phase === "grace") return state;
       state.phase = "grace";
-      state.graceExpiresAt = Math.min(nowMs(clock) + configuredPolicy.graceMinutes * 60_000, state.expiresAt || Number.POSITIVE_INFINITY);
+      state.graceExpiresAt = nowMs(clock) + configuredPolicy.graceMinutes * 60_000;
       emit();
       return state;
     }
@@ -282,6 +351,7 @@
       const module = String(moduleName || "");
       if (module && typeof clear === "function") clearers.set(module, clear);
       expireIfNeeded();
+      if (["stale", "unverified"].includes(state.phase)) await revalidate("guard");
       if (state.phase === "purging" || state.resetForGistId) await purge();
       refresh();
       if (state.phase === "purged") {
@@ -311,7 +381,11 @@
       const withId = new Set(["gist", "gistSnapshot", "patch"]);
       const wrap = (name) => async (...args) => {
         const id = withId.has(name) ? args[0] : "";
-        const before = expireIfNeeded();
+        let before = expireIfNeeded();
+        if (["stale", "unverified"].includes(before.phase)) {
+          await revalidate("client");
+          before = expireIfNeeded();
+        }
         if (id) canSync(id);
         else if (before.gistId && !["active", "grace"].includes(before.phase)) throw blockedError(before.phase);
         const purgeId = before.purgeId;
@@ -335,7 +409,7 @@
       return () => listeners.delete(listener);
     }
     schedule();
-    return { STORAGE_KEY, policy: configuredPolicy, state: () => expireIfNeeded(), renew, revoke, fail, guard, canSync, warning, gatedClient, purge, subscribe };
+    return { STORAGE_KEY, policy: configuredPolicy, state: () => expireIfNeeded(), renew, revoke, fail, guard, canSync, warning, gatedClient, purge, revalidate, heartbeat, subscribe };
   }
   return { DEFAULT_POLICY, PROTECTED_DATABASES, PROTECTED_DERIVED_STORAGE_KEYS, PROTECTED_STORAGE_KEYS, STORAGE_KEY, clearProtectedData, create, isDefinitive, policy };
 });

@@ -64,7 +64,7 @@ for (const appPath of pages) {
   });
 }
 
-test('lease expirado bloqueia Cálculos antes de expor os dados e limpa a cópia local', async ({ page }) => {
+test('lease expirado bloqueia Cálculos antes de expor os dados e preserva a cópia para revalidação', async ({ page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {
     localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
@@ -78,7 +78,8 @@ test('lease expirado bloqueia Cálculos antes de expor os dados e limpa a cópia
   await page.reload({ waitUntil: 'networkidle' });
   await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
   await expect(page.locator('body')).not.toContainText('Cálculo confidencial');
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::gist-access-lease'))).toContain('"stale"');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).not.toBeNull();
 });
 
 const localAccessBlockedRoutes = [
@@ -90,7 +91,7 @@ const localAccessBlockedRoutes = [
   'financeiro/',
   'lab/controle-pagamentos/',
 ];
-const blockedDescription = 'Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.';
+const blockedDescription = 'Os dados sincronizados estão protegidos e aguardam a revalidação autenticada do Gist. Eles não serão exibidos até a confirmação do acesso.';
 
 for (const route of localAccessBlockedRoutes) {
   test(`${route} padroniza o acesso local bloqueado`, async ({ page }) => {
