@@ -45,7 +45,7 @@
     });
   }
   function empty(phase = "active") {
-    return { version: VERSION, phase, gistId: "", expiresAt: 0, graceExpiresAt: 0, resetForGistId: "", purgeId: 0, verifiedAt: 0 };
+    return { version: VERSION, phase, gistId: "", expiresAt: 0, graceExpiresAt: 0, resetForGistId: "", purgeId: 0, generation: 0, verifiedAt: 0, retryAt: 0 };
   }
   function hasConfiguredGist(storage) {
     try { return Boolean(JSON.parse(storage.getItem("officejur-gist-settings") || "{}").gistId); }
@@ -66,7 +66,9 @@
         expiresAt: Math.max(0, Number(saved.expiresAt) || 0),
         graceExpiresAt: Math.max(0, Number(saved.graceExpiresAt) || 0),
         purgeId: Math.max(0, Number(saved.purgeId) || 0),
+        generation: Math.max(0, Number(saved.generation) || 0),
         verifiedAt: Math.max(0, Number(saved.verifiedAt) || 0),
+        retryAt: Math.max(0, Number(saved.retryAt) || 0),
       };
     } catch (_) {
       return empty(hasConfiguredGist(storage) ? "unverified" : "active");
@@ -155,7 +157,7 @@
     const transitionExpired = () => {
       const current = nowMs(clock);
       if (state.phase === "active" && state.gistId && state.expiresAt && current >= state.expiresAt) {
-        state.phase = "stale"; emit();
+        state = { ...state, phase: "stale", retryAt: 0 }; emit();
       } else if (state.phase === "grace" && current >= state.graceExpiresAt) {
         state.phase = "purging"; emit();
       }
@@ -163,7 +165,9 @@
     };
     const deadline = () => {
       if (state.phase === "grace") return state.graceExpiresAt;
-      if (state.phase !== "active") return 0;
+      if (state.phase === "stale" || state.phase === "unverified") return state.retryAt;
+      if (state.phase !== "active" || !state.gistId || !state.expiresAt) return 0;
+      if (state.retryAt > nowMs(clock)) return state.retryAt;
       // Renova bem antes do prazo, mas nunca mais de uma vez por hora em leases longos.
       const lead = Math.min(60 * 60_000, Math.max(5 * 60_000, configuredPolicy.leaseMinutes * 20_000));
       return Math.max(nowMs(clock), state.expiresAt - lead);
@@ -226,8 +230,8 @@
         if (state.phase !== "purging" && !state.resetForGistId) return state;
         const nextGistId = state.resetForGistId;
         state = nextGistId
-          ? { ...empty("active"), gistId: nextGistId, expiresAt: state.expiresAt, purgeId: state.purgeId + 1 }
-          : { ...empty("purged"), gistId: state.gistId, purgeId: state.purgeId + 1 };
+          ? { ...empty("active"), gistId: nextGistId, expiresAt: state.expiresAt, purgeId: state.purgeId + 1, generation: state.generation + 1 }
+          : { ...empty("purged"), gistId: state.gistId, purgeId: state.purgeId + 1, generation: state.generation + 1 };
         handledPurgeId = state.purgeId;
         locallyClearedPurgeId = state.purgeId;
         emit();
@@ -268,9 +272,9 @@
         return { gistId: normalizeId(saved.gistId), token: String(saved.token || "").trim() };
       } catch (_) { return { gistId: "", token: "" }; }
     }
-    async function revalidate(reason = "required") {
+    async function verify(reason = "required", allowActive = false) {
       expireIfNeeded();
-      if (!["stale", "unverified"].includes(state.phase)) return state;
+      if (!["stale", "unverified"].includes(state.phase) && !(allowActive && state.phase === "active")) return state;
       const expected = configuredSettings();
       if (!expected.gistId || !expected.token || (state.gistId && state.gistId !== expected.gistId)) return state;
       if (!rawClient?.gist) return state;
@@ -279,14 +283,15 @@
       const flight = withVerificationLock(async () => {
         refresh();
         transitionExpired();
-        if (!["stale", "unverified"].includes(state.phase)) return state;
+        if (!["stale", "unverified"].includes(state.phase) && !(allowActive && state.phase === "active")) return state;
         const current = configuredSettings();
         if (!current.gistId || !current.token || current.gistId !== expected.gistId) return state;
         const purgeId = state.purgeId;
+        const generation = state.generation;
         try {
           await rawClient.gist(current.gistId, current.token);
           refresh();
-          if (state.purgeId !== purgeId || state.phase === "purged" || state.resetForGistId || configuredSettings().gistId !== current.gistId) return state;
+          if (state.purgeId !== purgeId || state.generation !== generation || state.phase === "purged" || state.resetForGistId || configuredSettings().gistId !== current.gistId) return state;
           return renew(current.gistId);
         } catch (error) {
           // Somente uma negativa autenticada é revogação. Falhas transitórias mantêm
@@ -298,13 +303,15 @@
       verificationFlights.set(storage, flight);
       return flight;
     }
+    const revalidate = (reason = "required") => verify(reason, false);
     async function heartbeat(force = true) {
       expireIfNeeded();
+      // Uma instalação exclusivamente local não tem lease para renovar.
+      if (!state.gistId || !state.expiresAt) return state;
       if (!force && state.phase === "active" && nowMs(clock) - state.verifiedAt < HEARTBEAT_DEDUPLICATION_MS) return state;
-      if (state.phase === "active") {
-        state.phase = "stale";
-        emit();
-      }
+      // A renovação antecipada preserva o lease atual. Apenas a expiração real
+      // o torna stale e passa a exigir validação antes de qualquer leitura.
+      if (state.phase === "active") return verify("heartbeat", true);
       return revalidate("heartbeat");
     }
     if (browser) {
@@ -321,29 +328,43 @@
       refresh();
       const current = nowMs(clock);
       if (state.gistId && state.gistId !== id && state.phase !== "purged") {
-        state = { ...state, phase: "purging", resetForGistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0 };
+        state = { ...state, phase: "purging", resetForGistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0, generation: state.generation + 1, retryAt: 0 };
         emit();
         void purge().catch(() => {});
         return state;
       }
-      state = { ...state, version: VERSION, phase: "active", gistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0, resetForGistId: "", verifiedAt: current };
+      state = { ...state, version: VERSION, phase: "active", gistId: id, expiresAt: current + configuredPolicy.leaseMinutes * 60_000, graceExpiresAt: 0, resetForGistId: "", generation: state.generation + 1, verifiedAt: current, retryAt: 0 };
       emit();
       return state;
     }
     function revoke() {
       refresh();
-      state = { ...state, phase: "purging", resetForGistId: "", graceExpiresAt: 0 };
+      state = { ...state, phase: "purging", resetForGistId: "", graceExpiresAt: 0, generation: state.generation + 1 };
       emit();
       return purge();
     }
     function fail(errorValue) {
-      if (!isDefinitive(errorValue)) return state;
       refresh();
       transitionExpired();
-      if (!state.gistId || ["unverified", "purging", "purged"].includes(state.phase)) return state;
+      if (!isDefinitive(errorValue)) {
+        if (["active", "stale", "unverified"].includes(state.phase) && state.gistId && state.expiresAt) {
+          state = { ...state, retryAt: Math.min(state.expiresAt, nowMs(clock) + 60_000) };
+          emit();
+        }
+        return state;
+      }
+      if (!state.gistId || ["purging", "purged"].includes(state.phase)) return state;
+      // Uma negativa autenticada depois da expiração não pode cair em grace:
+      // as cópias continuam preservadas até esta decisão, mas são então purgadas.
+      if (["stale", "unverified"].includes(state.phase)) {
+        state = { ...state, phase: "purging", graceExpiresAt: 0, generation: state.generation + 1 };
+        emit();
+        void purge().catch(() => {});
+        return state;
+      }
       if (state.phase === "grace") return state;
       state.phase = "grace";
-      state.graceExpiresAt = nowMs(clock) + configuredPolicy.graceMinutes * 60_000;
+      state.graceExpiresAt = Math.min(state.expiresAt, nowMs(clock) + configuredPolicy.graceMinutes * 60_000);
       emit();
       return state;
     }

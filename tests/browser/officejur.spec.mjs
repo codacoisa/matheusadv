@@ -226,7 +226,7 @@ test('retry recarrega a página e o seletor continua operável no bloqueio', asy
   await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
 });
 
-test('guard limpa o armazenamento protegido antes de cada aplicativo lê-lo', async ({ page }) => {
+test('guard stale bloqueia antes de cada aplicativo ler ou remover o armazenamento protegido', async ({ page }) => {
   const cases = [
     ['calculos/', 'officejur::calculos-juridicos::data'],
     ['financeiro/', 'officejur::financeiro::sync-state'],
@@ -259,9 +259,25 @@ test('guard limpa o armazenamento protegido antes de cada aplicativo lê-lo', as
     await page.reload({ waitUntil: 'networkidle' });
     const events = await page.evaluate(({ key }) =>
       window.__officejurProtectedStorageEvents.filter((event) => event.endsWith(key)), { key: protectedKey });
-    expect(events[0]).toBe(`remove:${protectedKey}`);
+    expect(events).toEqual([]);
+    await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), protectedKey)).not.toBeNull();
     await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
   }
+});
+
+test('revogação definitiva remove o armazenamento protegido', async ({ page }) => {
+  const protectedKey = 'officejur::calculos-juridicos::data';
+  await page.goto('calculos/', { waitUntil: 'networkidle' });
+  await page.evaluate((key) => {
+    localStorage.setItem(key, JSON.stringify({ secret: 'deve ser removido' }));
+    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      version: 3, phase: 'purged', gistId: 'gist-teste', expiresAt: 0,
+      graceExpiresAt: 0, resetForGistId: '', purgeId: 1,
+    }));
+  }, protectedKey);
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), protectedKey)).toBeNull();
 });
 
 test('calculadora interna usa o guard antes de carregar um registro protegido', async ({ page }) => {
@@ -280,7 +296,7 @@ test('calculadora interna usa o guard antes de carregar um registro protegido', 
   await expect(page.locator('body')).not.toContainText('Pensão confidencial');
 });
 
-test('aba já aberta expira offline e coordena o bloqueio com outra aba', async ({ context, page }) => {
+test('abas abertas convergem para stale sem remover a cópia local', async ({ context, page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {
     localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
@@ -288,7 +304,7 @@ test('aba já aberta expira offline e coordena o bloqueio com outra aba', async 
       records: [{ id: 'segredo', name: 'Cálculo confidencial', updatedAt: new Date().toISOString() }], deleted: []
     }));
     localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
-      version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() + 500, graceExpiresAt: 0, resetForGistId: '', purgeId: 0
+      version: 3, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() + 60_000, graceExpiresAt: 0, resetForGistId: '', purgeId: 0
     }));
   });
   const second = await context.newPage();
@@ -296,9 +312,17 @@ test('aba já aberta expira offline e coordena o bloqueio com outra aba', async 
     page.reload({ waitUntil: 'networkidle' }),
     second.goto('calculos/', { waitUntil: 'networkidle' }),
   ]);
+  await page.evaluate(() => {
+    const lease = JSON.parse(localStorage.getItem('officejur::gist-access-lease'));
+    lease.expiresAt = Date.now() - 1;
+    localStorage.setItem('officejur::gist-access-lease', JSON.stringify(lease));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'officejur::gist-access-lease', newValue: JSON.stringify(lease) }));
+  });
   await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado', { timeout: 5_000 });
   await expect(second.getByRole('alert')).toContainText('Acesso local bloqueado', { timeout: 5_000 });
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).toBeNull();
+  await expect(page.locator('body')).not.toContainText('Cálculo confidencial');
+  await expect(second.locator('body')).not.toContainText('Cálculo confidencial');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).not.toBeNull();
   await second.close();
 });
 
@@ -471,6 +495,9 @@ test('Financeiro não reserva espaço acima do header compartilhado', async ({ p
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('financeiro/', { waitUntil: 'networkidle' });
+    await expect(page.locator('.shell')).toBeVisible();
+    await expect(page.locator('.sidebar')).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
     const layout = await page.evaluate(() => {
       const header = document.querySelector('.topbar');
       const shell = document.querySelector('.shell');
@@ -497,6 +524,9 @@ test('Financeiro mantém header e barra lateral alinhados durante o scroll', asy
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('financeiro/', { waitUntil: 'networkidle' });
+    await expect(page.locator('.shell')).toBeVisible();
+    await expect(page.locator('.sidebar')).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.evaluate(() => window.scrollTo(0, 240));
 
     const layout = await page.evaluate(() => {

@@ -118,7 +118,7 @@
   }
   const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
   access?.subscribe((lease) => {
-    if (lease.phase === "purging" || lease.phase === "purged") showBlocked();
+    if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlocked();
   });
   document.querySelector("#sync-retry")?.addEventListener("click", () => void sync.fromGist());
   void initialize();

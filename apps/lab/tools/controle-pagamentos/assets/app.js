@@ -1075,7 +1075,7 @@
   els.paymentMonth.value = currentMonthISO();
   els.paymentDate.value = todayISO();
   access?.subscribe((lease) => {
-    if (lease.phase === 'purging' || lease.phase === 'purged') showBlockedAccess();
+    if (['stale', 'unverified', 'purging', 'purged'].includes(lease.phase)) showBlockedAccess();
   });
   void bootstrapAccess().then((allowed) => {
     if (!allowed) return;

@@ -3941,7 +3941,7 @@
         .forEach((menu) => menu.removeAttribute("open"));
   });
   access?.subscribe((lease) => {
-    if (lease.phase === "purging" || lease.phase === "purged") showBlockedAccess();
+    if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlockedAccess();
   });
   void bootAccess.then((allowed) => { if (!allowed) showBlockedAccess(); });
   Promise.all([dataReady, bootAccess])

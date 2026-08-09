@@ -120,7 +120,7 @@
     });
   }
   access?.subscribe(lease => {
-    if (lease.phase === 'purging' || lease.phase === 'purged') showBlocked();
+    if (['stale', 'unverified', 'purging', 'purged'].includes(lease.phase)) showBlocked();
   });
   void initialize();
 })();

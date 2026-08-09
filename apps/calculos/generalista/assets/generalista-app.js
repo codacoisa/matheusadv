@@ -211,7 +211,7 @@
     });
   }
   access?.subscribe((lease) => {
-    if (lease.phase === "purging" || lease.phase === "purged") showBlocked();
+    if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlocked();
   });
   app.addEventListener("change", (event) => {
     if (event.target.id !== "feeType") return;
