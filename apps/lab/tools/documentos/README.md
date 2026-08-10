@@ -1,41 +1,61 @@
 # Documentos (protótipo de laboratório)
 
-Este módulo é experimental e, por enquanto, mantém os arquivos somente no navegador, em um IndexedDB próprio (`officejur-documentos-lab`). Não há sincronização com Gist, upload automático ou integração com servidor.
+Este módulo é experimental e mantém os arquivos somente no navegador, em um
+IndexedDB próprio (`officejur-documentos-lab`). Não há sincronização com Gist,
+upload automático ou integração com servidor.
 
-## Escopo desta primeira versão
+## Fluxo atual
 
-- lista vazia quando o navegador ainda não tem documentos locais;
 - vínculo obrigatório com um cliente lido do Financeiro do OfficeJur;
 - importação local de DOCX, XLSX, PPTX e CSV;
-- criação e edição real de CSV, com pré-visualização tabular e download;
-- preservação do binário importado dos formatos Office e campo local de anotações;
+- criação de arquivos Office vazios no navegador;
+- edição de DOCX, XLSX e PPTX com o editor OnlyOffice local e as abas
+  principais em português brasileiro (`pt-BR`), usando fallback para strings
+  ainda não traduzidas;
+- edição direta de CSV, com pré-visualização tabular;
+- salvamento do arquivo editado de volta no IndexedDB e download local;
 - exclusão apenas da cópia mantida neste navegador.
 
-DOCX, XLSX e PPTX ainda não são regravados por um motor Office nesta etapa. A primeira camada WASM faz leitura e prévia textual local, sem alterar o binário original. O módulo não baixa nem incorpora um editor remoto silenciosamente e não salva um arquivo inválido com extensão Office.
+## Editor Office local
 
-## Camada de integração WASM
+O editor é incorporado por um iframe same-origin construído a partir do
+submódulo `third_party/ranuts-document`, baseado na camada web do OnlyOffice.
+O aplicativo principal envia o arquivo por `postMessage` e recebe os eventos
+`document:ready`, `document:opened`, `document:saved` e `document:error`.
 
-O protótipo agora possui um contrato local e um primeiro engine WASM instalado:
+O build do site executa `pnpm install --frozen-lockfile` e `pnpm run build` no
+submódulo, copia o `dist` para `lab/documentos/editor/` e inclui a licença AGPL
+junto dos assets publicados. O build é estático e adequado ao GitHub Pages;
+nenhum arquivo é enviado a um servidor para ser editado.
 
-- `assets/engine/manifest.json` registra engine, versão, origem, licença, hashes e tamanho dos assets;
-- `assets/office-engine.worker.js` isola o processamento do thread da interface;
-- `assets/engine.js` carrega o worker sob demanda e expõe `probe()` e `inspect()`;
-- `assets/engine/office-oxide-adapter.js` adapta `office-oxide-wasm` para leitura de texto, Markdown e HTML;
-- `assets/office-templates.js` gera modelos DOCX, XLSX e PPTX vazios no navegador;
-- `fflate@0.8.3` permite regravar a cópia ZIP OOXML sem alterar o original;
-- o original importado é preservado em `originalFile`, enquanto `file` representa a versão corrente.
+O editor preserva `originalFile` no IndexedDB. A propriedade `file` representa
+a versão corrente que será aberta na próxima edição ou baixada pelo usuário.
 
-O pacote `office-oxide-wasm@0.1.8` é copiado durante o build para os assets do Lab. O runtime web tem aproximadamente 14 KB e o WASM 1,05 MB; o manifest fixa SHA-256 dos assets. A API pública desta versão lê e converte o conteúdo; a regravação experimental é feita separadamente sobre o ZIP OOXML por `fflate`.
+## Licenciamento
 
-O fluxo `Abrir para editar` apresenta o texto extraído em uma superfície visual editável e o botão `Salvar` regrava a cópia local, preservando o original importado. A edição técnica ainda substitui somente a primeira ocorrência em `word/document.xml`, na primeira planilha `xl/worksheets/*.xml` ou no primeiro slide `ppt/slides/*.xml`, inclusive quando a ocorrência atravessa nós textuais fragmentados. Não há fidelidade de layout nem edição de imagens, tabelas ou estilos; a próxima etapa para chegar a um editor Office completo será incorporar uma camada visual especializada, com auditoria de licença e tamanho do engine.
+O código do OfficeJur continua sujeito à OfficeJur Source License. O editor
+incorporado é um componente de terceiros sob AGPL-3.0; o submódulo, o arquivo
+`AGPL-3.0.LICENSE` publicado e `THIRD-PARTY-NOTICES.md` devem ser mantidos ao
+redistribuir o site.
 
-## Referências avaliadas
+Referências principais:
 
-- [ranuts/document](https://github.com/ranuts/document) — referência de editor/preview local no navegador, com suporte anunciado a DOCX, XLSX, PPTX e CSV. O repositório informa licença AGPL-3.0 e referências a `onlyoffice-x2t-wasm`, `sdkjs` e `web-apps`.
-- [ONLYOFFICE/web-apps](https://github.com/ONLYOFFICE/web-apps) — referência da camada de interface dos editores web do ONLYOFFICE. O repositório informa licença AGPL-3.0 e separa a interface do Document Server/engine.
+- [ranuts/document](https://github.com/ranuts/document) — editor local baseado
+  em OnlyOffice Web, com suporte anunciado a DOCX, XLSX, PPTX e CSV;
+- [ONLYOFFICE Docs API](https://api.onlyoffice.com/docs) — documentação da
+  integração e dos eventos do editor;
+- [ONLYOFFICE/web-apps](https://github.com/ONLYOFFICE/web-apps) — camada web
+  utilizada pelo editor.
 
-Nenhum código dessas referências é copiado ou carregado por esta versão. Antes de adicionar bibliotecas, WASM ou assets de terceiros, registrar origem, versão, licença e créditos em `THIRD-PARTY-NOTICES.md` e nesta pasta.
+## Build local
 
-## Próxima etapa sugerida
+Na raiz do repositório, com os submódulos disponíveis:
 
-Escolher e auditar um engine local compatível com a licença do OfficeJur, empacotar seus assets no build e criar um adaptador que receba `Blob`, idioma `pt-BR`, permissões somente locais e callback de salvamento de volta ao IndexedDB.
+```bash
+git submodule update --init --recursive
+npm ci
+./scripts/build-site.sh
+```
+
+O resultado fica em `_site/`. Para publicação, o workflow do GitHub Pages
+instala o pnpm usado pelo submódulo antes de executar o build.

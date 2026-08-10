@@ -16,7 +16,6 @@
     "@playwright/test": "1.62.1"
   },
   "dependencies": {
-    "fflate": "0.8.3",
-    "office-oxide-wasm": "0.1.8"
+    "fflate": "0.8.3"
   }
 }

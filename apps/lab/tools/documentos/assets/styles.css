@@ -11,6 +11,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 body { margin: 0; color: var(--ink); background: radial-gradient(circle at 12% 0, rgba(134, 103, 218, .28), transparent 32rem), linear-gradient(145deg, #161229, #17213a 68%, #111827); font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 button, input, select, textarea { font: inherit; }
@@ -66,20 +67,12 @@ select option { color: #14152a; background: #f4f1ff; }
 .editor-empty p { max-width: 430px; margin: 12px 0 22px; color: var(--muted); }
 .editor-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; padding-bottom: 19px; border-bottom: 1px solid var(--line); }
 .editor-head h2 { overflow-wrap: anywhere; }
-.editor-notice, .engine-note { margin: 18px 0; border-left: 3px solid var(--gold); padding: 10px 13px; color: var(--muted); background: rgba(217,189,121,.08); }
-.engine-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 18px 0 0; }
-.engine-status { color: var(--gold); font-size: 12px; }
-.engine-status.error { color: var(--danger); }
-.engine-preview { margin-top: 18px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.14); }
-.engine-preview .preview-head { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-.engine-preview pre { max-height: 260px; overflow: auto; margin: 0; padding: 13px; color: var(--ink); font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
-.office-visual { margin-top: 22px; border: 1px solid rgba(189,162,255,.35); border-radius: 10px; background: rgba(0,0,0,.14); }
-.office-visual .preview-head { margin: 0; padding: 11px 13px; border-bottom: 1px solid var(--line); }
-.office-content { min-height: 300px; max-height: 520px; overflow: auto; padding: 22px; color: #201a32; background: #fbf9ff; font: 16px/1.7 Georgia, "Times New Roman", serif; white-space: pre-wrap; outline: none; }
-.office-content:focus { box-shadow: inset 0 0 0 3px rgba(189,162,255,.35); }
-.visual-editor-note { margin: 0; padding: 10px 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
-.engine-edit { display: grid; gap: 14px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
-.engine-edit-copy { margin: 0; color: var(--muted); font-size: 12px; }
+.editor-notice { margin: 18px 0; border-left: 3px solid var(--gold); padding: 10px 13px; color: var(--muted); background: rgba(217,189,121,.08); }
+.office-editor { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.office-editor-status { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 9px 13px; color: #29213d; background: #f4f1ff; font-size: 12px; }
+.office-status { color: #66528d; }
+.office-status.error { color: #a33b35; }
+.office-editor iframe { display: block; width: 100%; height: min(760px, 72vh); min-height: 620px; border: 0; background: #fff; }
 .csv-editor, .office-editor { margin-top: 22px; }
 .csv-editor > label span { font-weight: 500; }
 #csv-content { min-height: 210px; margin-top: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; resize: vertical; }
@@ -88,7 +81,6 @@ select option { color: #14152a; background: #f4f1ff; }
 .csv-preview table { width: 100%; border-collapse: collapse; min-width: 450px; }
 .csv-preview th, .csv-preview td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 8px 10px; text-align: left; white-space: pre-wrap; }
 .csv-preview th { color: var(--violet); background: rgba(189,162,255,.1); }
-#office-notes { min-height: 290px; resize: vertical; }
 .document-dialog { width: min(560px, calc(100% - 30px)); border: 1px solid var(--line); border-radius: 14px; padding: 0; color: var(--ink); background: var(--panel-strong); box-shadow: 0 28px 90px rgba(0,0,0,.45); }
 .document-dialog::backdrop { background: rgba(5,7,20,.72); backdrop-filter: blur(3px); }
 .document-dialog form { padding: 24px; }

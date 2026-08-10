@@ -20,6 +20,13 @@ jobs:
     steps:
       - name: Baixar repositório
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Configurar pnpm do editor Office
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
 
       - name: Configurar Node.js
         uses: actions/setup-node@v7

@@ -19,7 +19,6 @@
     <script src="../../financeiro/assets/data-store.js?v=1" defer></script>
     <script src="./assets/storage.js?v=1" defer></script>
     <script src="./assets/office-templates.js?v=1" defer></script>
-    <script src="./assets/engine.js?v=1" defer></script>
     <script src="./assets/app.js?v=1" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
@@ -42,7 +41,7 @@
         <div>
           <p class="eyebrow">LABORATÓRIO · SEM SINCRONIZAÇÃO</p>
           <h1>Documentos</h1>
-          <p class="intro-copy">Arquivos locais organizados por cliente, com edição experimental no navegador. Nada é enviado ao Gist ou a outro servidor.</p>
+          <p class="intro-copy">Arquivos locais organizados por cliente, com editor Office completo no navegador. Nada é enviado ao Gist ou a outro servidor.</p>
         </div>
         <div class="intro-actions">
           <button id="new-document" class="button primary" type="button">Novo documento</button>
@@ -96,35 +95,11 @@
             <div id="csv-preview" class="csv-preview"></div>
           </div>
           <div id="office-editor" class="office-editor" hidden>
-            <div id="office-visual" class="office-visual" hidden>
-              <div class="preview-head"><strong>Editor visual experimental</strong><span>Texto editável no navegador</span></div>
-              <div id="office-content" class="office-content" contenteditable="true" role="textbox" aria-label="Conteúdo textual do documento" aria-multiline="true" spellcheck="true"></div>
-              <p class="visual-editor-note">O salvamento regrava o texto no arquivo local e preserva o original importado. Layout, imagens, tabelas e estilos ainda não são editáveis nesta etapa.</p>
+            <div class="office-editor-status">
+              <strong>OnlyOffice local</strong>
+            <span id="office-status" class="office-status" role="status" aria-live="polite">Inicializando editor…</span>
             </div>
-            <label for="office-notes">Rascunho e anotações locais
-              <textarea id="office-notes" placeholder="Registre aqui observações ou conteúdo de trabalho deste arquivo..."></textarea>
-            </label>
-            <div class="engine-actions">
-              <button id="engine-inspect" class="button secondary" type="button">Abrir para editar</button>
-              <span id="engine-status" class="engine-status" role="status" aria-live="polite">Engine WASM não carregado</span>
-            </div>
-            <div id="engine-preview" class="engine-preview" hidden>
-              <div class="preview-head"><strong>Texto extraído localmente</strong><span>O binário original não foi alterado</span></div>
-              <pre id="engine-preview-text"></pre>
-            </div>
-            <div class="engine-edit">
-              <p class="engine-edit-copy"><strong>Ferramenta técnica.</strong> Use-a somente quando precisar substituir um trecho específico sem abrir o editor visual.</p>
-              <div class="form-grid">
-                <label for="engine-search">Texto atual
-                  <input id="engine-search" type="text" autocomplete="off">
-                </label>
-                <label for="engine-replacement">Novo texto
-                  <input id="engine-replacement" type="text" autocomplete="off">
-                </label>
-              </div>
-              <button id="engine-replace" class="button secondary" type="button">Substituir e salvar cópia</button>
-            </div>
-            <p class="engine-note"><strong>Processamento Office local em avaliação.</strong> O original permanece preservado no IndexedDB; a cópia editada é baixada pelo botão existente. A edição visual completa continua sendo uma etapa separada.</p>
+            <iframe id="office-editor-frame" title="Editor de documentos Office" src="./editor/index.html?embed=1&amp;locale=pt-BR"></iframe>
           </div>
         </section>
       </section>

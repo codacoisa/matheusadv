@@ -362,20 +362,20 @@ test('Documentos vincula cliente e salva CSV localmente', async ({ page }) => {
   await expect(page.locator('#csv-preview')).toContainText('Teste');
 });
 
-test('Documentos cria Office em branco, abre editor visual e permite excluir', async ({ page }) => {
+test('Documentos cria Office em branco, abre OnlyOffice em português e permite excluir', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
-  await page.locator('#document-name').fill('Rascunho visual');
+  await page.locator('#document-name').fill('Rascunho OnlyOffice');
   await page.locator('#document-type').selectOption('docx');
   await page.getByRole('button', { name: 'Salvar documento' }).click();
-  await expect(page.getByRole('button', { name: /Rascunho visual/ })).toBeVisible();
-  await expect(page.locator('#engine-inspect')).toBeEnabled();
-  await page.locator('#engine-inspect').click();
-  await expect(page.locator('#office-visual')).toBeVisible();
-  await page.locator('#office-content').fill('Petição criada no editor visual local.');
+  await expect(page.getByRole('button', { name: /Rascunho OnlyOffice/ })).toBeVisible();
+  await expect(page.locator('#office-editor-frame')).toBeVisible();
+  await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
+  const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
+  await expect(office.getByText('Início', { exact: true })).toBeVisible();
   await page.locator('#save-document').click();
-  await expect(page.getByText('Alterações salvas localmente.')).toBeVisible();
+  await expect(page.getByText('Alterações salvas localmente no arquivo Office.')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#delete-document').click();
   await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
@@ -397,7 +397,7 @@ test('Documentos permite limpar a biblioteca local com confirmação', async ({ 
   await expect(page.locator('#clear-library')).toBeDisabled();
 });
 
-test('Documentos salva texto visual com múltiplos parágrafos', async ({ page }) => {
+test('Documentos abre e reabre um DOCX pelo OnlyOffice', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
@@ -408,65 +408,14 @@ test('Documentos salva texto visual com múltiplos parágrafos', async ({ page }
     buffer: minimalDocx({ paragraphs: ['OfficeJur WASM', 'Segundo parágrafo'] }),
   });
   await page.getByRole('button', { name: 'Salvar documento' }).click();
-  await expect(page.locator('#office-content')).toContainText('OfficeJur WASM');
-  await page.locator('#office-content').fill('OfficeJur editado\nSegundo parágrafo revisado');
-  await page.locator('#save-document').click();
-  await expect(page.getByText('Alterações salvas localmente.')).toBeVisible();
-  await page.locator('#engine-inspect').click();
-  await expect(page.locator('#office-content')).toContainText('Segundo parágrafo revisado');
+  await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: /Petição com parágrafos/ }).click();
+  await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
+  await expect(page.locator('#office-editor-frame')).toBeVisible();
 });
 
-test('Documentos preserva o binário Office e carrega o engine WASM local', async ({ page }) => {
-  await prepareCalculationPage(page, 'lab/documentos/');
-  await page.getByRole('button', { name: 'Novo documento' }).click();
-  await page.locator('#client-select').selectOption('client-test');
-  await page.locator('#document-name').fill('Contrato de teste');
-  await page.locator('#document-file').setInputFiles({
-    name: 'contrato.docx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    buffer: minimalDocx(['OfficeJur ', 'WASM']),
-  });
-  await page.getByRole('button', { name: 'Salvar documento' }).click();
-  await expect(page.getByRole('button', { name: /Contrato de teste/ })).toBeVisible();
-  await expect(page.locator('#engine-inspect')).toBeEnabled();
-  await expect(page.locator('#engine-status')).toContainText('Engine disponível: office-oxide-wasm 0.1.8');
-  await page.locator('#engine-inspect').click();
-  await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur WASM');
-  await expect(page.getByText('Conteúdo DOCX lido localmente; o original foi preservado.')).toBeVisible();
-  await page.locator('#engine-search').fill('OfficeJur WASM');
-  await page.locator('#engine-replacement').fill('OfficeJur editado & revisado');
-  await page.locator('#engine-replace').click();
-  await expect(page.getByText('1 ocorrência substituída localmente; o original foi preservado.')).toBeVisible();
-  const storedXml = await page.evaluate(async () => {
-    const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('officejur-documentos-lab', 2);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const records = await new Promise((resolve, reject) => {
-      const request = database.transaction('documents', 'readonly').objectStore('documents').getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    database.close();
-    const record = records.find((item) => item.name === 'Contrato de teste');
-    const { strFromU8, unzipSync } = await import('/lab/documentos/assets/engine/fflate.js');
-    const edited = unzipSync(new Uint8Array(await record.file.arrayBuffer()));
-    const original = unzipSync(new Uint8Array(await record.originalFile.arrayBuffer()));
-    return {
-      editedXml: strFromU8(edited['word/document.xml']),
-      originalXml: strFromU8(original['word/document.xml']),
-    };
-  });
-  expect(storedXml.editedXml).toContain('OfficeJur editado &amp; revisado');
-  expect(storedXml.originalXml).toContain('OfficeJur ');
-  expect(storedXml.originalXml).toContain('>WASM</w:t>');
-  expect(storedXml.originalXml).not.toContain('editado');
-  await page.locator('#engine-inspect').click();
-  await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur editado');
-});
-
-test('Documentos inspeciona XLSX e PPTX com o mesmo engine local', async ({ page }) => {
+test('Documentos abre XLSX e PPTX no mesmo editor OnlyOffice local', async ({ page }) => {
   const fixtures = [
     { extension: 'xlsx', name: 'planilha.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', text: 'OfficeJur XLSX', buffer: minimalXlsx('OfficeJur XLSX') },
     { extension: 'pptx', name: 'apresentacao.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', text: 'OfficeJur PPTX', buffer: minimalPptx('OfficeJur PPTX') },
@@ -480,10 +429,8 @@ test('Documentos inspeciona XLSX e PPTX com o mesmo engine local', async ({ page
     await page.locator('#document-file').setInputFiles({ name: fixture.name, mimeType: fixture.mimeType, buffer: fixture.buffer });
     await page.getByRole('button', { name: 'Salvar documento' }).click();
     await expect(page.getByRole('button', { name: new RegExp(fixture.name.replace('.', '\\.')) })).toBeVisible();
-    await expect(page.locator('#engine-status')).toContainText('Engine disponível: office-oxide-wasm 0.1.8');
-    await page.locator('#engine-inspect').click();
-    await expect(page.locator('#engine-preview-text')).toContainText(fixture.text);
-    await expect(page.getByText(`Conteúdo ${fixture.extension.toUpperCase()} lido localmente; o original foi preservado.`)).toBeVisible();
+    await expect(page.locator('#office-editor-frame')).toBeVisible();
+    await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   }
 });
 
