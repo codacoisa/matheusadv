@@ -26,7 +26,7 @@ O protótipo agora possui um contrato local e um primeiro engine WASM instalado:
 
 O pacote `office-oxide-wasm@0.1.8` é copiado durante o build para os assets do Lab. O runtime web tem aproximadamente 14 KB e o WASM 1,05 MB; o manifest fixa SHA-256 dos assets. A API pública desta versão lê e converte o conteúdo; a regravação experimental é feita separadamente sobre o ZIP OOXML por `fflate`.
 
-A edição atual substitui somente a primeira ocorrência de texto em `word/document.xml`, na primeira planilha `xl/worksheets/*.xml` ou no primeiro slide `ppt/slides/*.xml`. Ela não promete fidelidade de layout, não edita imagens, tabelas ou estilos e deve ser tratada como ferramenta experimental. A próxima decisão continua sendo entre ampliar esse writer estrutural ou adicionar uma camada de editor visual.
+A edição atual substitui somente a primeira ocorrência de texto em `word/document.xml`, na primeira planilha `xl/worksheets/*.xml` ou no primeiro slide `ppt/slides/*.xml`, inclusive quando a ocorrência atravessa nós textuais fragmentados. Ela não promete fidelidade de layout, não edita imagens, tabelas ou estilos e deve ser tratada como ferramenta experimental. A próxima decisão continua sendo entre ampliar esse writer estrutural ou adicionar uma camada de editor visual.
 
 ## Referências avaliadas
 

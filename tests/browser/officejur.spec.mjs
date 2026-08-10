@@ -370,7 +370,7 @@ test('Documentos preserva o binário Office e carrega o engine WASM local', asyn
   await page.locator('#document-file').setInputFiles({
     name: 'contrato.docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    buffer: minimalDocx('OfficeJur WASM'),
+    buffer: minimalDocx(['OfficeJur ', 'WASM']),
   });
   await page.getByRole('button', { name: 'Salvar documento' }).click();
   await expect(page.getByRole('button', { name: /Contrato de teste/ })).toBeVisible();
@@ -380,9 +380,34 @@ test('Documentos preserva o binário Office e carrega o engine WASM local', asyn
   await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur WASM');
   await expect(page.getByText('Conteúdo DOCX lido localmente; o original foi preservado.')).toBeVisible();
   await page.locator('#engine-search').fill('OfficeJur WASM');
-  await page.locator('#engine-replacement').fill('OfficeJur editado');
+  await page.locator('#engine-replacement').fill('OfficeJur editado & revisado');
   await page.locator('#engine-replace').click();
   await expect(page.getByText('1 ocorrência substituída localmente; o original foi preservado.')).toBeVisible();
+  const storedXml = await page.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('officejur-documentos-lab', 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const records = await new Promise((resolve, reject) => {
+      const request = database.transaction('documents', 'readonly').objectStore('documents').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    const record = records.find((item) => item.name === 'Contrato de teste');
+    const { strFromU8, unzipSync } = await import('/lab/documentos/assets/engine/fflate.js');
+    const edited = unzipSync(new Uint8Array(await record.file.arrayBuffer()));
+    const original = unzipSync(new Uint8Array(await record.originalFile.arrayBuffer()));
+    return {
+      editedXml: strFromU8(edited['word/document.xml']),
+      originalXml: strFromU8(original['word/document.xml']),
+    };
+  });
+  expect(storedXml.editedXml).toContain('OfficeJur editado &amp; revisado');
+  expect(storedXml.originalXml).toContain('OfficeJur ');
+  expect(storedXml.originalXml).toContain('>WASM</w:t>');
+  expect(storedXml.originalXml).not.toContain('editado');
   await page.locator('#engine-inspect').click();
   await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur editado');
 });

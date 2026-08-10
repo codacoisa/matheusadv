@@ -13,15 +13,53 @@ function escapeXml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character]);
 }
 
+function decodeXml(value) {
+  return String(value)
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#([0-9]+);/g, (_, code) => String.fromCodePoint(Number.parseInt(code, 10)))
+    .replace(/&(amp|lt|gt|quot|apos);/g, (_, entity) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" })[entity]);
+}
+
 function replaceFirstText(files, extension, search, replacement) {
   const candidates = textTargets[extension]?.(files) || [];
   const textTag = extension === 'docx' ? 'w:t' : extension === 'pptx' ? 'a:t' : 't';
-  const pattern = new RegExp(`(<${textTag}(?:\\s[^>]*)?>)([\\s\\S]*?)(</${textTag}>)`);
+  const pattern = new RegExp(`(<${textTag}(?:\\s[^>]*)?>)([\\s\\S]*?)(</${textTag}>)`, 'g');
   for (const path of candidates) {
     const source = strFromU8(files[path]);
-    const match = source.match(pattern);
-    if (!match || !match[2].includes(search)) continue;
-    files[path] = strToU8(source.replace(pattern, (_, open, value, close) => `${open}${escapeXml(value.replace(search, replacement))}${close}`));
+    const nodes = [];
+    let match;
+    let textOffset = 0;
+    while ((match = pattern.exec(source))) {
+      const value = decodeXml(match[2]);
+      if (value) {
+        const innerStart = match.index + match[1].length;
+        nodes.push({
+          end: textOffset + value.length,
+          innerEnd: innerStart + match[2].length,
+          innerStart,
+          start: textOffset,
+          value,
+        });
+        textOffset += value.length;
+      }
+    }
+
+    const fullText = nodes.map((node) => node.value).join('');
+    const matchStart = fullText.indexOf(search);
+    if (matchStart < 0) continue;
+    const matchEnd = matchStart + search.length;
+    const affected = nodes.filter((node) => node.end > matchStart && node.start < matchEnd);
+    let edited = source;
+    for (let index = affected.length - 1; index >= 0; index -= 1) {
+      const node = affected[index];
+      const localStart = Math.max(0, matchStart - node.start);
+      const localEnd = Math.min(node.value.length, matchEnd - node.start);
+      let value = node.value.slice(0, localStart);
+      if (index === 0) value += replacement;
+      if (index === affected.length - 1) value += node.value.slice(localEnd);
+      edited = `${edited.slice(0, node.innerStart)}${escapeXml(value)}${edited.slice(node.innerEnd)}`;
+    }
+    files[path] = strToU8(edited);
     return { path, count: 1 };
   }
   throw new Error(`Texto não encontrado no conteúdo estrutural ${extension.toUpperCase()}.`);
