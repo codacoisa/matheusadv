@@ -1,10 +1,11 @@
     const DEFAULT_FILE_NAME = 'projudi-central-guias.json';
     const CONFIG_FILE_NAME = 'officejur-central-guias.json';
     const CONFIG_SCHEMA = 'officejur/central-guias-config';
+    const CONFIG_STORAGE_KEY = 'central-guias::config';
     const gistSettings = window.OfficeJurGistSettings;
     const access = window.OfficeJurGistAccessLease?.create();
-    const syncClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
     const targetGistClient = window.OfficeJurGistClient;
+    const syncClient = access?.gatedClient(targetGistClient) || targetGistClient;
     const ALERT_BUSINESS_DAYS = 7;
     const WEEK_DAYS = 7;
     const STALE_SYNC_DAYS = 10;
@@ -13,7 +14,6 @@
 
     const state = {
       gistId: '',
-      configLoaded: false,
       payload: null,
       db: null,
       rows: [],
@@ -59,13 +59,16 @@
       bindEvents();
       syncInputs();
       render();
-      void initializeSharedConfig();
+      void initializeConfigSync();
     }
 
     function bindEvents() {
       nodes.loadButton.addEventListener('click', () => {
         state.gistId = nodes.gistId.value.trim();
-        void saveSharedConfig(state.gistId).then(() => loadBackup()).catch((error) => setStatus(error.message, true));
+        persistConfig();
+        void syncConfig()
+          .catch((error) => setStatus(`Configuração local salva. Não foi possível sincronizar: ${error.message}`, true))
+          .finally(() => loadBackup());
       });
 
       nodes.resetButton.addEventListener('click', () => {
@@ -74,7 +77,12 @@
         state.db = null;
         state.rows = [];
         state.processOptions = [];
-        void clearSharedConfig().catch((error) => setStatus(error.message, true));
+        persistConfig();
+        syncInputs();
+        render();
+        void syncConfig()
+          .then(() => setStatus('Configuração da Central removida deste navegador e da sincronização do OfficeJur.'))
+          .catch((error) => setStatus(`Configuração removida deste navegador. Não foi possível sincronizar: ${error.message}`, true));
       });
 
       nodes.searchInput.addEventListener('input', (event) => {
@@ -157,7 +165,7 @@
 
     function hydrateConfig() {
       try {
-        const saved = JSON.parse(localStorage.getItem('central-guias::config') || '{}');
+        const saved = JSON.parse(localStorage.getItem(CONFIG_STORAGE_KEY) || '{}');
         const gistIdFromUrl = new URLSearchParams(location.search).get('gist');
         state.gistId = String(gistIdFromUrl || saved.gistId || '').trim();
       } catch (_) {
@@ -165,9 +173,9 @@
       }
     }
 
-    function saveLegacyConfig() {
-      if (state.gistId) localStorage.setItem('central-guias::config', JSON.stringify({ gistId: state.gistId }));
-      else localStorage.removeItem('central-guias::config');
+    function persistConfig() {
+      if (state.gistId) localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify({ gistId: state.gistId }));
+      else localStorage.removeItem(CONFIG_STORAGE_KEY);
     }
 
     function syncInputs() {
@@ -177,82 +185,63 @@
       renderViewNav();
     }
 
-    async function initializeSharedConfig() {
+    async function initializeConfigSync() {
       const settings = gistSettings?.load?.() || {};
       if (!settings.gistId || !settings.token) {
-        syncInputs();
-        render();
-        setStatus(state.gistId
-          ? 'Configuração local encontrada. Salve-a para compartilhá-la com os demais computadores.'
-          : 'Configure primeiro o Gist global do OfficeJur para compartilhar esta Central.');
         if (state.gistId) await loadBackup();
+        else setStatus('Informe o ID ou endereço do Gist para acompanhar as guias.');
         return;
       }
+
       try {
-        if (access && !(await access.guard('central-guias'))) throw new Error('O acesso ao sincronismo do OfficeJur está bloqueado.');
+        access?.canSync(settings.gistId);
         const snapshot = await syncClient.gistSnapshot(settings.gistId, settings.token);
         const file = snapshot.gist?.files?.[CONFIG_FILE_NAME];
         if (file) {
           const config = JSON.parse(await syncClient.text(file, { maxBytes: 256 * 1024 }));
-          if (config?.schema !== CONFIG_SCHEMA) throw new Error('A configuração compartilhada da Central usa um formato incompatível.');
+          if (config?.schema !== CONFIG_SCHEMA) throw new Error('A configuração sincronizada da Central usa um formato incompatível.');
           state.gistId = normalizeGistId(config.gistId);
-          state.configLoaded = true;
-          saveLegacyConfig();
-        } else {
-          state.configLoaded = false;
+          persistConfig();
+        } else if (normalizeGistId(state.gistId)) {
+          await writeSharedConfig(settings, snapshot);
         }
         syncInputs();
         render();
         if (state.gistId) await loadBackup();
-        else setStatus('Informe o Gist que contém os backups da Central e salve a configuração.');
+        else setStatus('Informe o ID ou endereço do Gist para acompanhar as guias.');
       } catch (error) {
-        setStatus(error.message || 'Não foi possível carregar a configuração compartilhada da Central.', true);
+        setStatus(`Configuração local mantida. Não foi possível sincronizar: ${error.message}`, true);
+        if (state.gistId) await loadBackup();
       }
     }
 
-    async function saveSharedConfig(input) {
-      const gistId = normalizeGistId(input);
-      if (!gistId) throw new Error('Informe um Gist válido para a Central.');
+    async function syncConfig() {
       const settings = gistSettings?.load?.() || {};
-      if (!settings.gistId || !settings.token) throw new Error('Configure o Gist global e o token nas Configurações do OfficeJur antes de compartilhar esta Central.');
-      if (access) access.canSync(settings.gistId);
+      if (!settings.gistId || !settings.token) return false;
+      access?.canSync(settings.gistId);
       const snapshot = await syncClient.gistSnapshot(settings.gistId, settings.token);
+      return writeSharedConfig(settings, snapshot);
+    }
+
+    async function writeSharedConfig(settings, snapshot) {
+      const targetGistId = normalizeGistId(state.gistId);
+      const sharedFile = snapshot.gist?.files?.[CONFIG_FILE_NAME];
+      if (!targetGistId) {
+        if (sharedFile) {
+          await syncClient.patch(settings.gistId, settings.token, { [CONFIG_FILE_NAME]: null }, { etag: snapshot.etag });
+        }
+        return true;
+      }
       const config = {
         schema: CONFIG_SCHEMA,
         version: 1,
-        gistId,
+        gistId: targetGistId,
         updatedAt: new Date().toISOString()
       };
       await syncClient.patch(settings.gistId, settings.token, {
         [CONFIG_FILE_NAME]: { content: JSON.stringify(config, null, 2) }
       }, { etag: snapshot.etag });
-      state.gistId = gistId;
-      state.configLoaded = true;
-      saveLegacyConfig();
-      syncInputs();
-      render();
-      setStatus('Configuração da Central salva no sincronismo do OfficeJur.');
-    }
-
-    async function clearSharedConfig() {
-      const settings = gistSettings?.load?.() || {};
-      if (settings.gistId && settings.token) {
-        if (access) access.canSync(settings.gistId);
-        const snapshot = await syncClient.gistSnapshot(settings.gistId, settings.token);
-        if (snapshot.gist?.files?.[CONFIG_FILE_NAME]) {
-          await syncClient.patch(settings.gistId, settings.token, { [CONFIG_FILE_NAME]: null }, { etag: snapshot.etag });
-        }
-      }
-      state.gistId = '';
-      state.configLoaded = false;
-      state.payload = null;
-      state.db = null;
-      state.rows = [];
-      state.processOptions = [];
-      saveLegacyConfig();
-      syncInputs();
-      render();
-      setStatus('Configuração compartilhada da Central removida.');
+      return true;
     }
 
     async function loadBackup() {
@@ -265,9 +254,9 @@
       setStatus('Carregando backup...');
 
       try {
-        const settings = window.OfficeJurGistSettings?.load?.() || {};
         if (!targetGistClient) throw new Error('Cliente do Gist indisponível.');
-        const gist = await targetGistClient.gist(gistId, settings.token || '');
+        const token = window.OfficeJurGistSettings?.load?.().token || '';
+        const gist = await targetGistClient.gist(gistId, token);
         const gistFiles = gist && gist.files ? Object.values(gist.files) : [];
         const selectedFile = gist?.files?.[DEFAULT_FILE_NAME]
           || gistFiles.find((file) => String(file?.filename || '').toLowerCase().endsWith('.json'));

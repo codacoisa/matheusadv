@@ -6,17 +6,20 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../../../../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('Central sincroniza o Gist de destino como configuração no Gist global', () => {
+test('Central sincroniza sua configuração sem alterar o Gist global', () => {
   const index = read('apps/lab/tools/central-guias/index.html');
   const app = read('apps/lab/tools/central-guias/assets/app.js');
 
   assert.match(index, /ID ou endereço do Gist/);
-  assert.match(index, /Configuração compartilhada/);
+  assert.match(index, /Configuração do módulo/);
   assert.match(index, /gist-access-lease/);
+  assert.match(app, /central-guias::config/);
+  assert.match(app, /persistConfig/);
   assert.match(app, /officejur-central-guias\.json/);
   assert.match(app, /officejur\/central-guias-config/);
   assert.match(app, /syncClient\.patch/);
   assert.match(app, /targetGistClient\.gist/);
+  assert.match(app, /OfficeJurGistSettings\?\.load/);
   assert.doesNotMatch(app, /OfficeJurGistSettings\?\.save/);
 });
 
