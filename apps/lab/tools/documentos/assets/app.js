@@ -6,40 +6,22 @@
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const $ = (selector) => document.querySelector(selector);
-  const state = { clients: [], documents: [], selectedId: '', query: '' };
+  const state = { clients: [], documents: [], selectedId: '', query: '', dialogMode: 'create' };
   let officeReady = false;
   let officeOpenId = '';
   let officeSave = null;
 
   const els = {
-    status: $('#status'),
-    count: $('#document-count'),
-    list: $('#document-list'),
-    search: $('#document-search'),
-    clearLibrary: $('#clear-library'),
-    empty: $('#editor-empty'),
-    editor: $('#editor-view'),
-    editorType: $('#editor-type'),
-    editorTitle: $('#editor-title'),
-    editorClient: $('#editor-client'),
-    editorNotice: $('#editor-notice'),
-    deleteDocument: $('#delete-document'),
-    saveDocument: $('#save-document'),
-    downloadDocument: $('#download-document'),
-    csvEditor: $('#csv-editor'),
-    csvContent: $('#csv-content'),
-    csvPreview: $('#csv-preview'),
-    officeEditor: $('#office-editor'),
-    officeFrame: $('#office-editor-frame'),
-    officeStatus: $('#office-status'),
-    dialog: $('#document-dialog'),
-    form: $('#document-form'),
-    clientSelect: $('#client-select'),
-    clientEmpty: $('#client-empty'),
-    name: $('#document-name'),
-    type: $('#document-type'),
-    file: $('#document-file'),
-    confirm: $('#confirm-document'),
+    status: $('#status'), count: $('#document-count'), clientCount: $('#client-count'), folders: $('#client-folders'),
+    libraryEmpty: $('#library-empty'), search: $('#document-search'), clearLibrary: $('#clear-library'),
+    editorDialog: $('#editor-dialog'), editorFormat: $('#editor-format'), editorName: $('#editor-name'), editorClient: $('#editor-client'),
+    deleteDocument: $('#delete-document'), saveDocument: $('#save-document'), downloadDocument: $('#download-document'),
+    csvEditor: $('#csv-editor'), csvContent: $('#csv-content'), csvPreview: $('#csv-preview'),
+    officeEditor: $('#office-editor'), officeFrame: $('#office-editor-frame'), officeStatus: $('#office-status'),
+    dialog: $('#document-dialog'), form: $('#document-form'), dialogEyebrow: $('#dialog-eyebrow'), dialogTitle: $('#dialog-title'),
+    dialogCopy: $('#dialog-copy'), clientSelect: $('#client-select'), clientEmpty: $('#client-empty'), name: $('#document-name'),
+    type: $('#document-type'), createFormatField: $('#create-format-field'), importFileField: $('#import-file-field'),
+    file: $('#document-file'), filePickerTitle: $('#file-picker-title'), confirm: $('#confirm-document'),
   };
 
   const formatNames = { csv: 'CSV', docx: 'DOCX', xlsx: 'XLSX', pptx: 'PPTX' };
@@ -54,6 +36,7 @@
   const now = () => new Date().toISOString();
   const extension = (name) => String(name || '').split('.').pop().toLowerCase();
   const baseName = (name) => String(name || '').replace(/\.[^.]+$/, '') || 'Documento sem título';
+  const currentRecord = () => state.documents.find((item) => item.id === state.selectedId) || null;
   const clientName = (clientId) => state.clients.find((client) => client.id === clientId)?.name || 'Cliente removido';
 
   function setStatus(message, error = false) {
@@ -66,51 +49,47 @@
     els.officeStatus.classList.toggle('error', error);
   }
 
-  function officeTarget() {
-    return els.officeFrame?.contentWindow || null;
-  }
+  function officeTarget() { return els.officeFrame?.contentWindow || null; }
 
   function sendOfficeCommand(type, payload = {}) {
     const target = officeTarget();
-    if (!officeReady || !target) throw new Error('O editor OnlyOffice ainda não está pronto.');
+    if (!officeReady || !target) throw new Error('O editor ainda não está pronto.');
     target.postMessage({ type, payload }, window.location.origin);
   }
 
-  function fileForEditor(documentRecord) {
-    const filename = documentRecord.fileName || `${documentRecord.name}.${documentRecord.extension}`;
-    return new File([documentRecord.file], filename, { type: documentRecord.mimeType || mimeTypes[documentRecord.extension] });
-  }
-
   function openOfficeRecord(documentRecord) {
-    if (!documentRecord?.file || documentRecord.extension === 'csv' || !officeReady) return;
+    if (!documentRecord?.dataBase64 || documentRecord.extension === 'csv' || !officeReady) return;
+    const file = storage.toFile(documentRecord);
+    if (!file) return;
     officeOpenId = documentRecord.id;
-    setOfficeStatus('Abrindo documento no OnlyOffice local…');
-    try {
-      sendOfficeCommand('document:open-file', { file: fileForEditor(documentRecord), readonly: false });
-    } catch (error) {
-      officeOpenId = '';
-      setOfficeStatus(error.message, true);
-    }
+    setOfficeStatus('Abrindo documento no OnlyOffice…');
+    try { sendOfficeCommand('document:open-file', { file, readonly: false }); }
+    catch (error) { officeOpenId = ''; setOfficeStatus(error.message, true); }
   }
 
-  function resolveOfficeSave(error, file = null, payload = {}) {
+  function resolveOfficeSave(error) {
     const pending = officeSave;
     officeSave = null;
     if (pending?.timer) clearTimeout(pending.timer);
     if (error) pending?.reject(error);
-    else pending?.resolve({ file, payload });
+    else pending?.resolve();
+  }
+
+  async function refreshDocuments() {
+    state.documents = await storage.list();
+    renderLibrary();
   }
 
   async function persistOfficeSave(file, payload, documentRecord) {
-    if (!file) throw new Error('O OnlyOffice não retornou o arquivo editado.');
-    documentRecord.file = file instanceof File ? file : new Blob([file], { type: payload.mimeType || documentRecord.mimeType });
-    documentRecord.fileName = payload.fileName || documentRecord.fileName || `${documentRecord.name}.${documentRecord.extension}`;
+    if (!file || !documentRecord) throw new Error('O OnlyOffice não retornou o arquivo editado.');
+    documentRecord.dataBase64 = await storage.blobToBase64(file);
+    documentRecord.fileName = payload.fileName || `${documentRecord.name}.${documentRecord.extension}`;
     documentRecord.updatedAt = now();
     await storage.save(documentRecord);
-    state.documents = await storage.list();
-    setStatus('Alterações salvas localmente no arquivo Office.');
-    setOfficeStatus('Alterações salvas no arquivo local.');
-    render();
+    await refreshDocuments();
+    setStatus('Alterações salvas neste navegador.');
+    setOfficeStatus('Alterações salvas.');
+    renderEditor();
   }
 
   window.addEventListener('message', (event) => {
@@ -121,18 +100,17 @@
 
     if (message.type === 'document:ready') {
       officeReady = true;
-      setOfficeStatus('Editor OnlyOffice pronto · português brasileiro');
-      const documentRecord = state.documents.find((item) => item.id === state.selectedId);
-      if (documentRecord) openOfficeRecord(documentRecord);
+      setOfficeStatus('Editor pronto · português brasileiro');
+      const documentRecord = currentRecord();
+      if (els.editorDialog.open && documentRecord?.extension !== 'csv') openOfficeRecord(documentRecord);
       return;
     }
     if (message.type === 'document:opened') {
-      setOfficeStatus('Documento aberto para edição · português brasileiro');
+      setOfficeStatus('Documento aberto para edição');
       return;
     }
     if (message.type === 'document:saved') {
-      const documentRecord = state.documents.find((item) => item.id === state.selectedId);
-      void persistOfficeSave(payload.file, payload, documentRecord).then(() => resolveOfficeSave()).catch((error) => {
+      void persistOfficeSave(payload.file, payload, currentRecord()).then(() => resolveOfficeSave()).catch((error) => {
         resolveOfficeSave(error);
         setOfficeStatus(error.message, true);
         setStatus(`Não foi possível salvar: ${error.message}`, true);
@@ -154,47 +132,85 @@
     return option;
   }
 
+  function updateDialogConfirmation() {
+    const missingClient = !state.clients.length;
+    const missingImport = state.dialogMode === 'import' && !els.file.files?.[0];
+    els.confirm.disabled = missingClient || missingImport;
+  }
+
   function renderClients() {
+    const previous = els.clientSelect.value;
     els.clientSelect.replaceChildren();
     els.clientSelect.append(createOption('', state.clients.length ? 'Selecione um cliente' : 'Nenhum cliente cadastrado'));
     state.clients.forEach((client) => els.clientSelect.append(createOption(client.id, client.name)));
+    if (state.clients.some((client) => client.id === previous)) els.clientSelect.value = previous;
     els.clientEmpty.hidden = state.clients.length > 0;
-    els.confirm.disabled = state.clients.length === 0;
+    updateDialogConfirmation();
   }
 
   function filteredDocuments() {
     const term = state.query.trim().toLocaleLowerCase('pt-BR');
-    return state.documents.filter((document) => !term || [document.name, document.clientName, document.extension].some((value) => String(value).toLocaleLowerCase('pt-BR').includes(term)));
+    return state.documents.filter((documentRecord) => !term || [documentRecord.name, clientName(documentRecord.clientId), documentRecord.extension]
+      .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(term)));
   }
 
-  function renderList() {
+  function formatUpdatedAt(value) {
+    return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  function renderLibrary() {
     const documents = filteredDocuments();
+    const groups = new Map();
+    documents.forEach((documentRecord) => {
+      const group = groups.get(documentRecord.clientId) || [];
+      group.push(documentRecord);
+      groups.set(documentRecord.clientId, group);
+    });
+
     els.count.textContent = String(state.documents.length);
+    els.clientCount.textContent = String(new Set(state.documents.map((record) => record.clientId)).size);
     els.clearLibrary.disabled = state.documents.length === 0;
-    els.list.replaceChildren();
-    if (!documents.length) {
-      const empty = document.createElement('p');
-      empty.className = 'list-empty';
-      empty.textContent = state.documents.length ? 'Nenhum documento corresponde à busca.' : 'A biblioteca está vazia.';
-      els.list.append(empty);
-      return;
+    els.libraryEmpty.hidden = documents.length > 0;
+    els.folders.hidden = documents.length === 0;
+    els.folders.replaceChildren();
+
+    if (!documents.length && state.documents.length) {
+      els.libraryEmpty.querySelector('h2').textContent = 'Nenhum arquivo encontrado';
+      els.libraryEmpty.querySelector('p').textContent = 'Tente pesquisar por outro nome, cliente ou formato.';
+    } else {
+      els.libraryEmpty.querySelector('h2').textContent = 'Nenhum arquivo na biblioteca';
+      els.libraryEmpty.querySelector('p').textContent = 'Crie um documento em branco ou importe um arquivo e vincule-o a um cliente.';
     }
-    documents.forEach((record) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `document-item${record.id === state.selectedId ? ' active' : ''}`;
-      button.dataset.id = record.id;
-      button.innerHTML = `<span class="format-icon format-${escape(record.extension)}">${escape(formatNames[record.extension] || record.extension.toUpperCase())}</span><span class="document-copy"><strong>${escape(record.name)}</strong><small>${escape(record.clientName)}</small></span><span class="item-arrow" aria-hidden="true">›</span>`;
-      els.list.append(button);
+
+    [...groups.entries()].sort((left, right) => clientName(left[0]).localeCompare(clientName(right[0]), 'pt-BR')).forEach(([clientId, records]) => {
+      const folder = document.createElement('section');
+      folder.className = 'client-folder';
+      folder.dataset.clientId = clientId;
+      const cards = records.map((record) => `
+        <article class="file-card" data-card-id="${escape(record.id)}">
+          <button class="file-open" type="button" data-open-id="${escape(record.id)}" aria-label="Abrir ${escape(record.name)}">
+            <span class="format-icon format-${escape(record.extension)}">${escape(formatNames[record.extension])}</span>
+            <span class="file-copy"><strong>${escape(record.name)}</strong><small>${escape(formatUpdatedAt(record.updatedAt))}</small></span>
+          </button>
+          <button class="rename-file" type="button" data-rename-id="${escape(record.id)}" aria-label="Renomear ${escape(record.name)}" title="Renomear">✎</button>
+          <form class="rename-form" data-rename-form="${escape(record.id)}" hidden>
+            <input type="text" value="${escape(record.name)}" aria-label="Novo nome do arquivo" required>
+            <button type="submit">Salvar</button>
+          </form>
+        </article>`).join('');
+      folder.innerHTML = `
+        <header class="folder-head">
+          <div class="folder-title"><span class="folder-symbol" aria-hidden="true"></span><span><strong>${escape(clientName(clientId))}</strong><small>Pasta vinculada ao Financeiro</small></span></div>
+          <span class="folder-count">${records.length} ${records.length === 1 ? 'arquivo' : 'arquivos'}</span>
+        </header>
+        <div class="file-grid">${cards}</div>`;
+      els.folders.append(folder);
     });
   }
 
   function csvRows(value) {
     const lines = String(value || '').split(/\r?\n/).filter((line, index, all) => line || index < all.length - 1);
-    return lines.map((line) => {
-      const separator = line.includes(';') ? ';' : ',';
-      return line.split(separator).map((cell) => cell.trim());
-    });
+    return lines.map((line) => line.split(line.includes(';') ? ';' : ',').map((cell) => cell.trim()));
   }
 
   function renderCsvPreview() {
@@ -218,109 +234,153 @@
   }
 
   function renderEditor() {
-    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
-    if (!documentRecord) {
-      els.empty.hidden = false;
-      els.editor.hidden = true;
-      return;
-    }
-    els.empty.hidden = true;
-    els.editor.hidden = false;
-    els.editorType.textContent = `${formatNames[documentRecord.extension]} · ${documentRecord.source === 'imported' ? 'ARQUIVO IMPORTADO' : 'EDITOR LOCAL'}`;
-    els.editorTitle.textContent = documentRecord.name;
-    els.editorClient.textContent = `Vinculado a ${documentRecord.clientName} · atualizado em ${new Date(documentRecord.updatedAt).toLocaleString('pt-BR')}`;
+    const documentRecord = currentRecord();
+    if (!documentRecord) return;
+    els.editorFormat.textContent = formatNames[documentRecord.extension];
+    els.editorFormat.className = `format-icon format-${documentRecord.extension}`;
+    els.editorName.value = documentRecord.name;
+    els.editorClient.textContent = `${clientName(documentRecord.clientId)} · atualizado em ${formatUpdatedAt(documentRecord.updatedAt)}`;
     const isCsv = documentRecord.extension === 'csv';
     els.csvEditor.hidden = !isCsv;
     els.officeEditor.hidden = isCsv;
-    els.deleteDocument.disabled = false;
-    els.downloadDocument.disabled = !isCsv && !documentRecord.file;
-    els.saveDocument.textContent = isCsv ? 'Salvar' : 'Salvar no OfficeJur';
+    els.downloadDocument.disabled = !isCsv && !documentRecord.dataBase64;
+    els.saveDocument.textContent = 'Salvar';
     if (isCsv) {
       els.csvContent.value = documentRecord.content || '';
+      setOfficeStatus('Editor CSV');
       renderCsvPreview();
-      els.editorNotice.textContent = documentRecord.source === 'imported' ? 'Este CSV foi importado do dispositivo e pode ser editado diretamente.' : 'Este CSV é um documento novo salvo somente neste navegador.';
       return;
     }
-    els.editorNotice.textContent = documentRecord.fileName ? `Arquivo local: ${documentRecord.fileName}. O original importado permanece preservado.` : 'Documento Office local criado em branco. O editor OnlyOffice abaixo trabalha no próprio navegador.';
-    if (documentRecord.file && officeReady && officeOpenId !== documentRecord.id) openOfficeRecord(documentRecord);
-    if (!documentRecord.file) setOfficeStatus('Este documento ainda não possui um arquivo Office.');
+    if (!documentRecord.dataBase64) {
+      setOfficeStatus('Este documento ainda não possui conteúdo.', true);
+      return;
+    }
+    if (officeReady && officeOpenId !== documentRecord.id) openOfficeRecord(documentRecord);
+    else if (!officeReady) setOfficeStatus('Preparando editor…');
   }
-
-  function render() { renderList(); renderEditor(); }
 
   async function loadData() {
     try {
       const domains = await financeDataStore.load({ financeStorage });
-      state.clients = (domains.clients?.records || []).filter((client) => client?.id).map((client) => ({ id: String(client.id), name: String(client.name || client.companyName || 'Cliente sem nome') })).sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
+      state.clients = (domains.clients?.records || []).filter((client) => client?.id)
+        .map((client) => ({ id: String(client.id), name: String(client.name || client.companyName || 'Cliente sem nome') }))
+        .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
       renderClients();
     } catch (error) {
       setStatus(`Não foi possível carregar os clientes do Financeiro: ${error.message}`, true);
       renderClients();
     }
-    state.documents = await storage.list();
-    render();
+    await refreshDocuments();
   }
 
-  function openDialog() {
-    renderClients();
+  function openDocumentDialog(mode) {
+    state.dialogMode = mode;
     els.form.reset();
-    els.type.value = 'csv';
+    els.type.value = 'docx';
+    els.createFormatField.hidden = mode === 'import';
+    els.importFileField.hidden = mode !== 'import';
+    els.dialogEyebrow.textContent = mode === 'import' ? 'IMPORTAR ARQUIVO' : 'NOVO DOCUMENTO';
+    els.dialogTitle.textContent = mode === 'import' ? 'Importar para a biblioteca' : 'Criar documento';
+    els.dialogCopy.textContent = mode === 'import'
+      ? 'Escolha um arquivo; o formato e o nome serão detectados automaticamente.'
+      : 'Crie um arquivo em branco e vincule-o a uma pasta de cliente.';
+    els.confirm.textContent = mode === 'import' ? 'Importar arquivo' : 'Criar documento';
+    els.filePickerTitle.textContent = 'Escolher arquivo';
+    renderClients();
     els.dialog.showModal();
     if (state.clients.length) els.clientSelect.focus();
   }
 
-  function closeDialog() { els.dialog.close(); }
+  function closeDocumentDialog() { els.dialog.close(); }
 
   async function saveNewDocument(event) {
     event.preventDefault();
     const clientId = els.clientSelect.value;
-    const file = els.file.files?.[0] || null;
-    if (!clientId) { setStatus('Selecione um cliente antes de salvar o documento.', true); return; }
-    const selectedExtension = file ? extension(file.name) : els.type.value;
+    const importing = state.dialogMode === 'import';
+    const file = importing ? els.file.files?.[0] || null : null;
+    if (!clientId) { setStatus('Selecione um cliente antes de continuar.', true); return; }
+    if (importing && !file) { setStatus('Escolha o arquivo que deseja importar.', true); return; }
+    const selectedExtension = importing ? extension(file.name) : els.type.value;
     if (!formatNames[selectedExtension]) { setStatus('Formato não suportado. Use DOCX, XLSX, PPTX ou CSV.', true); return; }
-    if (file && !['docx', 'xlsx', 'pptx', 'csv'].includes(selectedExtension)) { setStatus('Escolha um arquivo DOCX, XLSX, PPTX ou CSV.', true); return; }
+
     const timestamp = now();
     const documentName = els.name.value.trim() || baseName(file?.name) || 'Documento sem título';
-    let fileBytes = file ? await file.arrayBuffer() : null;
-    if (!file && selectedExtension !== 'csv') {
-      if (!templates?.createBlank) { setStatus('Os modelos Office em branco não estão disponíveis neste build.', true); return; }
-      try { fileBytes = await templates.createBlank(selectedExtension); }
-      catch (error) { setStatus(`Não foi possível criar o modelo vazio: ${error.message}`, true); return; }
+    let dataBase64 = '';
+    let content = '';
+    if (file) {
+      dataBase64 = await storage.blobToBase64(file);
+      if (selectedExtension === 'csv') content = await file.text();
+    } else if (selectedExtension === 'csv') {
+      dataBase64 = storage.textToBase64('');
+    } else {
+      if (!templates?.createBlank) { setStatus('Os modelos Office não estão disponíveis neste build.', true); return; }
+      try { dataBase64 = storage.bytesToBase64(new Uint8Array(await templates.createBlank(selectedExtension))); }
+      catch (error) { setStatus(`Não foi possível criar o documento: ${error.message}`, true); return; }
     }
-    const fileBlob = fileBytes ? new Blob([fileBytes], { type: file?.type || mimeTypes[selectedExtension] }) : null;
+
     const record = {
       id: id(), clientId, clientName: clientName(clientId), name: documentName, extension: selectedExtension,
-      mimeType: file?.type || mimeTypes[selectedExtension], source: file ? 'imported' : 'created', fileName: file?.name || (fileBlob ? `${documentName}.${selectedExtension}` : ''), content: selectedExtension === 'csv' && file ? await file.text() : '', notes: '', createdAt: timestamp, updatedAt: timestamp,
-      file: fileBlob,
-      originalFile: fileBlob ? new Blob([fileBytes], { type: file?.type || mimeTypes[selectedExtension] }) : null,
+      mimeType: file?.type || mimeTypes[selectedExtension], source: file ? 'imported' : 'created',
+      fileName: `${documentName}.${selectedExtension}`, content, createdAt: timestamp, updatedAt: timestamp,
+      dataBase64, originalDataBase64: dataBase64,
     };
     await storage.save(record);
-    state.documents = await storage.list();
     state.selectedId = record.id;
     officeOpenId = '';
-    closeDialog();
-    setStatus(`Documento ${record.name} salvo somente neste navegador.`);
-    render();
+    closeDocumentDialog();
+    await refreshDocuments();
+    setStatus(`“${record.name}” foi adicionado à pasta de ${record.clientName}.`);
+    openEditor(record.id);
+  }
+
+  function openEditor(recordId) {
+    const documentRecord = state.documents.find((record) => record.id === recordId);
+    if (!documentRecord) return;
+    state.selectedId = recordId;
+    if (officeOpenId !== recordId) officeOpenId = '';
+    if (!els.editorDialog.open) els.editorDialog.showModal();
+    renderEditor();
+  }
+
+  function closeEditor() { els.editorDialog.close(); }
+
+  async function renameRecord(documentRecord, requestedName) {
+    const newName = baseName(String(requestedName || '').trim());
+    if (!newName || newName === documentRecord.name) return;
+    documentRecord.name = newName;
+    documentRecord.fileName = `${newName}.${documentRecord.extension}`;
+    documentRecord.updatedAt = now();
+    await storage.save(documentRecord);
+    await refreshDocuments();
+    if (state.selectedId === documentRecord.id) renderEditor();
+    setStatus(`Arquivo renomeado para “${newName}”.`);
+  }
+
+  async function renameSelected() {
+    const documentRecord = currentRecord();
+    if (documentRecord) await renameRecord(documentRecord, els.editorName.value);
   }
 
   async function saveCurrent() {
-    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
+    const documentRecord = currentRecord();
     if (!documentRecord) return;
     try {
+      await renameSelected();
       if (documentRecord.extension === 'csv') {
         documentRecord.content = els.csvContent.value;
+        documentRecord.dataBase64 = storage.textToBase64(documentRecord.content);
         documentRecord.updatedAt = now();
         await storage.save(documentRecord);
-        state.documents = await storage.list();
-        setStatus('Alterações salvas localmente.');
-        render();
+        await refreshDocuments();
+        setStatus('Alterações salvas neste navegador.');
+        setOfficeStatus('Alterações salvas.');
         return;
       }
-      if (!officeReady || officeOpenId !== documentRecord.id) throw new Error('Abra o arquivo no editor OnlyOffice antes de salvar.');
+      if (!officeReady || officeOpenId !== documentRecord.id) throw new Error('Aguarde o documento abrir no editor antes de salvar.');
       if (officeSave) throw new Error('Já existe uma solicitação de salvamento em andamento.');
-      setOfficeStatus('Solicitando o arquivo editado ao OnlyOffice…');
+      setOfficeStatus('Salvando alterações…');
       await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => resolveOfficeSave(new Error('O OnlyOffice demorou para retornar o arquivo editado.')), 30000);
+        const timer = setTimeout(() => resolveOfficeSave(new Error('O editor demorou para retornar o arquivo.')), 30000);
         officeSave = { resolve, reject, timer };
         try { sendOfficeCommand('document:save', { targetExt: documentRecord.extension.toUpperCase() }); }
         catch (error) { resolveOfficeSave(error); }
@@ -332,52 +392,88 @@
   }
 
   async function downloadCurrent() {
-    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
+    const documentRecord = currentRecord();
     if (!documentRecord) return;
-    let blob = documentRecord.file;
-    let filename = documentRecord.fileName || `${documentRecord.name}.${documentRecord.extension}`;
-    if (documentRecord.extension === 'csv') { blob = new Blob([els.csvContent.value], { type: mimeTypes.csv }); filename = `${documentRecord.name}.csv`; }
-    if (!blob) { setStatus('Este documento ainda não possui um arquivo Office binário para baixar.', true); return; }
+    let blob;
+    if (documentRecord.extension === 'csv') blob = new Blob([els.csvContent.value], { type: mimeTypes.csv });
+    else blob = storage.toBlob(documentRecord);
+    if (!blob) { setStatus('Este documento ainda não possui conteúdo para baixar.', true); return; }
+    const filename = `${documentRecord.name}.${documentRecord.extension}`;
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
     setTimeout(() => URL.revokeObjectURL(url), 500);
     setStatus(`Download de ${filename} iniciado.`);
   }
 
   async function removeCurrent() {
-    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
-    if (!documentRecord || !confirm(`Excluir localmente “${documentRecord.name}”?`)) return;
+    const documentRecord = currentRecord();
+    if (!documentRecord || !confirm(`Excluir “${documentRecord.name}” da biblioteca?`)) return;
     await storage.remove(documentRecord.id);
-    state.documents = await storage.list();
+    closeEditor();
     state.selectedId = '';
     officeOpenId = '';
-    setStatus('Documento removido deste navegador.'); render();
+    await refreshDocuments();
+    setStatus('Arquivo excluído deste navegador.');
   }
 
   async function clearLibrary() {
-    if (!state.documents.length || !confirm(`Excluir os ${state.documents.length} documentos locais desta biblioteca?`)) return;
-    await Promise.all(state.documents.map((documentRecord) => storage.remove(documentRecord.id)));
+    const count = state.documents.length;
+    if (!count) return;
+    if (!confirm(`Confirmação 1 de 3: remover todos os ${count} arquivos da biblioteca?`)) return;
+    if (!confirm('Confirmação 2 de 3: esta ação não poderá ser desfeita. Deseja continuar?')) return;
+    const phrase = prompt('Confirmação 3 de 3: digite APAGAR para excluir toda a biblioteca.');
+    if (phrase !== 'APAGAR') { setStatus('Limpeza cancelada: a confirmação final não corresponde.', true); return; }
+    await storage.clear();
     state.documents = [];
     state.selectedId = '';
     officeOpenId = '';
-    setStatus('Biblioteca local limpa.'); render();
+    renderLibrary();
+    setStatus('Biblioteca apagada deste navegador.');
   }
 
-  $('#new-document').addEventListener('click', openDialog);
-  $('#import-document').addEventListener('click', openDialog);
-  document.querySelectorAll('[data-action="new"]').forEach((button) => button.addEventListener('click', openDialog));
-  $('#close-dialog').addEventListener('click', closeDialog);
-  $('#cancel-dialog').addEventListener('click', closeDialog);
-  els.form.addEventListener('submit', saveNewDocument);
-  els.search.addEventListener('input', () => { state.query = els.search.value; renderList(); });
+  $('#new-document').addEventListener('click', () => openDocumentDialog('create'));
+  $('#import-document').addEventListener('click', () => openDocumentDialog('import'));
+  document.querySelectorAll('[data-action="new"]').forEach((button) => button.addEventListener('click', () => openDocumentDialog('create')));
+  $('#close-dialog').addEventListener('click', closeDocumentDialog);
+  $('#cancel-dialog').addEventListener('click', closeDocumentDialog);
+  $('#close-editor').addEventListener('click', closeEditor);
+  els.form.addEventListener('submit', (event) => void saveNewDocument(event));
+  els.search.addEventListener('input', () => { state.query = els.search.value; renderLibrary(); });
   els.clearLibrary.addEventListener('click', () => void clearLibrary());
-  els.list.addEventListener('click', (event) => { const button = event.target.closest('[data-id]'); if (button) { state.selectedId = button.dataset.id; officeOpenId = ''; render(); } });
+  els.folders.addEventListener('click', (event) => {
+    const openButton = event.target.closest('[data-open-id]');
+    if (openButton) { openEditor(openButton.dataset.openId); return; }
+    const renameButton = event.target.closest('[data-rename-id]');
+    if (!renameButton) return;
+    const card = renameButton.closest('.file-card');
+    const form = card.querySelector('.rename-form');
+    form.hidden = false;
+    card.querySelector('.file-copy').hidden = true;
+    form.querySelector('input').focus();
+    form.querySelector('input').select();
+  });
+  els.folders.addEventListener('submit', (event) => {
+    const form = event.target.closest('[data-rename-form]');
+    if (!form) return;
+    event.preventDefault();
+    const documentRecord = state.documents.find((record) => record.id === form.dataset.renameForm);
+    if (documentRecord) void renameRecord(documentRecord, form.querySelector('input').value);
+  });
   els.csvContent.addEventListener('input', renderCsvPreview);
+  els.editorName.addEventListener('change', () => void renameSelected());
   els.saveDocument.addEventListener('click', () => void saveCurrent());
   els.downloadDocument.addEventListener('click', () => void downloadCurrent());
   els.deleteDocument.addEventListener('click', () => void removeCurrent());
-  els.officeFrame.addEventListener('load', () => setOfficeStatus('Carregando editor OnlyOffice local…'));
-  els.file.addEventListener('change', () => { const file = els.file.files?.[0]; if (file) { els.type.value = extension(file.name); if (!els.name.value) els.name.value = baseName(file.name); } });
+  els.officeFrame.addEventListener('load', () => setOfficeStatus('Carregando editor…'));
+  els.file.addEventListener('change', () => {
+    const file = els.file.files?.[0];
+    els.filePickerTitle.textContent = file?.name || 'Escolher arquivo';
+    if (file && !els.name.value) els.name.value = baseName(file.name);
+    updateDialogConfirmation();
+  });
 
   if (!storage || !financeStorage || !financeDataStore) {
     setStatus('O armazenamento de documentos ou o Financeiro não está disponível.', true);

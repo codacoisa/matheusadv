@@ -2,11 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const storage = require('../assets/storage.js');
 
 const root = path.resolve(__dirname, '../../../../..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-test('Documentos integra o editor OnlyOffice local', () => {
+test('Documentos integra o editor OnlyOffice', () => {
   const index = read('apps/lab/tools/documentos/index.html');
   const app = read('apps/lab/tools/documentos/assets/app.js');
 
@@ -15,8 +16,19 @@ test('Documentos integra o editor OnlyOffice local', () => {
   assert.match(app, /document:open-file/);
   assert.match(app, /document:save/);
   assert.match(app, /document:saved/);
-  assert.match(app, /originalFile/);
+  assert.match(app, /dataBase64/);
+  assert.match(app, /originalDataBase64/);
   assert.doesNotMatch(app, /engineApi|office-oxide/);
+});
+
+test('Documentos codifica arquivos em Base64 sem manter binários estruturados', () => {
+  const bytes = new Uint8Array([0, 1, 2, 127, 128, 255]);
+  const base64 = storage.bytesToBase64(bytes);
+  assert.equal(base64, 'AAECf4D/');
+  assert.deepEqual([...storage.base64ToBytes(base64)], [...bytes]);
+  const normalized = storage.normalize({ id: 'doc', dataBase64: base64, originalDataBase64: base64 });
+  assert.equal(normalized.file, undefined);
+  assert.equal(normalized.originalFile, undefined);
 });
 
 test('o build publica o submódulo e a licença AGPL do editor', () => {

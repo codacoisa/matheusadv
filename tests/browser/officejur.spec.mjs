@@ -341,81 +341,112 @@ test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ 
 
 test('Documentos começa vazio e exige vínculo com cliente', async ({ page }) => {
   await page.goto('lab/documentos/', { waitUntil: 'networkidle' });
-  await expect(page.getByRole('heading', { name: 'Documentos', level: 1 })).toBeVisible();
-  await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Biblioteca de documentos', level: 1 })).toBeVisible();
+  await expect(page.getByText('Nenhum arquivo na biblioteca')).toBeVisible();
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.locator('#client-select')).toHaveValue('');
-  await expect(page.getByRole('button', { name: 'Salvar documento' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Criar documento' })).toBeDisabled();
 });
 
-test('Documentos vincula cliente e salva CSV localmente', async ({ page }) => {
+test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
   await page.locator('#document-name').fill('Planilha de teste');
-  await page.getByRole('button', { name: 'Salvar documento' }).click();
-  await expect(page.getByRole('button', { name: /Planilha de teste/ })).toBeVisible();
+  await page.locator('#document-type').selectOption('csv');
+  await page.getByRole('button', { name: 'Criar documento' }).click();
+  await expect(page.getByRole('region', { name: 'Biblioteca de documentos' }).getByText('Cliente de teste', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Abrir Planilha de teste/ })).toBeVisible();
+  await expect(page.locator('#editor-dialog')).toBeVisible();
   await page.locator('#csv-content').fill('Nome;Valor\nTeste;10');
   await page.getByRole('button', { name: 'Salvar' }).click();
-  await expect(page.getByText('Alterações salvas localmente.')).toBeVisible();
+  await expect(page.getByText('Alterações salvas neste navegador.')).toBeVisible();
   await expect(page.locator('#csv-preview')).toContainText('Teste');
 });
 
-test('Documentos cria Office em branco, abre OnlyOffice em português e permite excluir', async ({ page }) => {
+test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a edição', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
-  await page.locator('#document-name').fill('Rascunho OnlyOffice');
+  await page.locator('#document-name').fill('Rascunho');
   await page.locator('#document-type').selectOption('docx');
-  await page.getByRole('button', { name: 'Salvar documento' }).click();
-  await expect(page.getByRole('button', { name: /Rascunho OnlyOffice/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Criar documento' }).click();
+  await expect(page.locator('#editor-dialog')).toBeVisible();
+  await expect(page.locator('#editor-dialog')).toHaveCSS('width', /.+/);
   await expect(page.locator('#office-editor-frame')).toBeVisible();
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
   await expect(office.getByText('Início', { exact: true })).toBeVisible();
+  await page.locator('#editor-name').fill('Rascunho revisado');
+  await page.locator('#editor-name').press('Tab');
+  await expect(page.getByText('Arquivo renomeado para “Rascunho revisado”.')).toBeVisible();
   await page.locator('#save-document').click();
-  await expect(page.getByText('Alterações salvas localmente no arquivo Office.')).toBeVisible();
+  await expect(page.getByText('Alterações salvas neste navegador.')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#delete-document').click();
-  await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
+  await expect(page.getByText('Nenhum arquivo na biblioteca')).toBeVisible();
 });
 
-test('Documentos permite limpar a biblioteca local com confirmação', async ({ page }) => {
+test('Documentos exige três confirmações para limpar a biblioteca', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   for (const name of ['Rascunho um', 'Rascunho dois']) {
     await page.getByRole('button', { name: 'Novo documento' }).click();
     await page.locator('#client-select').selectOption('client-test');
     await page.locator('#document-name').fill(name);
-    await page.getByRole('button', { name: 'Salvar documento' }).click();
+    await page.getByRole('button', { name: 'Criar documento' }).click();
+    await page.locator('#close-editor').click();
   }
   await expect(page.locator('#document-count')).toHaveText('2');
-  page.once('dialog', (dialog) => dialog.accept());
+  let confirmations = 0;
+  page.on('dialog', async (dialog) => {
+    confirmations += 1;
+    await dialog.accept(dialog.type() === 'prompt' ? 'APAGAR' : undefined);
+  });
   await page.locator('#clear-library').click();
-  await expect(page.getByText('Biblioteca local limpa.')).toBeVisible();
-  await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
+  await expect(page.getByText('Biblioteca apagada deste navegador.')).toBeVisible();
+  expect(confirmations).toBe(3);
+  await expect(page.getByText('Nenhum arquivo na biblioteca')).toBeVisible();
   await expect(page.locator('#clear-library')).toBeDisabled();
 });
 
-test('Documentos abre e reabre um DOCX pelo OnlyOffice', async ({ page }) => {
+test('Documentos importa formato detectado, salva Base64 e reabre DOCX', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
-  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await page.getByRole('button', { name: 'Importar arquivo' }).click();
   await page.locator('#client-select').selectOption('client-test');
-  await page.locator('#document-name').fill('Petição com parágrafos');
   await page.locator('#document-file').setInputFiles({
     name: 'peticao.docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     buffer: minimalDocx({ paragraphs: ['OfficeJur WASM', 'Segundo parágrafo'] }),
   });
-  await page.getByRole('button', { name: 'Salvar documento' }).click();
+  await expect(page.locator('#document-type')).toBeHidden();
+  await page.getByRole('button', { name: 'Importar arquivo' }).last().click();
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
+  const stored = await page.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('officejur-documentos-lab', 3);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const records = await new Promise((resolve, reject) => {
+      const request = database.transaction('documents', 'readonly').objectStore('documents').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    return records[0];
+  });
+  expect(typeof stored.dataBase64).toBe('string');
+  expect(stored.dataBase64.length).toBeGreaterThan(20);
+  expect(stored.file).toBeUndefined();
+  expect(stored.originalFile).toBeUndefined();
   await page.reload({ waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: /Petição com parágrafos/ }).click();
+  await page.getByRole('button', { name: /Abrir peticao/ }).click();
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   await expect(page.locator('#office-editor-frame')).toBeVisible();
 });
 
-test('Documentos abre XLSX e PPTX no mesmo editor OnlyOffice local', async ({ page }) => {
+test('Documentos abre XLSX e PPTX no mesmo editor', async ({ page }) => {
   const fixtures = [
     { extension: 'xlsx', name: 'planilha.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', text: 'OfficeJur XLSX', buffer: minimalXlsx('OfficeJur XLSX') },
     { extension: 'pptx', name: 'apresentacao.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', text: 'OfficeJur PPTX', buffer: minimalPptx('OfficeJur PPTX') },
@@ -423,14 +454,14 @@ test('Documentos abre XLSX e PPTX no mesmo editor OnlyOffice local', async ({ pa
 
   await prepareCalculationPage(page, 'lab/documentos/');
   for (const fixture of fixtures) {
-    await page.getByRole('button', { name: 'Novo documento' }).click();
+    await page.getByRole('button', { name: 'Importar arquivo' }).click();
     await page.locator('#client-select').selectOption('client-test');
-    await page.locator('#document-name').fill(fixture.name);
     await page.locator('#document-file').setInputFiles({ name: fixture.name, mimeType: fixture.mimeType, buffer: fixture.buffer });
-    await page.getByRole('button', { name: 'Salvar documento' }).click();
-    await expect(page.getByRole('button', { name: new RegExp(fixture.name.replace('.', '\\.')) })).toBeVisible();
+    await page.getByRole('button', { name: 'Importar arquivo' }).last().click();
     await expect(page.locator('#office-editor-frame')).toBeVisible();
     await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
+    await page.locator('#close-editor').click();
+    await expect(page.getByRole('button', { name: new RegExp(`Abrir ${fixture.name.replace(/\.[^.]+$/, '')}`) })).toBeVisible();
   }
 });
 

@@ -52,10 +52,10 @@ index 3987884..5d12200 100644
      const langMap: Record<Language, OnlyOfficeLanguageCode> = {
        [LanguageCode.ZH]: OnlyOfficeLanguageCode.ZH_CN,
 diff --git a/public/web-apps/apps/documenteditor/main/app.js b/public/web-apps/apps/documenteditor/main/app.js
-index 9ea61a4..3ac2e32 100644
+index 9ea61a4..973cd87 100644
 --- a/public/web-apps/apps/documenteditor/main/app.js
 +++ b/public/web-apps/apps/documenteditor/main/app.js
-@@ -3532,6 +3532,31 @@ define('documenteditor/main/locale/zh.json', {
+@@ -3532,6 +3532,77 @@ define('documenteditor/main/locale/zh.json', {
    'DE.Views.WatermarkSettingsDialog.tipFontSize': '字号',
  });
  
@@ -68,6 +68,34 @@ index 9ea61a4..3ac2e32 100644
 +  'Common.Views.Header.textZoom': 'Zoom',
 +  'DE.Controllers.Main.textRedo': 'Refazer',
 +  'DE.Controllers.Main.textUndo': 'Desfazer',
++  'DE.Controllers.Main.txtStyle_Heading_1': 'Título 1',
++  'DE.Controllers.Main.txtStyle_Heading_2': 'Título 2',
++  'DE.Controllers.Main.txtStyle_Heading_3': 'Título 3',
++  'DE.Controllers.Main.txtStyle_Heading_4': 'Título 4',
++  'DE.Controllers.Main.txtStyle_Heading_5': 'Título 5',
++  'DE.Controllers.Main.txtStyle_Heading_6': 'Título 6',
++  'DE.Controllers.Main.txtStyle_Heading_7': 'Título 7',
++  'DE.Controllers.Main.txtStyle_Heading_8': 'Título 8',
++  'DE.Controllers.Main.txtStyle_Heading_9': 'Título 9',
++  'DE.Controllers.Main.txtStyle_No_List': 'Sem lista',
++  'DE.Controllers.Main.txtStyle_No_Spacing': 'Sem espaçamento',
++  'DE.Controllers.Main.txtStyle_Normal': 'Normal',
++  'DE.Controllers.Main.txtStyle_Quote': 'Citação',
++  'DE.Controllers.Main.txtStyle_Subtitle': 'Subtítulo',
++  'DE.Controllers.Main.txtStyle_Title': 'Título',
++  'DE.Views.Statusbar.goToPageText': 'Ir para a página',
++  'DE.Views.Statusbar.pageIndexText': 'Página {0} de {1}',
++  'DE.Views.Statusbar.tipFitPage': 'Ajustar à página',
++  'DE.Views.Statusbar.tipFitWidth': 'Ajustar à largura',
++  'DE.Views.Statusbar.tipZoomFactor': 'Zoom',
++  'DE.Views.Statusbar.tipZoomIn': 'Ampliar',
++  'DE.Views.Statusbar.tipZoomOut': 'Reduzir',
++  'DE.Views.Statusbar.txtPages': 'Páginas',
++  'DE.Views.Statusbar.txtParagraphs': 'Parágrafos',
++  'DE.Views.Statusbar.txtSpaces': 'Caracteres com espaços',
++  'DE.Views.Statusbar.txtSymbols': 'Caracteres',
++  'DE.Views.Statusbar.txtWordCount': 'Contagem de palavras',
++  'DE.Views.Statusbar.txtWords': 'Palavras',
 +  'DE.Views.FileMenu.btnPrintCaption': 'Imprimir',
 +  'DE.Views.FileMenu.btnSaveCaption': 'Salvar',
 +  'DE.Views.Toolbar.textTabCollaboration': 'Colaboração',
@@ -82,12 +110,30 @@ index 9ea61a4..3ac2e32 100644
 +  'DE.Views.Toolbar.textTabView': 'Exibir',
 +  'DE.Views.Toolbar.textUndo': 'Desfazer',
 +  'DE.Views.Toolbar.textRedo': 'Refazer',
++  'DE.Views.Toolbar.capBtnBlankPage': 'Página em branco',
++  'DE.Views.Toolbar.capBtnColumns': 'Colunas',
++  'DE.Views.Toolbar.capBtnDateTime': 'Data e hora',
++  'DE.Views.Toolbar.capBtnInsChart': 'Gráfico',
++  'DE.Views.Toolbar.capBtnInsEquation': 'Equação',
++  'DE.Views.Toolbar.capBtnInsHeader': 'Cabeçalho e rodapé',
++  'DE.Views.Toolbar.capBtnInsImage': 'Imagem',
++  'DE.Views.Toolbar.capBtnInsPagebreak': 'Quebras',
++  'DE.Views.Toolbar.capBtnInsShape': 'Forma',
++  'DE.Views.Toolbar.capBtnInsSymbol': 'Símbolo',
++  'DE.Views.Toolbar.capBtnInsTable': 'Tabela',
++  'DE.Views.Toolbar.capBtnInsTextbox': 'Caixa de texto',
++  'DE.Views.Toolbar.capBtnMargins': 'Margens',
++  'DE.Views.Toolbar.capBtnPageColor': 'Cor da página',
++  'DE.Views.Toolbar.capBtnPageOrient': 'Orientação',
++  'DE.Views.Toolbar.capBtnPageSize': 'Tamanho',
++  'DE.Views.Toolbar.capBtnSelect': 'Selecionar',
++  'DE.Views.Toolbar.capBtnWatermark': 'Marca-d’água',
 +});
 +
  define('documenteditor/main/locale/en.json', {
    'Common.Controllers.Chat.notcriticalErrorTitle': 'Warning',
    'Common.Controllers.Desktop.hintBtnHome': 'Show main window',
-@@ -8054,7 +8079,8 @@ define('documenteditor/main/locale/en.json', {
+@@ -8054,7 +8125,8 @@ define('documenteditor/main/locale/en.json', {
    'DE.Views.WatermarkSettingsDialog.tipFontSize': 'Font size',
  });
  var params = getUrlParams(),
@@ -97,7 +143,7 @@ index 9ea61a4..3ac2e32 100644
    logo = params.headerlogo ? encodeUrlParam(params.headerlogo) : null,
    logoDark = params.headerlogodark ? encodeUrlParam(params.headerlogodark) : null,
    checkLocalStorage =
-@@ -17681,7 +17707,7 @@ function _extend_object(t, e) {
+@@ -17681,7 +17753,7 @@ function _extend_object(t, e) {
        apply = !1,
        defLang = 'zh',
        currentLang = defLang,
@@ -106,7 +152,7 @@ index 9ea61a4..3ac2e32 100644
        _applyLocalization = function (t, e) {
          try {
            if ((t && (loadcallback = t), e)) {
-@@ -110937,7 +110963,8 @@ var FONT_TYPE_RECENT = 4,
+@@ -110937,7 +111009,8 @@ var FONT_TYPE_RECENT = 4,
      'locale',
      'device_scale',
      'documenteditor/main/locale/en.json',
@@ -116,7 +162,7 @@ index 9ea61a4..3ac2e32 100644
      var a;
      (n.History && n.History.started) ||
        (n.history.start(),
-@@ -111020,7 +111047,7 @@ var FONT_TYPE_RECENT = 4,
+@@ -111020,7 +111093,7 @@ var FONT_TYPE_RECENT = 4,
              a.start();
            });
          },
@@ -126,10 +172,10 @@ index 9ea61a4..3ac2e32 100644
    }, function (t) {
      'timeout' == t.requireType &&
 diff --git a/public/web-apps/apps/presentationeditor/main/app.js b/public/web-apps/apps/presentationeditor/main/app.js
-index 5ca1efb..78b5cb5 100644
+index 5ca1efb..b82ad43 100644
 --- a/public/web-apps/apps/presentationeditor/main/app.js
 +++ b/public/web-apps/apps/presentationeditor/main/app.js
-@@ -2777,6 +2777,26 @@ define('presentationeditor/main/locale/zh.json', {
+@@ -2777,6 +2777,42 @@ define('presentationeditor/main/locale/zh.json', {
    'PE.Views.ViewTab.tipGuides': '显示参考线',
    'PE.Views.ViewTab.tipInterfaceTheme': '界面主题',
  });
@@ -142,6 +188,22 @@ index 5ca1efb..78b5cb5 100644
 +  'Common.Views.Header.textZoom': 'Zoom',
 +  'PE.Controllers.Main.textRedo': 'Refazer',
 +  'PE.Controllers.Main.textUndo': 'Desfazer',
++  'PE.Views.Toolbar.capAddSlide': 'Novo slide',
++  'PE.Views.Toolbar.capBtnAddComment': 'Adicionar comentário',
++  'PE.Views.Toolbar.capBtnComment': 'Comentários',
++  'PE.Views.Toolbar.capBtnDateTime': 'Data e hora',
++  'PE.Views.Toolbar.capBtnInsHeader': 'Cabeçalho e rodapé',
++  'PE.Views.Toolbar.capBtnInsSymbol': 'Símbolo',
++  'PE.Views.Toolbar.capBtnSlideNum': 'Número do slide',
++  'PE.Views.Toolbar.capInsertAudio': 'Áudio',
++  'PE.Views.Toolbar.capInsertChart': 'Gráfico',
++  'PE.Views.Toolbar.capInsertEquation': 'Equação',
++  'PE.Views.Toolbar.capInsertHyperlink': 'Hiperlink',
++  'PE.Views.Toolbar.capInsertImage': 'Imagem',
++  'PE.Views.Toolbar.capInsertShape': 'Forma',
++  'PE.Views.Toolbar.capInsertTable': 'Tabela',
++  'PE.Views.Toolbar.capInsertText': 'Caixa de texto',
++  'PE.Views.Toolbar.capInsertVideo': 'Vídeo',
 +  'PE.Views.Toolbar.textTabAnimation': 'Animação',
 +  'PE.Views.Toolbar.textTabCollaboration': 'Revisão',
 +  'PE.Views.Toolbar.textTabDraw': 'Desenhar',
@@ -156,7 +218,7 @@ index 5ca1efb..78b5cb5 100644
  define('presentationeditor/main/locale/en.json', {
    'Common.Controllers.Chat.notcriticalErrorTitle': 'Warning',
    'Common.Controllers.Chat.textEnterMessage': 'Enter your message here',
-@@ -14465,7 +14485,7 @@ function _extend_object(t, e) {
+@@ -14465,7 +14501,7 @@ function _extend_object(t, e) {
        apply = !1,
        defLang = 'zh',
        currentLang = defLang,
@@ -165,7 +227,7 @@ index 5ca1efb..78b5cb5 100644
        _applyLocalization = function (t, e) {
          try {
            if ((t && (loadcallback = t), e)) {
-@@ -81192,11 +81212,13 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
+@@ -81192,11 +81228,13 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
      'locale',
      'device_scale',
      'presentationeditor/main/locale/en.json',
@@ -181,7 +243,7 @@ index 5ca1efb..78b5cb5 100644
      })();
      (n.History && n.History.started) ||
        (n.history.start(),
-@@ -81271,7 +81293,7 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
+@@ -81271,7 +81309,7 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
              a.start();
            });
          },
@@ -191,10 +253,10 @@ index 5ca1efb..78b5cb5 100644
    }, function (t) {
      'timeout' == t.requireType &&
 diff --git a/public/web-apps/apps/spreadsheeteditor/main/app.js b/public/web-apps/apps/spreadsheeteditor/main/app.js
-index 7ffc13b..d70ca77 100644
+index 7ffc13b..5755c79 100644
 --- a/public/web-apps/apps/spreadsheeteditor/main/app.js
 +++ b/public/web-apps/apps/spreadsheeteditor/main/app.js
-@@ -4292,6 +4292,27 @@ define('spreadsheeteditor/main/locale/zh.json', {
+@@ -4292,6 +4292,46 @@ define('spreadsheeteditor/main/locale/zh.json', {
    'SSE.Views.WBProtection.txtWBUnlockDescription': '输入密码解除保护',
    'SSE.Views.WBProtection.txtWBUnlockTitle': '取消工作簿保护',
  });
@@ -207,6 +269,25 @@ index 7ffc13b..d70ca77 100644
 +  'Common.Views.Header.textZoom': 'Zoom',
 +  'SSE.Controllers.Main.textRedo': 'Refazer',
 +  'SSE.Controllers.Main.textUndo': 'Desfazer',
++  'SSE.Views.Toolbar.capBtnAddComment': 'Adicionar comentário',
++  'SSE.Views.Toolbar.capBtnComment': 'Comentário',
++  'SSE.Views.Toolbar.capBtnInsHeader': 'Cabeçalho e rodapé',
++  'SSE.Views.Toolbar.capBtnInsSlicer': 'Segmentação de dados',
++  'SSE.Views.Toolbar.capBtnInsSymbol': 'Símbolo',
++  'SSE.Views.Toolbar.capBtnMargins': 'Margens',
++  'SSE.Views.Toolbar.capBtnPageBreak': 'Quebras',
++  'SSE.Views.Toolbar.capBtnPageOrient': 'Orientação',
++  'SSE.Views.Toolbar.capBtnPageSize': 'Tamanho',
++  'SSE.Views.Toolbar.capBtnPrintArea': 'Área de impressão',
++  'SSE.Views.Toolbar.capBtnPrintTitles': 'Títulos de impressão',
++  'SSE.Views.Toolbar.capInsertChart': 'Gráfico',
++  'SSE.Views.Toolbar.capInsertEquation': 'Equação',
++  'SSE.Views.Toolbar.capInsertHyperlink': 'Hiperlink',
++  'SSE.Views.Toolbar.capInsertImage': 'Imagem',
++  'SSE.Views.Toolbar.capInsertShape': 'Forma',
++  'SSE.Views.Toolbar.capInsertSpark': 'Minigráfico',
++  'SSE.Views.Toolbar.capInsertTable': 'Tabela',
++  'SSE.Views.Toolbar.capInsertText': 'Caixa de texto',
 +  'SSE.Views.Toolbar.textTabCollaboration': 'Revisão',
 +  'SSE.Views.Toolbar.textTabData': 'Dados',
 +  'SSE.Views.Toolbar.textTabDraw': 'Desenhar',
@@ -222,7 +303,7 @@ index 7ffc13b..d70ca77 100644
  define('spreadsheeteditor/main/locale/en.json', {
    'Common.Controllers.Chat.notcriticalErrorTitle': 'Warning',
    'Common.Controllers.Chat.textEnterMessage': 'Enter your message here',
-@@ -17615,7 +17636,7 @@ function _extend_object(t, e) {
+@@ -17615,7 +17655,7 @@ function _extend_object(t, e) {
        apply = !1,
        defLang = 'zh',
        currentLang = defLang,
@@ -231,7 +312,7 @@ index 7ffc13b..d70ca77 100644
        _applyLocalization = function (t, e) {
          try {
            if ((t && (loadcallback = t), e)) {
-@@ -113435,11 +113456,13 @@ var c_paragraphLinerule = { LINERULE_AUTO: 1, LINERULE_EXACT: 2 },
+@@ -113435,11 +113475,13 @@ var c_paragraphLinerule = { LINERULE_AUTO: 1, LINERULE_EXACT: 2 },
      'locale',
      'device_scale',
      'spreadsheeteditor/main/locale/en.json',
@@ -247,7 +328,7 @@ index 7ffc13b..d70ca77 100644
      })();
      (s.History && s.History.started) ||
        (s.history.start(),
-@@ -113519,7 +113542,7 @@ var c_paragraphLinerule = { LINERULE_AUTO: 1, LINERULE_EXACT: 2 },
+@@ -113519,7 +113561,7 @@ var c_paragraphLinerule = { LINERULE_AUTO: 1, LINERULE_EXACT: 2 },
              a.start();
            });
          },
@@ -256,4 +337,3 @@ index 7ffc13b..d70ca77 100644
        ));
    }, function (t) {
      'timeout' == t.requireType &&
-

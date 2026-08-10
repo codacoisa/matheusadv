@@ -13,13 +13,13 @@
     <link rel="apple-touch-icon" href="../../assets/app-icon.png" data-officejur-href="office.appIconUrl">
     <script src="../../assets/office-config.js"></script>
     <script src="../../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=1">
+    <link rel="stylesheet" href="./assets/styles.css?v=2">
     <link rel="stylesheet" href="./assets/site-header.css?v=1">
     <script src="../../financeiro/assets/storage.js?v=1" defer></script>
     <script src="../../financeiro/assets/data-store.js?v=1" defer></script>
-    <script src="./assets/storage.js?v=1" defer></script>
+    <script src="./assets/storage.js?v=2" defer></script>
     <script src="./assets/office-templates.js?v=1" defer></script>
-    <script src="./assets/app.js?v=1" defer></script>
+    <script src="./assets/app.js?v=2" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -31,114 +31,120 @@
         <span><strong>Documentos</strong><small data-officejur-field="office.shortName">Escritório</small></span>
       </a>
       <div class="top-actions">
-        <span class="lab-tag">Protótipo local</span>
+        <span class="lab-tag">Protótipo</span>
         <office-app-switcher current="lab"></office-app-switcher>
       </div>
     </header>
 
-    <main class="workspace">
-      <section class="page-intro">
+    <main class="documents-main">
+      <header class="page-head">
         <div>
-          <p class="eyebrow">LABORATÓRIO · SEM SINCRONIZAÇÃO</p>
-          <h1>Documentos</h1>
-          <p class="intro-copy">Arquivos locais organizados por cliente, com editor Office completo no navegador. Nada é enviado ao Gist ou a outro servidor.</p>
+          <p class="eyebrow">LABORATÓRIO · ARMAZENADO NESTE NAVEGADOR</p>
+          <h1>Biblioteca de documentos</h1>
+          <p>Arquivos organizados em pastas por cliente, com edição pelo OnlyOffice.</p>
         </div>
-        <div class="intro-actions">
+        <div class="page-actions">
+          <button id="import-document" class="button ghost" type="button">Importar arquivo</button>
           <button id="new-document" class="button primary" type="button">Novo documento</button>
-          <button id="import-document" class="button secondary" type="button">Importar arquivo</button>
         </div>
-      </section>
+      </header>
 
       <div id="status" class="status-line" role="status" aria-live="polite"></div>
 
-      <section id="library-view" class="library-layout" aria-label="Biblioteca local de documentos">
-        <aside class="library-sidebar">
-          <div class="sidebar-head">
-            <div>
-              <p class="eyebrow">BIBLIOTECA LOCAL</p>
-              <h2>Seus arquivos</h2>
-            </div>
-            <span id="document-count" class="count-badge">0</span>
+      <section class="library-panel" aria-label="Biblioteca de documentos">
+        <header class="library-toolbar">
+          <div class="library-summary">
+            <strong><span id="document-count">0</span> arquivos</strong>
+            <span><span id="client-count">0</span> pastas de clientes</span>
           </div>
-          <label class="search-field" for="document-search">Pesquisar documento
-            <input id="document-search" type="search" placeholder="Nome ou cliente">
+          <label class="search-field" for="document-search">
+            <span class="sr-only">Pesquisar arquivos</span>
+            <input id="document-search" type="search" placeholder="Pesquisar por arquivo, cliente ou formato">
           </label>
-          <button id="clear-library" class="button danger library-clear" type="button" disabled>Limpar biblioteca</button>
-          <div id="document-list" class="document-list"></div>
-        </aside>
+        </header>
 
-        <section id="editor-empty" class="editor-empty panel" aria-label="Nenhum documento aberto">
-          <div class="empty-icon" aria-hidden="true">✎</div>
-          <h2>Nenhum documento aberto</h2>
-          <p>Crie um documento ou importe um arquivo local. Primeiro escolha o cliente responsável pelo arquivo.</p>
-          <button class="button primary" type="button" data-action="new">Criar documento</button>
-        </section>
+        <div id="library-empty" class="library-empty">
+          <span class="empty-folder" aria-hidden="true">▰</span>
+          <h2>Nenhum arquivo na biblioteca</h2>
+          <p>Crie um documento em branco ou importe um arquivo e vincule-o a um cliente.</p>
+          <button class="button primary" type="button" data-action="new">Criar primeiro documento</button>
+        </div>
 
-        <section id="editor-view" class="editor panel" hidden aria-label="Editor de documento">
-          <header class="editor-head">
-            <div>
-              <p id="editor-type" class="eyebrow">CSV · EDITOR LOCAL</p>
-              <h2 id="editor-title"></h2>
-              <p id="editor-client" class="muted"></p>
-            </div>
-            <div class="editor-actions">
-              <button id="download-document" class="button secondary" type="button">Baixar</button>
-              <button id="delete-document" class="button danger" type="button">Excluir</button>
-              <button id="save-document" class="button primary" type="button">Salvar</button>
-            </div>
-          </header>
-          <div id="editor-notice" class="editor-notice"></div>
-          <div id="csv-editor" class="csv-editor" hidden>
-            <label for="csv-content">Conteúdo CSV <span>Use ponto e vírgula ou vírgula conforme o arquivo.</span></label>
-            <textarea id="csv-content" spellcheck="false" aria-describedby="csv-preview-label"></textarea>
-            <div class="preview-head"><strong id="csv-preview-label">Pré-visualização</strong><span>Atualizada enquanto você digita</span></div>
-            <div id="csv-preview" class="csv-preview"></div>
-          </div>
-          <div id="office-editor" class="office-editor" hidden>
-            <div class="office-editor-status">
-              <strong>OnlyOffice local</strong>
-            <span id="office-status" class="office-status" role="status" aria-live="polite">Inicializando editor…</span>
-            </div>
-            <iframe id="office-editor-frame" title="Editor de documentos Office" src="./editor/index.html?embed=1&amp;locale=pt-BR"></iframe>
-          </div>
-        </section>
+        <div id="client-folders" class="client-folders"></div>
+
+        <footer class="library-footer">
+          <p>Os arquivos ficam codificados em Base64 no armazenamento deste navegador.</p>
+          <button id="clear-library" class="danger-link" type="button" disabled>Limpar biblioteca</button>
+        </footer>
       </section>
     </main>
+
+    <dialog id="editor-dialog" class="editor-dialog" aria-labelledby="editor-name">
+      <section class="editor-shell">
+        <header class="editor-head">
+          <div class="editor-identity">
+            <span id="editor-format" class="format-icon">DOCX</span>
+            <div>
+              <label class="sr-only" for="editor-name">Nome do arquivo</label>
+              <input id="editor-name" class="editor-name" type="text" aria-label="Nome do arquivo">
+              <p id="editor-client" class="editor-meta"></p>
+            </div>
+          </div>
+          <div class="editor-actions">
+            <span id="office-status" class="office-status" role="status" aria-live="polite">Preparando editor…</span>
+            <button id="download-document" class="button ghost compact" type="button">Baixar</button>
+            <button id="delete-document" class="button danger compact" type="button">Excluir</button>
+            <button id="save-document" class="button primary compact" type="button">Salvar</button>
+            <button id="close-editor" class="icon-button" type="button" aria-label="Fechar editor">×</button>
+          </div>
+        </header>
+
+        <div id="csv-editor" class="csv-editor" hidden>
+          <label for="csv-content">Conteúdo CSV <span>Use ponto e vírgula ou vírgula conforme o arquivo.</span></label>
+          <textarea id="csv-content" spellcheck="false" aria-describedby="csv-preview-label"></textarea>
+          <div class="preview-head"><strong id="csv-preview-label">Pré-visualização</strong><span>Atualizada enquanto você digita</span></div>
+          <div id="csv-preview" class="csv-preview"></div>
+        </div>
+
+        <div id="office-editor" class="office-editor" hidden>
+          <iframe id="office-editor-frame" title="Editor de documentos Office" src="./editor/index.html?embed=1&amp;locale=pt-BR"></iframe>
+        </div>
+      </section>
+    </dialog>
 
     <dialog id="document-dialog" class="document-dialog" aria-labelledby="dialog-title">
       <form id="document-form" method="dialog">
         <header class="dialog-head">
           <div>
-            <p class="eyebrow">NOVO ARQUIVO LOCAL</p>
-            <h2 id="dialog-title">Vincular documento</h2>
+            <p id="dialog-eyebrow" class="eyebrow">NOVO DOCUMENTO</p>
+            <h2 id="dialog-title">Criar documento</h2>
           </div>
           <button id="close-dialog" class="icon-button" type="button" aria-label="Fechar">×</button>
         </header>
-        <p class="dialog-copy">Todo documento precisa estar vinculado a um cliente do OfficeJur antes de ser salvo.</p>
+        <p id="dialog-copy" class="dialog-copy">Crie um arquivo em branco e vincule-o a uma pasta de cliente.</p>
         <label for="client-select">Cliente
           <select id="client-select" required></select>
         </label>
-        <label for="document-name">Nome do documento
-          <input id="document-name" type="text" required placeholder="Ex.: Contrato de honorários">
+        <label for="document-name">Nome do arquivo
+          <input id="document-name" type="text" placeholder="Ex.: Contrato de honorários">
         </label>
-        <div class="form-grid">
-          <label for="document-type">Formato
-            <select id="document-type">
-              <option value="csv">CSV</option>
-              <option value="docx">DOCX</option>
-              <option value="xlsx">XLSX</option>
-              <option value="pptx">PPTX</option>
-            </select>
-          </label>
-          <label for="document-file">Arquivo local (opcional)
-            <input id="document-file" type="file" accept=".docx,.xlsx,.pptx,.csv">
-          </label>
-        </div>
-        <p class="field-help">Sem escolher arquivo, o OfficeJur cria um arquivo Office vazio no navegador para você abrir e editar.</p>
+        <label id="create-format-field" for="document-type">Formato do novo arquivo
+          <select id="document-type">
+            <option value="docx">Documento DOCX</option>
+            <option value="xlsx">Planilha XLSX</option>
+            <option value="pptx">Apresentação PPTX</option>
+            <option value="csv">Planilha CSV</option>
+          </select>
+        </label>
+        <label id="import-file-field" class="file-picker" for="document-file" hidden>
+          <span class="file-picker-icon" aria-hidden="true">↑</span>
+          <span><strong id="file-picker-title">Escolher arquivo</strong><small>DOCX, XLSX, PPTX ou CSV · o formato será detectado automaticamente</small></span>
+          <input id="document-file" type="file" accept=".docx,.xlsx,.pptx,.csv">
+        </label>
         <p id="client-empty" class="field-help" hidden>Nenhum cliente foi encontrado. Cadastre um cliente no <a href="../../financeiro/">Financeiro</a> antes de criar documentos.</p>
         <div class="dialog-actions">
           <button id="cancel-dialog" class="button ghost" type="button">Cancelar</button>
-          <button id="confirm-document" class="button primary" type="submit">Salvar documento</button>
+          <button id="confirm-document" class="button primary" type="submit">Criar documento</button>
         </div>
       </form>
     </dialog>

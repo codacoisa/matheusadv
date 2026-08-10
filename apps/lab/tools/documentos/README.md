@@ -7,16 +7,17 @@ upload automático ou integração com servidor.
 ## Fluxo atual
 
 - vínculo obrigatório com um cliente lido do Financeiro do OfficeJur;
-- importação local de DOCX, XLSX, PPTX e CSV;
+- importação de DOCX, XLSX, PPTX e CSV com formato detectado pelo arquivo;
 - criação de arquivos Office vazios no navegador;
-- edição de DOCX, XLSX e PPTX com o editor OnlyOffice local e as abas
-  principais em português brasileiro (`pt-BR`), usando fallback para strings
-  ainda não traduzidas;
+- biblioteca organizada em pastas por cliente;
+- edição de DOCX, XLSX e PPTX com o OnlyOffice em modal amplo e interface
+  principal em português brasileiro (`pt-BR`);
+- renomeação no cartão do arquivo e durante a edição;
 - edição direta de CSV, com pré-visualização tabular;
-- salvamento do arquivo editado de volta no IndexedDB e download local;
+- salvamento do arquivo editado em Base64 no IndexedDB e download pelo navegador;
 - exclusão apenas da cópia mantida neste navegador.
 
-## Editor Office local
+## Editor Office
 
 O editor é incorporado por um iframe same-origin construído a partir do
 submódulo `third_party/ranuts-document`, baseado na camada web do OnlyOffice.
@@ -31,8 +32,10 @@ submódulo, copia o `dist` para `lab/documentos/editor/` e inclui a licença AGP
 junto dos assets publicados. O build é estático e adequado ao GitHub Pages;
 nenhum arquivo é enviado a um servidor para ser editado.
 
-O editor preserva `originalFile` no IndexedDB. A propriedade `file` representa
-a versão corrente que será aberta na próxima edição ou baixada pelo usuário.
+O armazenamento usa `dataBase64` para a versão corrente e
+`originalDataBase64` para a versão originalmente importada. Registros antigos
+com `Blob` ou `File` são migrados para Base64 na primeira leitura após a
+atualização. Nenhum binário estruturado permanece gravado no IndexedDB.
 
 ## Licenciamento
 
@@ -43,7 +46,7 @@ redistribuir o site.
 
 Referências principais:
 
-- [ranuts/document](https://github.com/ranuts/document) — editor local baseado
+- [ranuts/document](https://github.com/ranuts/document) — editor baseado
   em OnlyOffice Web, com suporte anunciado a DOCX, XLSX, PPTX e CSV;
 - [ONLYOFFICE Docs API](https://api.onlyoffice.com/docs) — documentação da
   integração e dos eventos do editor;
