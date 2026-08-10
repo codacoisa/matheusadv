@@ -12,8 +12,8 @@ upload automático ou integração com servidor.
 - biblioteca organizada em pastas por cliente;
 - edição de DOCX, XLSX e PPTX com o OnlyOffice em modal de 90% da tela e
   catálogo oficial completo em português brasileiro (`pt-BR`);
-- renomeação no cartão do arquivo e, após clicar no título, durante a edição,
-  com atualização imediata do nome exibido pelo OnlyOffice;
+- renomeação somente durante a edição, após clicar no título do pop-up, com
+  atualização imediata do nome exibido pelo OnlyOffice;
 - edição direta de CSV, com pré-visualização tabular;
 - salvamento manual ou automático a cada 10 segundos, com preferência
   persistida no navegador;
@@ -29,8 +29,11 @@ O build fixa o submódulo no commit público `fcaa66e` e aplica o patch
 português, sem depender de commits privados ou locais.
 O aplicativo principal envia o arquivo por `postMessage` e recebe os eventos
 `document:ready`, `document:opened`, `document:saved` e `document:error`.
-Também usa `document:rename` e `document:changed` para sincronizar o título e
-acionar o salvamento automático somente quando houver alterações.
+Também usa `document:rename`, `document:focus` e `document:changed` para
+sincronizar o título, devolver o foco ao documento e acionar o salvamento
+automático somente quando houver alterações. O comando Salvar da faixa nativa
+do OnlyOffice publica o arquivo editado pela mesma ponte usada pelo botão do
+pop-up.
 
 O Microsoft Word descreve o AutoSave como um salvamento realizado a cada
 "poucos segundos", sem publicar um intervalo exato. Este protótipo adota 10

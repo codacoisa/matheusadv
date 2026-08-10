@@ -364,9 +364,12 @@ test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }
   await expect(page.locator('#office-status')).toContainText('Salvo automaticamente', { timeout: 15_000 });
   await expect(page.locator('#csv-preview')).toContainText('Teste');
   await page.locator('#close-editor').click();
-  await page.getByRole('button', { name: 'Renomear Planilha de teste' }).click();
+  await expect(page.locator('[data-rename-id]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Abrir Planilha de teste' }).click();
+  await page.locator('#editor-name-trigger').click();
   await page.getByRole('textbox', { name: 'Novo nome do arquivo' }).fill('Planilha renomeada');
-  await page.locator('[data-rename-form]').getByRole('button', { name: 'Salvar' }).click();
+  await page.locator('#editor-name-form').getByRole('button', { name: 'Salvar nome' }).click();
+  await page.locator('#close-editor').click();
   await expect(page.getByRole('button', { name: /Abrir Planilha renomeada/ })).toBeVisible();
 });
 
@@ -384,6 +387,7 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
   await expect(office.getByText('Página Inicial', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await page.locator('#autosave-toggle').uncheck();
   await expect(page.locator('#editor-name')).toBeHidden();
   await page.locator('#editor-name-trigger').click();
   await page.locator('#editor-name').fill('Rascunho revisado');
@@ -391,7 +395,25 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await expect(page.getByText('Arquivo renomeado para “Rascunho revisado”.')).toBeVisible();
   await expect(page.locator('#editor-name-trigger')).toHaveText('Rascunho revisado');
   await expect(office.locator('#title-doc-name')).toHaveValue('Rascunho revisado.docx');
-  await page.locator('#save-document').click();
+  await expect(office.locator('#area_id')).toBeFocused();
+  await page.keyboard.type('Teste de foco');
+  await expect(page.locator('#office-status')).toContainText('Alterações pendentes', { timeout: 10_000 });
+  const nativeButton = (name) => office.locator(`button:has(> i.icon--inverse.btn-${name})`);
+  await expect(nativeButton('undo')).toBeEnabled();
+  await nativeButton('undo').click();
+  await expect(nativeButton('redo')).toBeEnabled();
+  await nativeButton('redo').click();
+  await expect(nativeButton('print')).toBeEnabled();
+  await office.locator('body').evaluate(() => {
+    const main = window.DE?.getController?.('Main');
+    main.api.asc_Print = () => { document.body.dataset.printRequested = 'true'; };
+  });
+  await nativeButton('print').click();
+  await expect(office.locator('body')).toHaveAttribute('data-print-requested', 'true');
+  await office.locator('a[data-tab="file"]').click();
+  await expect(office.locator('#file-menu-panel')).toBeVisible();
+  await office.locator('#fm-btn-return').click();
+  await nativeButton('save').click();
   await expect(page.getByText('Alterações salvas neste navegador.')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#delete-document').click();

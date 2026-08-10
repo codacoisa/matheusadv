@@ -70,7 +70,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 10px; padding: 12px; }
 .file-card { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 9px; background: #fff; transition: border-color .15s, box-shadow .15s, transform .15s; }
 .file-card:hover, .file-card:focus-within { border-color: #cfb777; box-shadow: 0 8px 24px rgba(23,33,58,.1); transform: translateY(-1px); }
-.file-open { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 11px; width: 100%; min-height: 82px; border: 0; padding: 12px 42px 12px 12px; color: inherit; text-align: left; background: transparent; }
+.file-open { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 11px; width: 100%; min-height: 82px; border: 0; padding: 12px; color: inherit; text-align: left; background: transparent; }
 .format-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; color: #173052; background: #dbeafe; font-size: 9px; font-weight: 900; }
 .format-xlsx { color: #155b33; background: #dcfce7; }
 .format-pptx { color: #8a3b12; background: #ffedd5; }
@@ -79,11 +79,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .file-copy strong, .file-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-copy strong { color: var(--navy); font-size: 12px; }
 .file-copy small { margin-top: 5px; color: var(--muted); font-size: 10px; }
-.rename-file { position: absolute; top: 9px; right: 9px; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 6px; color: var(--gold); background: #fff; opacity: 0; transform: translateY(2px); transition: opacity .15s, transform .15s; }
-.file-card:hover .rename-file, .file-card:focus-within .rename-file { opacity: 1; transform: none; }
-.rename-form { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--line); background: #f8f9fb; }
-.rename-form input { min-height: 34px; padding: 6px 8px; font-size: 11px; }
-.rename-form button { min-height: 34px; border: 0; border-radius: 6px; padding: 0 9px; color: #fff; background: var(--gold); font-size: 10px; font-weight: 800; }
 
 .library-empty { display: grid; place-items: center; align-content: center; min-height: 420px; padding: 40px; text-align: center; }
 .library-empty h2 { margin-top: 13px; }

@@ -1,25 +1,32 @@
 diff --git a/lib/embed-api.ts b/lib/embed-api.ts
-index dc72abb..2b0a88a 100644
+index dc72abb..a582847 100644
 --- a/lib/embed-api.ts
 +++ b/lib/embed-api.ts
-@@ -1,7 +1,7 @@
+@@ -1,7 +1,13 @@
  import { setDocmentObj } from '@ranuts/shared/store';
  import { handleDocumentOperation, loadEditorApi } from './converter';
  import { openDocumentFromUrl } from './document';
 -import { getReadonlyMode, requestSaveDocument, setReadonlyMode } from './onlyoffice-editor';
-+import { getReadonlyMode, renameOpenDocument, requestSaveDocument, setReadonlyMode } from './onlyoffice-editor';
++import {
++  focusOpenDocument,
++  getReadonlyMode,
++  renameOpenDocument,
++  requestSaveDocument,
++  setReadonlyMode,
++} from './onlyoffice-editor';
  
  type EmbedMessageType =
    | 'document:open'
-@@ -9,6 +9,7 @@ type EmbedMessageType =
+@@ -9,6 +15,8 @@ type EmbedMessageType =
    | 'document:open-file'
    | 'document:open-buffer'
    | 'document:set-readonly'
 +  | 'document:rename'
++  | 'document:focus'
    | 'document:save'
    | 'document:get-state';
  
-@@ -156,6 +157,13 @@ async function handleMessage(event: MessageEvent): Promise<void> {
+@@ -156,6 +164,18 @@ async function handleMessage(event: MessageEvent): Promise<void> {
          postToParent('document:readonly-changed', { readonly: getReadonlyMode() }, message.id);
          break;
  
@@ -30,10 +37,15 @@ index dc72abb..2b0a88a 100644
 +        break;
 +      }
 +
++      case 'document:focus':
++        focusOpenDocument();
++        postToParent('document:focused', {}, message.id);
++        break;
++
        case 'document:save': {
          const file = await requestSaveDocument(payload.targetExt || 'XLSX', {
            returnOriginalOnTimeout: Boolean(payload.returnOriginalOnTimeout),
-@@ -215,4 +223,10 @@ export function initEmbedApi(): void {
+@@ -215,4 +235,21 @@ export function initEmbedApi(): void {
    window.addEventListener('load', () => {
      postToParent('document:ready');
    });
@@ -43,9 +55,20 @@ index dc72abb..2b0a88a 100644
 +      modified: Boolean((event as CustomEvent<boolean>).detail),
 +    });
 +  });
++
++  window.addEventListener('ranuts:document-native-save', (event) => {
++    const file = (event as CustomEvent<File>).detail;
++    postToParent('document:saved', {
++      file,
++      fileName: file.name,
++      mimeType: file.type,
++      size: file.size,
++      native: true,
++    });
++  });
  }
 diff --git a/lib/onlyoffice-editor.ts b/lib/onlyoffice-editor.ts
-index f732e9c..a73e04c 100644
+index f732e9c..cac5064 100644
 --- a/lib/onlyoffice-editor.ts
 +++ b/lib/onlyoffice-editor.ts
 @@ -1,6 +1,6 @@
@@ -56,7 +79,26 @@ index f732e9c..a73e04c 100644
  import { getOnlyOfficeLang, t } from '@ranuts/shared/i18n';
  import { c_oAscFileType2 } from './file-types';
  import type { BinConversionResult, SaveEvent } from '@ranuts/shared/document-types';
-@@ -431,6 +431,13 @@ export function createEditorInstance(config: {
+@@ -271,7 +271,13 @@ async function handleSaveDocument(event: SaveEvent) {
+         throw error;
+       }
+     } else if (isEmbedMode()) {
+-      console.warn('Local save is disabled in iframe embed mode. Use document:save from the parent page.');
++      if (!convertBinToDocumentFn) {
++        throw new Error('Converter callback not set');
++      }
++      const result = await convertBinToDocumentFn(data.data, fileName, targetFormat);
++      const bytes = toUint8Array(result.data);
++      const file = new File([bytes as BlobPart], result.fileName, { type: getSavedFileMimeType(result.fileName) });
++      window.dispatchEvent(new CustomEvent('ranuts:document-native-save', { detail: file }));
+     } else if (convertBinToDocumentAndDownloadFn) {
+       await convertBinToDocumentAndDownloadFn(data.data, fileName, targetFormat);
+     } else {
+@@ -428,9 +434,17 @@ export function createEditorInstance(config: {
+           },
+           onDocumentReady: () => {
+             console.log(`${t('documentLoaded')}${fileName}`);
++            window.setTimeout(focusOpenDocument, 0);
              // Note: For CSV files, the save dialog may show XLSX format,
              // but the actual save will be forced to CSV format in handleSaveDocument
            },
@@ -70,7 +112,7 @@ index f732e9c..a73e04c 100644
            onSave: handleSaveDocument,
            onDownloadAs: handleDownloadAs,
            // writeFile
-@@ -456,6 +463,31 @@ export function setReadonlyMode(readonly: boolean): void {
+@@ -456,6 +470,36 @@ export function setReadonlyMode(readonly: boolean): void {
    });
  }
  
@@ -97,6 +139,11 @@ index f732e9c..a73e04c 100644
 +    command: 'asc_setDocumentName',
 +    data: nextName,
 +  });
++  focusOpenDocument();
++}
++
++export function focusOpenDocument(): void {
++  (window.editor as any)?.grabFocus?.();
 +}
 +
  export function getReadonlyMode(): boolean {
@@ -4669,7 +4716,19 @@ index 9ea61a4..4691182 100644
        _applyLocalization = function (t, e) {
          try {
            if ((t && (loadcallback = t), e)) {
-@@ -110937,7 +115428,8 @@ var FONT_TYPE_RECENT = 4,
+@@ -22741,11 +27232,6 @@ function _extend_object(t, e) {
+                 (this.rendered || this.render(),
+                 (i = !this.mode.canDownload || (this.mode.isDesktopApp && this.mode.isOffline) ? 'info' : 'saveas'),
+                 (i = this.mode.canOpenRecent && this.mode.recent ? 'recent' : i),
+-                this.miToggleOnline.setCaption(
+-                  Common.localStorage.getBool('de-disable-online')
+-                    ? this.btnEnableOnlineCaption
+-                    : this.btnDisableOnlineCaption,
+-                ),
+                 (t = t || this.active || i),
+                 this.$el.show(),
+                 this.scroller.update(),
+@@ -110937,7 +115423,8 @@ var FONT_TYPE_RECENT = 4,
      'locale',
      'device_scale',
      'documenteditor/main/locale/en.json',
@@ -4679,7 +4738,7 @@ index 9ea61a4..4691182 100644
      var a;
      (n.History && n.History.started) ||
        (n.history.start(),
-@@ -111020,7 +115512,7 @@ var FONT_TYPE_RECENT = 4,
+@@ -111020,7 +115507,7 @@ var FONT_TYPE_RECENT = 4,
              a.start();
            });
          },

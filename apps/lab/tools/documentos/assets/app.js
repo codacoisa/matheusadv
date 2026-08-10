@@ -110,6 +110,10 @@
     setStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}.` : 'Alterações salvas neste navegador.');
     setOfficeStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}` : 'Alterações salvas.');
     renderEditor();
+    if (documentRecord.extension !== 'csv') {
+      try { sendOfficeCommand('document:focus'); }
+      catch { /* O editor pode estar sendo fechado. */ }
+    }
   }
 
   window.addEventListener('message', (event) => {
@@ -137,11 +141,15 @@
     }
     if (message.type === 'document:renamed') {
       setOfficeStatus('Nome atualizado no editor');
+      try { sendOfficeCommand('document:focus'); }
+      catch { /* O documento pode estar concluindo a abertura. */ }
       return;
     }
     if (message.type === 'document:saved') {
       const automatic = Boolean(officeSave?.automatic);
-      const savedRecord = state.documents.find((record) => record.id === officeSave?.documentId) || null;
+      const savedRecord = officeSave
+        ? state.documents.find((record) => record.id === officeSave.documentId) || null
+        : currentRecord();
       void persistOfficeSave(payload.file, payload, savedRecord, automatic).then(() => resolveOfficeSave()).catch((error) => {
         resolveOfficeSave(error);
         setOfficeStatus(error.message, true);
@@ -224,11 +232,6 @@
             <span class="format-icon format-${escape(record.extension)}">${escape(formatNames[record.extension])}</span>
             <span class="file-copy"><strong>${escape(record.name)}</strong><small>${escape(formatUpdatedAt(record.updatedAt))}</small></span>
           </button>
-          <button class="rename-file" type="button" data-rename-id="${escape(record.id)}" aria-label="Renomear ${escape(record.name)}" title="Renomear">✎</button>
-          <form class="rename-form" data-rename-form="${escape(record.id)}" hidden>
-            <input type="text" value="${escape(record.name)}" aria-label="Novo nome do arquivo" required>
-            <button type="submit">Salvar</button>
-          </form>
         </article>`).join('');
       folder.innerHTML = `
         <header class="folder-head">
@@ -523,28 +526,6 @@
   els.folders.addEventListener('click', (event) => {
     const openButton = event.target.closest('[data-open-id]');
     if (openButton) { openEditor(openButton.dataset.openId); return; }
-    const renameButton = event.target.closest('[data-rename-id]');
-    if (!renameButton) return;
-    const card = renameButton.closest('.file-card');
-    const form = card.querySelector('.rename-form');
-    form.hidden = false;
-    card.querySelector('.file-copy').hidden = true;
-    form.querySelector('input').focus();
-    form.querySelector('input').select();
-  });
-  els.folders.addEventListener('submit', async (event) => {
-    const form = event.target.closest('[data-rename-form]');
-    if (!form) return;
-    event.preventDefault();
-    const documentRecord = state.documents.find((record) => record.id === form.dataset.renameForm);
-    if (!documentRecord) return;
-    const button = form.querySelector('button[type="submit"]');
-    button.disabled = true;
-    try { await renameRecord(documentRecord, form.querySelector('input').value); }
-    catch (error) {
-      button.disabled = false;
-      setStatus(`Não foi possível renomear: ${error.message}`, true);
-    }
   });
   els.csvContent.addEventListener('input', () => {
     state.dirty = true;
