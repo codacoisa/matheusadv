@@ -127,13 +127,6 @@
       gap: 14px;
     }
 
-    .config-grid::before {
-      content: "O mesmo Gist é usado pelos módulos participantes do OfficeJur.";
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
     .field-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -751,4 +744,77 @@
         width: min(100% - 24px, var(--max));
         padding-top: 12px;
       }
+    }
+
+    /* Dashboard da Central: fonte compartilhada em primeiro plano e fila de trabalho logo abaixo. */
+    .hero {
+      grid-template-columns: minmax(0, 1.05fr) minmax(420px, .95fr);
+      align-items: stretch;
+      gap: 16px;
+    }
+
+    .hero-card {
+      min-height: 286px;
+      padding: 26px;
+    }
+
+    .hero-card--brand {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hero-card--config {
+      display: grid;
+      align-content: space-between;
+      gap: 20px;
+      border-top: 4px solid var(--gold-light);
+      background: #fff;
+    }
+
+    .config-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 13px;
+    }
+
+    .config-heading h2 {
+      margin: 0 0 6px;
+      color: var(--navy);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 24px;
+      line-height: 1.1;
+    }
+
+    .config-heading p:last-child {
+      max-width: 45ch;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .config-icon {
+      display: grid;
+      flex: 0 0 42px;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border-radius: 12px;
+      color: var(--gold);
+      background: var(--gold-soft, #f3ead8);
+      font-size: 18px;
+    }
+
+    .hero-card--config .config-grid::before { display: none; }
+    .hero-card--config .config-grid { gap: 14px; }
+    .hero-card--config .actions { justify-content: flex-start; }
+    .hero-card--config .status-line { margin-top: -4px; }
+
+    @media (max-width: 1080px) {
+      .hero { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 700px) {
+      .hero-card { min-height: 0; padding: 20px; }
     }

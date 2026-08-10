@@ -19,6 +19,7 @@
   <script src="./assets/app-switcher.js?v=5" defer></script>
   <script src="./assets/gist-settings.js?v=1" defer></script>
   <script src="./assets/gist-client.js?v=2" defer></script>
+  <script src="./assets/gist-access-lease.js?v=1" defer></script>
   <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
   <script src="./assets/site-footer.js?v=5" defer></script>
 </head>
@@ -52,10 +53,17 @@
           <strong id="attention-summary">Configure o Gist para começar.</strong>
         </div>
       </article>
-      <article class="hero-card">
+      <article class="hero-card hero-card--config">
+        <div class="config-heading">
+          <span class="config-icon"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i></span>
+          <div>
+            <p class="eyebrow eyebrow--muted">Configuração compartilhada</p>
+            <h2>Fonte da Central</h2>
+            <p>Este endereço é salvo no sincronismo do OfficeJur para que todos os computadores participantes acompanhem a mesma Central.</p>
+          </div>
+        </div>
         <div class="config-grid">
           <div>
-            <p class="eyebrow eyebrow--muted">Sincronização OfficeJur</p>
             <div class="field-row">
               <div class="field">
                 <label for="gist-id">ID ou endereço do Gist</label>
@@ -64,8 +72,8 @@
             </div>
           </div>
           <div class="actions">
-            <button id="load-button" class="btn-primary" type="button">Sincronizar agora</button>
-            <button id="reset-button" class="btn-secondary" type="button">Limpar configuração</button>
+            <button id="load-button" class="btn-primary" type="button">Salvar configuração</button>
+            <button id="reset-button" class="btn-secondary" type="button">Remover configuração</button>
           </div>
           <div id="load-status" class="status-line" aria-live="polite"></div>
         </div>
