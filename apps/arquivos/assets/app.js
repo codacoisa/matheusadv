@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const storage = window.OfficeJurLabDocuments;
+  const storage = window.OfficeJurDocuments;
   const documentFiles = window.OfficeJurDocumentFiles;
   const templates = window.OfficeJurDocumentTemplates;
   const financeStorage = window.FinanceStorage;

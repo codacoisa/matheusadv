@@ -8,6 +8,7 @@ SITE_DIR="$ROOT_DIR/_site"
 rm -rf "$SITE_DIR"
 
 mkdir -p "$SITE_DIR/documentos/assets"
+mkdir -p "$SITE_DIR/arquivos/assets"
 mkdir -p "$SITE_DIR/configuracoes"
 mkdir -p "$SITE_DIR/calculos"
 mkdir -p "$SITE_DIR/financeiro"
@@ -102,19 +103,21 @@ if [[ ! -f "$RANUTS_EDITOR_SOURCE/dist/index.html" ]]; then
   echo "O build do editor ranuts/document não gerou dist/index.html." >&2
   exit 1
 fi
-mkdir -p "$SITE_DIR/lab/documentos/editor"
-cp -R "$RANUTS_EDITOR_SOURCE/dist/." "$SITE_DIR/lab/documentos/editor/"
-cp "$RANUTS_EDITOR_SOURCE/LICENSE" "$SITE_DIR/lab/documentos/editor/AGPL-3.0.LICENSE"
+mkdir -p "$SITE_DIR/arquivos/editor"
+cp -R "$RANUTS_EDITOR_SOURCE/dist/." "$SITE_DIR/arquivos/editor/"
+cp "$RANUTS_EDITOR_SOURCE/LICENSE" "$SITE_DIR/arquivos/editor/AGPL-3.0.LICENSE"
 
 FFLATE_SOURCE="$ROOT_DIR/node_modules/fflate/esm/browser.js"
 if [[ ! -f "$FFLATE_SOURCE" ]]; then
   echo "A dependência fflate está ausente; execute npm ci antes de montar o site." >&2
   exit 1
 fi
-mkdir -p "$SITE_DIR/lab/documentos/assets/engine"
-cp "$FFLATE_SOURCE" "$SITE_DIR/lab/documentos/assets/engine/fflate.js"
-cp "$ROOT_DIR/node_modules/fflate/LICENSE" "$SITE_DIR/lab/documentos/assets/engine/fflate.LICENSE"
+mkdir -p "$SITE_DIR/arquivos/assets/engine"
+cp "$FFLATE_SOURCE" "$SITE_DIR/arquivos/assets/engine/fflate.js"
+cp "$ROOT_DIR/node_modules/fflate/LICENSE" "$SITE_DIR/arquivos/assets/engine/fflate.LICENSE"
 
+cp "$ROOT_DIR/apps/arquivos/index.html" "$SITE_DIR/arquivos/index.html"
+cp -R "$ROOT_DIR/apps/arquivos/assets/." "$SITE_DIR/arquivos/assets/"
 cp -R "$ROOT_DIR/apps/documentos/assets/." "$SITE_DIR/documentos/assets/"
 
 for source in "$ROOT_DIR/apps/documentos/"*; do
@@ -151,6 +154,7 @@ for assets in \
   "$SITE_DIR/configuracoes/assets" \
   "$SITE_DIR/calculos/assets" \
   "$SITE_DIR/documentos/assets" \
+  "$SITE_DIR/arquivos/assets" \
   "$SITE_DIR/financeiro/assets" \
   "$SITE_DIR/lab/assets" \
   "$SITE_DIR/validador-projudi/assets"

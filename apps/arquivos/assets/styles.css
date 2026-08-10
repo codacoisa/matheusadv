@@ -30,8 +30,6 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 .brand strong { font: 700 18px Georgia, serif; }
 .brand small { margin-top: 2px; color: #c9d0dc; font-size: 11px; }
 .top-actions, .page-actions, .editor-actions, .dialog-actions { display: flex; align-items: center; gap: 9px; }
-.lab-tag { border: 1px solid rgba(255,255,255,.24); border-radius: 999px; padding: 5px 10px; color: #e8edf5; font-size: 11px; font-weight: 800; }
-
 .documents-main { width: min(1280px, calc(100% - 48px)); min-height: calc(100vh - 68px); margin: 0 auto; padding: 30px 0 58px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 18px; }
 .eyebrow { margin: 0; color: var(--gold); font-size: 10px; font-weight: 850; letter-spacing: .13em; }
@@ -161,7 +159,6 @@ dialog::backdrop { background: rgba(16,26,47,.75); backdrop-filter: blur(3px); }
 
 @media (max-width: 560px) {
   .topbar { padding: 0 14px; }
-  .lab-tag { display: none; }
   .page-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .file-grid { grid-template-columns: 1fr; }
   .library-footer { align-items: flex-start; flex-direction: column; }

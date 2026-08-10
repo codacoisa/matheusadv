@@ -1,6 +1,6 @@
-# Documentos (protótipo de laboratório)
+# Arquivos
 
-Este módulo mantém os arquivos em um IndexedDB próprio (`officejur-documentos-lab`)
+Este app mantém os arquivos em um IndexedDB próprio (`officejur-documentos-lab`, nome preservado para compatibilidade com dados criados no protótipo)
 e pode sincronizá-los pelo Gist global configurado no OfficeJur. O índice dos
 documentos fica separado dos conteúdos: cada arquivo corrente e sua versão
 original são enviados como payloads Base64 próprios, no mesmo padrão usado
@@ -22,7 +22,7 @@ pelos PDFs do Financeiro.
 - salvamento manual ou automático a cada 10 segundos, com preferência
   persistida no navegador;
 - armazenamento do arquivo editado em Base64 no IndexedDB e download pelo navegador;
-- sincronização do índice `lab-documentos.json` e dos payloads Base64 individuais;
+- sincronização do índice `arquivos-documentos.json` e dos payloads Base64 individuais;
 - exclusão registrada como marca de sincronização para os demais computadores.
 
 ## Editor Office
@@ -49,12 +49,12 @@ No Safari, a recuperação de foco ativa primeiro o iframe interno e depois a
 cliques na página, evitando o cursor visual sem entrada de teclado.
 
 O Microsoft Word descreve o AutoSave como um salvamento realizado a cada
-"poucos segundos", sem publicar um intervalo exato. Este protótipo adota 10
+"poucos segundos", sem publicar um intervalo exato. Este app adota 10
 segundos para equilibrar recuperação rápida e o custo de reconverter o arquivo
 Office no navegador. Referência: [Microsoft Support](https://support.microsoft.com/en-gb/office/what-is-autosave-6d6bd723-ebfd-4e40-b5f6-ae6e8088f7a5).
 
 O build do site executa `pnpm install --frozen-lockfile` e `pnpm run build` no
-submódulo, copia o `dist` para `lab/documentos/editor/` e inclui a licença AGPL
+submódulo, copia o `dist` para `arquivos/editor/` e inclui a licença AGPL
 junto dos assets publicados. O build é estático e adequado ao GitHub Pages;
 nenhum arquivo é enviado a um servidor para ser editado.
 
@@ -70,7 +70,7 @@ pela interface. O arquivo fica versionado como texto Base64 em
 `config/document-templates/modelo-institucional.docx.base64`; os metadados, a
 ativação e o hash SHA-256 ficam em `config/office.js`. O build publica esse
 recurso junto da configuração institucional. Ao marcar **Usar modelo do
-escritório**, o Documentos valida a integridade do modelo e cria uma cópia no
+escritório**, o app valida a integridade do modelo e cria uma cópia no
 IndexedDB, sem modificar o arquivo-base.
 
 ## Licenciamento

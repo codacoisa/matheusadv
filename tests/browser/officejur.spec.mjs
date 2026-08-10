@@ -40,7 +40,7 @@ const pages = [
   'lab/',
   'lab/controle-pagamentos/',
   'lab/central-guias/',
-  'lab/documentos/',
+  'arquivos/',
 ];
 
 for (const appPath of pages) {
@@ -357,8 +357,8 @@ test('seletor de aplicativos abre, fecha com Escape e mantém o foco', async ({ 
 });
 
 test('Documentos começa vazio e exige vínculo com cliente', async ({ page }) => {
-  await page.goto('lab/documentos/', { waitUntil: 'networkidle' });
-  await expect(page.getByRole('heading', { name: 'Biblioteca de documentos', level: 1 })).toBeVisible();
+  await page.goto('arquivos/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'Biblioteca de arquivos', level: 1 })).toBeVisible();
   await expect(page.getByText('Nenhum arquivo na biblioteca')).toBeVisible();
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -367,7 +367,7 @@ test('Documentos começa vazio e exige vínculo com cliente', async ({ page }) =
 });
 
 test('Documentos cria DOCX com o modelo institucional da implantação', async ({ page }) => {
-  await prepareCalculationPage(page, 'lab/documentos/');
+  await prepareCalculationPage(page, 'arquivos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
   await page.locator('#document-name').fill('Petição com timbre');
@@ -424,7 +424,7 @@ test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) 
 });
 
 test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }) => {
-  await prepareCalculationPage(page, 'lab/documentos/');
+  await prepareCalculationPage(page, 'arquivos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
   await page.locator('#document-name').fill('Planilha de teste');
@@ -448,7 +448,7 @@ test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }
 });
 
 test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a edição', async ({ page }) => {
-  await prepareCalculationPage(page, 'lab/documentos/');
+  await prepareCalculationPage(page, 'arquivos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
   await page.locator('#document-name').fill('Rascunho');
@@ -504,7 +504,7 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
 });
 
 test('Documentos exige três confirmações para limpar a biblioteca', async ({ page }) => {
-  await prepareCalculationPage(page, 'lab/documentos/');
+  await prepareCalculationPage(page, 'arquivos/');
   for (const name of ['Rascunho um', 'Rascunho dois']) {
     await page.getByRole('button', { name: 'Novo documento' }).click();
     await page.locator('#client-select').selectOption('client-test');
@@ -526,7 +526,7 @@ test('Documentos exige três confirmações para limpar a biblioteca', async ({ 
 });
 
 test('Documentos importa formato detectado, salva Base64 e reabre DOCX', async ({ page }) => {
-  await prepareCalculationPage(page, 'lab/documentos/');
+  await prepareCalculationPage(page, 'arquivos/');
   await page.getByRole('button', { name: 'Importar arquivo' }).click();
   await page.locator('#client-select').selectOption('client-test');
   await page.locator('#document-file').setInputFiles({
@@ -567,7 +567,7 @@ test('Documentos abre XLSX e PPTX no mesmo editor', async ({ page }) => {
     { extension: 'pptx', name: 'apresentacao.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', text: 'OfficeJur PPTX', buffer: minimalPptx('OfficeJur PPTX') },
   ];
 
-  await prepareCalculationPage(page, 'lab/documentos/');
+  await prepareCalculationPage(page, 'arquivos/');
   for (const fixture of fixtures) {
     await page.getByRole('button', { name: 'Importar arquivo' }).click();
     await page.locator('#client-select').selectOption('client-test');

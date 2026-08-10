@@ -3,7 +3,7 @@
 
   const SCHEMA = 'officejur/documentos-data';
   const VERSION = 1;
-  const INDEX_FILE = 'lab-documentos.json';
+  const INDEX_FILE = 'arquivos-documentos.json';
   const MAX_PAYLOAD_BYTES = 10 * 1024 * 1024;
 
   const timestamp = (item) => String(item?.updatedAt || item?.createdAt || item?.deletedAt || '');

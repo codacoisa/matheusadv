@@ -27,16 +27,16 @@ const pagesWithoutStandardMetadata = [];
 const attributePattern = /(?<![\w-])(?:href|src)=["']([^"']+)["']/g;
 // O bundle do editor preserva páginas e rotas próprias do projeto de origem.
 // Seu contrato publicado é validado pelos arquivos essenciais listados abaixo.
-const thirdPartyHtmlPrefixes = ["lab/documentos/editor/"];
+const thirdPartyHtmlPrefixes = ["arquivos/editor/"];
 const requiredEditorFiles = [
-  "lab/documentos/editor/index.html",
-  "lab/documentos/editor/AGPL-3.0.LICENSE",
-  "lab/documentos/editor/wasm/x2t/x2t.js",
-  "lab/documentos/editor/wasm/x2t/x2t.wasm.gz",
-  "lab/documentos/editor/web-apps/apps/api/documents/api.js",
-  "lab/documentos/editor/web-apps/apps/documenteditor/main/index.html",
-  "lab/documentos/editor/web-apps/apps/presentationeditor/main/index.html",
-  "lab/documentos/editor/web-apps/apps/spreadsheeteditor/main/index.html",
+  "arquivos/editor/index.html",
+  "arquivos/editor/AGPL-3.0.LICENSE",
+  "arquivos/editor/wasm/x2t/x2t.js",
+  "arquivos/editor/wasm/x2t/x2t.wasm.gz",
+  "arquivos/editor/web-apps/apps/api/documents/api.js",
+  "arquivos/editor/web-apps/apps/documenteditor/main/index.html",
+  "arquivos/editor/web-apps/apps/presentationeditor/main/index.html",
+  "arquivos/editor/web-apps/apps/spreadsheeteditor/main/index.html",
 ];
 
 for (const htmlFile of htmlFiles) {
@@ -106,12 +106,12 @@ for (const requiredEditorFile of requiredEditorFiles) {
   }
 }
 
-const editorAssetsDirectory = join(root, "lab/documentos/editor/assets");
+const editorAssetsDirectory = join(root, "arquivos/editor/assets");
 if (
   !existsSync(editorAssetsDirectory) ||
   !readdirSync(editorAssetsDirectory).some((entry) => /^index-.*\.js$/.test(entry))
 ) {
-  missing.push("Bundle do editor ausente: lab/documentos/editor/assets/index-*.js");
+  missing.push("Bundle do editor ausente: arquivos/editor/assets/index-*.js");
 }
 
 if (pagesWithoutModalScrollLock.length) {
@@ -210,6 +210,7 @@ const sharedHeaderPages = [
   "apps/lab/tools/central-guias/index.html",
   "apps/lab/tools/controle-pagamentos/index.html",
   "apps/validador-projudi/index.html",
+  "apps/arquivos/index.html",
   "apps/documentos/ciencia-audiencia/index.html",
   "apps/documentos/hipossuficiencia/index.html",
   "apps/documentos/honorarios/index.html",

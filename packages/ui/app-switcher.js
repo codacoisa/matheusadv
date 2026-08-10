@@ -44,6 +44,14 @@
       icon: '<rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 6.5h8M8 11h2M14 11h2M8 15h2M14 15h2M8 19h8"/>'
     },
     {
+      id: 'arquivos',
+      name: 'Arquivos',
+      description: 'Biblioteca e edição de arquivos',
+      url: `${BASE_URL}arquivos/`,
+      color: '#3568b8',
+      icon: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>'
+    },
+    {
       id: 'procuracao',
       name: 'Procuração',
       description: 'Gerador de procurações',

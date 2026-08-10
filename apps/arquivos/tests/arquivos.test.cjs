@@ -6,13 +6,21 @@ const { createHash } = require('node:crypto');
 const storage = require('../assets/storage.js');
 const documentFiles = require('../assets/files.js');
 
-const root = path.resolve(__dirname, '../../../../..');
+const root = path.resolve(__dirname, '../../..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-test('Documentos integra o editor OnlyOffice', () => {
-  const index = read('apps/lab/tools/documentos/index.html');
-  const app = read('apps/lab/tools/documentos/assets/app.js');
+test('Arquivos integra o editor OnlyOffice sem se misturar aos geradores', () => {
+  const index = read('apps/arquivos/index.html');
+  const app = read('apps/arquivos/assets/app.js');
+  const portal = read('apps/portal/index.html');
+  const switcher = read('packages/ui/app-switcher.js');
+  const labCatalog = read('apps/lab/assets/catalog.js');
 
+  assert.match(portal, /href="\.\/arquivos\/"/);
+  assert.match(switcher, /id: 'arquivos'/);
+  assert.match(index, /current="arquivos"/);
+  assert.doesNotMatch(index, /documentos\/procuracao|documentos\/honorarios/);
+  assert.doesNotMatch(labCatalog, /id: 'documentos'/);
   assert.match(index, /id="office-editor-frame"/);
   assert.match(index, /locale=pt-BR/);
   assert.match(app, /document:open-file/);
@@ -48,7 +56,7 @@ test('Documentos separa índice e payloads Base64 para o Gist', () => {
     deletedDocuments: [{ id: 'doc-old', deletedAt: '2026-01-01T00:00:00.000Z' }]
   });
   assert.equal(encoded, 'AQID');
-  assert.equal(documentFiles.INDEX_FILE, 'lab-documentos.json');
+  assert.equal(documentFiles.INDEX_FILE, 'arquivos-documentos.json');
   assert.equal(documentFiles.payloadFileName('doc-1'), 'officejur-documento-doc-1.b64');
   assert.equal(documentFiles.originalPayloadFileName('doc-1'), 'officejur-documento-doc-1-original.b64');
   assert.equal(data.documents[0].clientId, 'client-1');
@@ -56,9 +64,9 @@ test('Documentos separa índice e payloads Base64 para o Gist', () => {
   assert.match(documentFiles.signature(data), /doc-1/);
 });
 
-test('Documentos oferece o modelo institucional definido pela implantação', () => {
-  const index = read('apps/lab/tools/documentos/index.html');
-  const app = read('apps/lab/tools/documentos/assets/app.js');
+test('Arquivos oferece o modelo institucional definido pela implantação', () => {
+  const index = read('apps/arquivos/index.html');
+  const app = read('apps/arquivos/assets/app.js');
   const config = read('config/office.js');
   const configuredHash = config.match(/institutionalDocxTemplate[\s\S]*?sha256:\s*'([a-f0-9]{64})'/)?.[1];
   const template = Buffer.from(read('config/document-templates/modelo-institucional.docx.base64').replace(/\s+/g, ''), 'base64');
@@ -96,5 +104,5 @@ test('o build publica o submódulo e a licença AGPL do editor', () => {
   assert.match(patch, /pt-br\.json/);
   assert.match(patch, /"DE\.Views\.Toolbar\.capBtnInsImage": "Imagem"/);
   assert.match(patch, /"DE\.Views\.Toolbar\.capBtnDateTime": "Data e Hora"/);
-  assert.match(validator, /thirdPartyHtmlPrefixes = \["lab\/documentos\/editor\/"\]/);
+  assert.match(validator, /thirdPartyHtmlPrefixes = \["arquivos\/editor\/"\]/);
 });
