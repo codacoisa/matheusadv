@@ -1,8 +1,10 @@
 # Documentos (protótipo de laboratório)
 
-Este módulo é experimental e mantém os arquivos somente no navegador, em um
-IndexedDB próprio (`officejur-documentos-lab`). Não há sincronização com Gist,
-upload automático ou integração com servidor.
+Este módulo mantém os arquivos em um IndexedDB próprio (`officejur-documentos-lab`)
+e pode sincronizá-los pelo Gist global configurado no OfficeJur. O índice dos
+documentos fica separado dos conteúdos: cada arquivo corrente e sua versão
+original são enviados como payloads Base64 próprios, no mesmo padrão usado
+pelos PDFs do Financeiro.
 
 ## Fluxo atual
 
@@ -20,7 +22,8 @@ upload automático ou integração com servidor.
 - salvamento manual ou automático a cada 10 segundos, com preferência
   persistida no navegador;
 - armazenamento do arquivo editado em Base64 no IndexedDB e download pelo navegador;
-- exclusão apenas da cópia mantida neste navegador.
+- sincronização do índice `lab-documentos.json` e dos payloads Base64 individuais;
+- exclusão registrada como marca de sincronização para os demais computadores.
 
 ## Editor Office
 

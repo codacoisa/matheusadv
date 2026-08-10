@@ -2,18 +2,26 @@
   'use strict';
 
   const storage = window.OfficeJurLabDocuments;
+  const documentFiles = window.OfficeJurDocumentFiles;
   const templates = window.OfficeJurDocumentTemplates;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
+  const gistSettings = window.OfficeJurGistSettings;
+  const access = window.OfficeJurGistAccessLease?.create();
+  const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
   const institutionalTemplateConfig = window.OFFICEJUR_CONFIG?.documents?.institutionalDocxTemplate || null;
   const $ = (selector) => document.querySelector(selector);
   const AUTO_SAVE_INTERVAL = 10000;
   const AUTO_SAVE_KEY = 'officejur.documentos.autosave';
-  const state = { clients: [], documents: [], selectedId: '', query: '', dialogMode: 'create', dirty: false };
+  const SYNC_STATE_KEY = 'officejur::documentos::sync-state';
+  const state = { clients: [], documents: [], selectedId: '', query: '', dialogMode: 'create', dirty: false, deletedDocuments: [] };
   let officeReady = false;
   let officeOpenId = '';
   let officeSave = null;
   let autoSaveTimer = null;
+  let syncTimer = null;
+  let syncInFlight = null;
+  let syncPending = false;
   let officePrintFrame = null;
   let officePrintUrl = '';
 
@@ -47,7 +55,8 @@
   const extension = (name) => String(name || '').split('.').pop().toLowerCase();
   const baseName = (name) => String(name || '').replace(/\.[^.]+$/, '') || 'Documento sem título';
   const currentRecord = () => state.documents.find((item) => item.id === state.selectedId) || null;
-  const clientName = (clientId) => state.clients.find((client) => client.id === clientId)?.name || 'Cliente removido';
+  const clientName = (clientId, fallback = '') => state.clients.find((client) => client.id === clientId)?.name || fallback || 'Cliente removido';
+  const recordClientName = (documentRecord) => clientName(documentRecord?.clientId, documentRecord?.clientName);
 
   function autoSaveEnabled() {
     try { return localStorage.getItem(AUTO_SAVE_KEY) !== 'off'; }
@@ -139,6 +148,171 @@
     renderLibrary();
   }
 
+  function loadSyncState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}');
+      state.deletedDocuments = Array.isArray(saved.deletedDocuments) ? saved.deletedDocuments : [];
+    } catch (_) {
+      state.deletedDocuments = [];
+    }
+  }
+
+  function currentSyncSettings() {
+    return gistSettings?.load?.() || { gistId: '', token: '', autoSync: false };
+  }
+
+  async function documentMetadata(documentRecord) {
+    const bytes = storage.base64ToBytes(documentRecord.dataBase64 || '');
+    const originalBytes = storage.base64ToBytes(documentRecord.originalDataBase64 || documentRecord.dataBase64 || '');
+    const [hash, originalHash] = await Promise.all([sha256(bytes), sha256(originalBytes)]);
+    const { dataBase64, originalDataBase64, file, originalFile, ...metadata } = documentRecord;
+    return documentFiles.normalizeDocument({
+      ...metadata,
+      size: bytes.byteLength,
+      originalSize: originalBytes.byteLength,
+      sha256: hash,
+      originalSha256: originalHash,
+      payloadFile: documentFiles.payloadFileName(documentRecord.id),
+      originalPayloadFile: documentFiles.originalPayloadFileName(documentRecord.id),
+    });
+  }
+
+  async function localSyncData(records = state.documents) {
+    const documents = await Promise.all(records.map(documentMetadata));
+    return documentFiles.normalizeData({
+      updatedAt: now(),
+      documents,
+      deletedDocuments: state.deletedDocuments,
+    });
+  }
+
+  function saveSyncState(data, signature = '') {
+    localStorage.setItem(SYNC_STATE_KEY, JSON.stringify({
+      lastSyncAt: now(),
+      lastSyncSignature: signature || documentFiles.signature(data),
+      deletedDocuments: state.deletedDocuments,
+    }));
+  }
+
+  function rememberDeletion(id) {
+    if (!id) return;
+    state.deletedDocuments = [
+      ...state.deletedDocuments.filter((item) => item.id !== id),
+      { id, deletedAt: now() },
+    ];
+    try {
+      const saved = JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}');
+      localStorage.setItem(SYNC_STATE_KEY, JSON.stringify({ ...saved, deletedDocuments: state.deletedDocuments }));
+    } catch (_) { /* a próxima sincronização persiste a marca de exclusão */ }
+  }
+
+  async function readGistText(file, message) {
+    if (!file) throw new Error(message || 'Arquivo não encontrado no Gist.');
+    return gistClient.text(file, { maxBytes: documentFiles.MAX_PAYLOAD_BYTES });
+  }
+
+  async function readGistIndex(gist) {
+    const file = gist?.files?.[documentFiles.INDEX_FILE];
+    if (!file) return documentFiles.emptyData();
+    return documentFiles.normalizeData(JSON.parse(await readGistText(file, 'Não foi possível ler o índice de documentos do Gist.')));
+  }
+
+  async function readRemotePayload(gist, metadata, original = false) {
+    const fileName = original ? metadata.originalPayloadFile : metadata.payloadFile;
+    const file = gist?.files?.[fileName];
+    if (!file) throw new Error(`O conteúdo Base64 de “${metadata.name}” não foi encontrado no Gist.`);
+    const encoded = (await readGistText(file, `Não foi possível ler o conteúdo de “${metadata.name}”.`)).replace(/\s+/g, '');
+    const bytes = documentFiles.fromBase64(encoded);
+    const expected = original ? metadata.originalSha256 : metadata.sha256;
+    const actual = await sha256(bytes);
+    if (expected && actual !== expected) throw new Error(`A integridade de “${metadata.name}” não pôde ser confirmada.`);
+    return encoded;
+  }
+
+  async function syncDocuments() {
+    if (syncInFlight) {
+      syncPending = true;
+      return syncInFlight;
+    }
+    syncInFlight = (async () => {
+      const settings = currentSyncSettings();
+      if (!settings.gistId) throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+      access?.canSync(settings.gistId);
+      setStatus('Sincronizando documentos com o Gist…');
+      const snapshot = await gistClient.gistSnapshot(settings.gistId, settings.token);
+      const localRecords = await storage.list();
+      const localData = await localSyncData(localRecords);
+      const remoteData = await readGistIndex(snapshot.gist);
+      const mergedData = documentFiles.mergeData(localData, remoteData);
+      const localMeta = new Map(localData.documents.map((item) => [item.id, item]));
+      const localRecordsById = new Map(localRecords.map((item) => [item.id, item]));
+      const mergedRecords = [];
+
+      for (const metadata of mergedData.documents) {
+        const localRecord = localRecordsById.get(metadata.id);
+        const localMetadata = localMeta.get(metadata.id);
+        let dataBase64 = '';
+        let originalDataBase64 = '';
+        if (localRecord && localMetadata?.sha256 === metadata.sha256 && localMetadata?.originalSha256 === metadata.originalSha256) {
+          dataBase64 = localRecord.dataBase64;
+          originalDataBase64 = localRecord.originalDataBase64 || dataBase64;
+        } else {
+          dataBase64 = await readRemotePayload(snapshot.gist, metadata);
+          originalDataBase64 = await readRemotePayload(snapshot.gist, metadata, true);
+        }
+        mergedRecords.push({
+          ...metadata,
+          dataBase64,
+          originalDataBase64,
+          content: metadata.content || localRecord?.content || (metadata.extension === 'csv' ? new TextDecoder().decode(storage.base64ToBytes(dataBase64)) : ''),
+        });
+      }
+
+      const mergedIds = new Set(mergedRecords.map((item) => item.id));
+      for (const record of localRecords) if (!mergedIds.has(record.id)) await storage.remove(record.id);
+      for (const record of mergedRecords) await storage.save(record);
+      state.documents = await storage.list();
+      renderLibrary();
+
+      let revision = snapshot.etag || '';
+      const remoteById = new Map(remoteData.documents.map((item) => [item.id, item]));
+      for (const metadata of mergedData.documents) {
+        const record = state.documents.find((item) => item.id === metadata.id);
+        if (!record || !documentFiles.needsPayloadUpload(metadata, remoteById.get(metadata.id))) continue;
+        const payloads = {
+          [metadata.payloadFile]: { content: record.dataBase64 || '' },
+          [metadata.originalPayloadFile]: { content: record.originalDataBase64 || record.dataBase64 || '' },
+        };
+        const patched = await gistClient.patch(settings.gistId, settings.token, payloads, { etag: revision });
+        revision = patched.etag || revision;
+      }
+      const indexChanged = documentFiles.signature(mergedData) !== documentFiles.signature(remoteData);
+      const changedFiles = {};
+      if (indexChanged) changedFiles[documentFiles.INDEX_FILE] = { content: JSON.stringify(mergedData, null, 2) };
+      documentFiles.deletedPayloadFiles(mergedData, snapshot.gist?.files).forEach((fileName) => { changedFiles[fileName] = null; });
+      if (Object.keys(changedFiles).length) await gistClient.patch(settings.gistId, settings.token, changedFiles, { etag: revision });
+      state.deletedDocuments = mergedData.deletedDocuments;
+      saveSyncState(mergedData);
+      setStatus('Documentos sincronizados com o Gist.');
+    })();
+    try { await syncInFlight; }
+    catch (error) {
+      setStatus(error.message || 'Não foi possível sincronizar os documentos.', true);
+      throw error;
+    }
+    finally {
+      syncInFlight = null;
+      if (syncPending) { syncPending = false; void syncDocuments(); }
+    }
+  }
+
+  function scheduleSync() {
+    const settings = currentSyncSettings();
+    if (!settings.gistId || !settings.token || !settings.autoSync) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => void syncDocuments().catch(() => {}), 1400);
+  }
+
   async function persistOfficeSave(file, payload, documentRecord, automatic = false) {
     if (!file || !documentRecord) throw new Error('O OnlyOffice não retornou o arquivo editado.');
     documentRecord.dataBase64 = await storage.blobToBase64(file);
@@ -146,6 +320,7 @@
     documentRecord.updatedAt = now();
     await storage.save(documentRecord);
     await refreshDocuments();
+    scheduleSync();
     state.dirty = false;
     setStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}.` : 'Alterações salvas neste navegador.');
     setOfficeStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}` : 'Alterações salvas.');
@@ -285,7 +460,7 @@
 
   function filteredDocuments() {
     const term = state.query.trim().toLocaleLowerCase('pt-BR');
-    return state.documents.filter((documentRecord) => !term || [documentRecord.name, clientName(documentRecord.clientId), documentRecord.extension]
+    return state.documents.filter((documentRecord) => !term || [documentRecord.name, recordClientName(documentRecord), documentRecord.extension]
       .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(term)));
   }
 
@@ -317,7 +492,7 @@
       els.libraryEmpty.querySelector('p').textContent = 'Crie um documento em branco ou importe um arquivo e vincule-o a um cliente.';
     }
 
-    [...groups.entries()].sort((left, right) => clientName(left[0]).localeCompare(clientName(right[0]), 'pt-BR')).forEach(([clientId, records]) => {
+    [...groups.entries()].sort((left, right) => recordClientName(left[1][0]).localeCompare(recordClientName(right[1][0]), 'pt-BR')).forEach(([clientId, records]) => {
       const folder = document.createElement('section');
       folder.className = 'client-folder';
       folder.dataset.clientId = clientId;
@@ -330,7 +505,7 @@
         </article>`).join('');
       folder.innerHTML = `
         <header class="folder-head">
-          <div class="folder-title"><span class="folder-symbol" aria-hidden="true"></span><span><strong>${escape(clientName(clientId))}</strong><small>Documentos vinculados a este cliente</small></span></div>
+          <div class="folder-title"><span class="folder-symbol" aria-hidden="true"></span><span><strong>${escape(recordClientName(records[0]) || clientId)}</strong><small>Documentos vinculados a este cliente</small></span></div>
           <span class="folder-count">${records.length} ${records.length === 1 ? 'arquivo' : 'arquivos'}</span>
         </header>
         <div class="file-grid">${cards}</div>`;
@@ -370,7 +545,7 @@
     els.editorFormat.className = `format-icon format-${documentRecord.extension}`;
     els.editorNameTrigger.textContent = documentRecord.name;
     if (els.editorNameForm.hidden) els.editorName.value = documentRecord.name;
-    els.editorClient.textContent = `${clientName(documentRecord.clientId)} · atualizado em ${formatUpdatedAt(documentRecord.updatedAt)}`;
+    els.editorClient.textContent = `${recordClientName(documentRecord)} · atualizado em ${formatUpdatedAt(documentRecord.updatedAt)}`;
     const isCsv = documentRecord.extension === 'csv';
     els.csvEditor.hidden = !isCsv;
     els.officeEditor.hidden = isCsv;
@@ -391,6 +566,17 @@
   }
 
   async function loadData() {
+    loadSyncState();
+    const allowed = access ? await access.guard('documentos', async () => {
+      await storage.clear();
+      localStorage.removeItem(SYNC_STATE_KEY);
+      state.documents = [];
+      state.deletedDocuments = [];
+    }) : true;
+    if (!allowed) {
+      setStatus('O acesso local aos documentos sincronizados está bloqueado. Revise o Gist nas Configurações.', true);
+      return;
+    }
     try {
       const domains = await financeDataStore.load({ financeStorage });
       state.clients = (domains.clients?.records || []).filter((client) => client?.id)
@@ -402,6 +588,8 @@
       renderClients();
     }
     await refreshDocuments();
+    const syncSettings = currentSyncSettings();
+    if (syncSettings.gistId && syncSettings.token) await syncDocuments().catch(() => {});
   }
 
   function openDocumentDialog(mode) {
@@ -465,6 +653,7 @@
     officeOpenId = '';
     closeDocumentDialog();
     await refreshDocuments();
+    scheduleSync();
     setStatus(`“${record.name}” foi adicionado à pasta de ${record.clientName}.`);
     openEditor(record.id);
   }
@@ -525,6 +714,7 @@
     documentRecord.updatedAt = now();
     await storage.save(documentRecord);
     await refreshDocuments();
+    scheduleSync();
     if (state.selectedId === documentRecord.id) {
       renderEditor();
       if (documentRecord.extension !== 'csv' && officeReady && officeOpenId === documentRecord.id) {
@@ -552,6 +742,7 @@
         documentRecord.updatedAt = now();
         await storage.save(documentRecord);
         await refreshDocuments();
+        scheduleSync();
         state.dirty = false;
         setStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}.` : 'Alterações salvas neste navegador.');
         setOfficeStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}` : 'Alterações salvas.');
@@ -596,11 +787,13 @@
     const documentRecord = currentRecord();
     if (!documentRecord || !confirm(`Excluir “${documentRecord.name}” da biblioteca?`)) return;
     await storage.remove(documentRecord.id);
+    rememberDeletion(documentRecord.id);
     state.dirty = false;
     await closeEditor();
     state.selectedId = '';
     officeOpenId = '';
     await refreshDocuments();
+    scheduleSync();
     setStatus('Arquivo excluído deste navegador.');
   }
 
@@ -612,10 +805,12 @@
     const phrase = prompt('Confirmação 3 de 3: digite APAGAR para excluir toda a biblioteca.');
     if (phrase !== 'APAGAR') { setStatus('Limpeza cancelada: a confirmação final não corresponde.', true); return; }
     await storage.clear();
+    state.documents.forEach((record) => rememberDeletion(record.id));
     state.documents = [];
     state.selectedId = '';
     officeOpenId = '';
     renderLibrary();
+    scheduleSync();
     setStatus('Biblioteca apagada deste navegador.');
   }
 

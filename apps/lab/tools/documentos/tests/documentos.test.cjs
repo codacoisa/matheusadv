@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const storage = require('../assets/storage.js');
+const documentFiles = require('../assets/files.js');
 
 const root = path.resolve(__dirname, '../../../../..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -38,6 +39,21 @@ test('Documentos codifica arquivos em Base64 sem manter binários estruturados',
   const normalized = storage.normalize({ id: 'doc', dataBase64: base64, originalDataBase64: base64 });
   assert.equal(normalized.file, undefined);
   assert.equal(normalized.originalFile, undefined);
+});
+
+test('Documentos separa índice e payloads Base64 para o Gist', () => {
+  const encoded = documentFiles.toBase64(new Uint8Array([1, 2, 3]));
+  const data = documentFiles.normalizeData({
+    documents: [{ id: 'doc-1', clientId: 'client-1', name: 'Petição', extension: 'docx', sha256: 'hash' }],
+    deletedDocuments: [{ id: 'doc-old', deletedAt: '2026-01-01T00:00:00.000Z' }]
+  });
+  assert.equal(encoded, 'AQID');
+  assert.equal(documentFiles.INDEX_FILE, 'lab-documentos.json');
+  assert.equal(documentFiles.payloadFileName('doc-1'), 'officejur-documento-doc-1.b64');
+  assert.equal(documentFiles.originalPayloadFileName('doc-1'), 'officejur-documento-doc-1-original.b64');
+  assert.equal(data.documents[0].clientId, 'client-1');
+  assert.equal(data.deletedDocuments[0].id, 'doc-old');
+  assert.match(documentFiles.signature(data), /doc-1/);
 });
 
 test('Documentos oferece o modelo institucional definido pela implantação', () => {

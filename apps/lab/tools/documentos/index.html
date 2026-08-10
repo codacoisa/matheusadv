@@ -18,6 +18,10 @@
     <script src="../../financeiro/assets/storage.js?v=1" defer></script>
     <script src="../../financeiro/assets/data-store.js?v=1" defer></script>
     <script src="./assets/storage.js?v=2" defer></script>
+    <script src="./assets/files.js?v=1" defer></script>
+    <script src="./assets/gist-settings.js?v=1" defer></script>
+    <script src="./assets/gist-client.js?v=1" defer></script>
+    <script src="./assets/gist-access-lease.js?v=1" defer></script>
     <script src="./assets/office-templates.js?v=1" defer></script>
     <script src="./assets/app.js?v=4" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
@@ -31,7 +35,6 @@
         <span><strong>Documentos</strong><small data-officejur-field="office.shortName">Escritório</small></span>
       </a>
       <div class="top-actions">
-        <span class="lab-tag">Protótipo</span>
         <office-app-switcher current="lab"></office-app-switcher>
       </div>
     </header>
@@ -73,7 +76,7 @@
         <div id="client-folders" class="client-folders"></div>
 
         <footer class="library-footer">
-          <p>Os arquivos ficam codificados em Base64 no armazenamento deste navegador.</p>
+          <p>Os arquivos ficam em Base64 neste navegador e podem ser sincronizados pelo Gist do OfficeJur.</p>
           <button id="clear-library" class="danger-link" type="button" disabled>Limpar biblioteca</button>
         </footer>
       </section>

@@ -99,9 +99,39 @@
       opacity: 0.92;
     }
 
+    .hero-focus {
+      display: grid;
+      gap: 4px;
+      margin-top: 22px;
+      padding: 13px 15px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 12px;
+      background: rgba(255,255,255,.08);
+    }
+
+    .hero-focus-label {
+      color: #d9bd7a;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .hero-focus strong {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
     .config-grid {
       display: grid;
       gap: 14px;
+    }
+
+    .config-grid::before {
+      content: "O mesmo Gist é usado pelos módulos participantes do OfficeJur.";
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
     }
 
     .field-row {
@@ -253,6 +283,43 @@
     .stat-ok .stat-value {
       color: var(--ok);
     }
+
+    .work-queue {
+      display: grid;
+      grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 18px;
+      padding: 20px 22px;
+      background: linear-gradient(115deg, #fff 0%, #f8faf9 100%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .work-queue h2 { margin: 0; font-size: 21px; }
+    .queue-copy { max-width: 44ch; margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .focus-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .focus-action {
+      display: grid;
+      gap: 2px;
+      min-height: 96px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--text);
+      text-align: left;
+      background: #fff;
+    }
+    .focus-action strong { font-size: 28px; line-height: 1; }
+    .focus-action span { font-weight: 800; }
+    .focus-action small { color: var(--muted); font-size: 11px; }
+    .focus-action.focus-danger { background: var(--danger-soft); border-color: rgba(180, 35, 24, .16); }
+    .focus-action.focus-danger strong { color: var(--danger); }
+    .focus-action.focus-warn { background: var(--warn-soft); border-color: rgba(154, 103, 0, .16); }
+    .focus-action.focus-warn strong { color: var(--warn); }
+    .focus-action.focus-ok { background: var(--ok-soft); border-color: rgba(12, 122, 67, .16); }
+    .focus-action.focus-ok strong { color: var(--ok); }
 
     .panel {
       padding: 18px;
@@ -495,7 +562,8 @@
       .meta-grid,
       .toolbar,
       .field-row,
-      .process-grid {
+      .process-grid,
+      .work-queue {
         grid-template-columns: 1fr;
       }
     }
@@ -676,6 +744,8 @@
       }
 
       .top-actions { width: 100%; }
+
+      .focus-actions { grid-template-columns: 1fr; }
 
       .shell {
         width: min(100% - 24px, var(--max));

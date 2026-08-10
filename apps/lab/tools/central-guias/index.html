@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="./assets/styles.css?v=1">
   <link rel="stylesheet" href="./assets/site-header.css?v=1">
   <script src="./assets/app-switcher.js?v=5" defer></script>
+  <script src="./assets/gist-settings.js?v=1" defer></script>
   <script src="./assets/gist-client.js?v=2" defer></script>
   <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
   <script src="./assets/site-footer.js?v=5" defer></script>
@@ -46,20 +47,24 @@
           <span id="backup-meta-exported" class="backup-meta-pill"><i class="fa-regular fa-clock" aria-hidden="true"></i> Sem data</span>
           <span id="backup-meta-signature" class="backup-meta-pill"><i class="fa-solid fa-fingerprint" aria-hidden="true"></i> Sem assinatura</span>
         </div>
+        <div class="hero-focus">
+          <span class="hero-focus-label">Próxima ação</span>
+          <strong id="attention-summary">Configure o Gist para começar.</strong>
+        </div>
       </article>
       <article class="hero-card">
         <div class="config-grid">
           <div>
-            <p class="eyebrow eyebrow--muted">Origem dos dados</p>
+            <p class="eyebrow eyebrow--muted">Sincronização OfficeJur</p>
             <div class="field-row">
               <div class="field">
-                <label for="gist-id">ID ou endereço do Gist público</label>
+                <label for="gist-id">ID ou endereço do Gist</label>
                 <input id="gist-id" type="text" autocomplete="off" placeholder="Cole o ID ou o endereço compartilhado">
               </div>
             </div>
           </div>
           <div class="actions">
-            <button id="load-button" class="btn-primary" type="button">Carregar backup</button>
+            <button id="load-button" class="btn-primary" type="button">Sincronizar agora</button>
             <button id="reset-button" class="btn-secondary" type="button">Limpar configuração</button>
           </div>
           <div id="load-status" class="status-line" aria-live="polite"></div>
@@ -68,6 +73,15 @@
     </section>
 
     <section id="stats-grid" class="meta-grid"></section>
+
+    <section class="work-queue" aria-labelledby="work-queue-title">
+      <div>
+        <p class="eyebrow eyebrow--muted">Fila de trabalho</p>
+        <h2 id="work-queue-title">O que merece sua atenção agora</h2>
+        <p class="queue-copy">A Central organiza as próximas ações a partir dos vencimentos e da atualização dos processos.</p>
+      </div>
+      <div id="focus-actions" class="focus-actions"></div>
+    </section>
 
     <nav id="view-nav" class="view-nav" aria-label="Seções da central">
       <button type="button" class="view-tab active" data-view="critical">Guias críticas</button>

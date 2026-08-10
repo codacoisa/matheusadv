@@ -1,5 +1,4 @@
     const DEFAULT_FILE_NAME = 'projudi-central-guias.json';
-    const STORAGE_KEY = 'central-guias::config';
     const ALERT_BUSINESS_DAYS = 7;
     const WEEK_DAYS = 7;
     const STALE_SYNC_DAYS = 10;
@@ -26,6 +25,8 @@
       loadButton: document.getElementById('load-button'),
       resetButton: document.getElementById('reset-button'),
       loadStatus: document.getElementById('load-status'),
+      attentionSummary: document.getElementById('attention-summary'),
+      focusActions: document.getElementById('focus-actions'),
       statsGrid: document.getElementById('stats-grid'),
       viewNav: document.getElementById('view-nav'),
       criticalPanel: document.getElementById('critical-panel'),
@@ -48,12 +49,11 @@
 
     function init() {
       hydrateConfig();
-      persistConfig();
       bindEvents();
       syncInputs();
       render();
       if (state.gistId) loadBackup();
-      else setStatus('Informe o ID ou endereço de um Gist público para carregar o backup.');
+      else setStatus('Informe o ID ou endereço do Gist para acompanhar as guias.');
     }
 
     function bindEvents() {
@@ -72,7 +72,7 @@
         persistConfig();
         syncInputs();
         render();
-        setStatus('Configuração removida deste navegador.');
+        setStatus('Gist removido da sincronização deste navegador.');
       });
 
       nodes.searchInput.addEventListener('input', (event) => {
@@ -110,6 +110,16 @@
         render();
       });
 
+      nodes.focusActions.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-status]');
+        if (!button) return;
+        state.activeView = 'critical';
+        state.filters.status = button.dataset.status;
+        nodes.statusFilter.value = state.filters.status;
+        render();
+        nodes.criticalPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
       nodes.criticalTableContainer.addEventListener('click', async (event) => {
         const button = event.target.closest('button[data-copy]');
         if (!button) return;
@@ -145,7 +155,7 @@
 
     function hydrateConfig() {
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        const saved = window.OfficeJurGistSettings?.load?.() || {};
         const gistIdFromUrl = new URLSearchParams(location.search).get('gist');
         state.gistId = String(gistIdFromUrl || saved.gistId || '').trim();
       } catch (_) {
@@ -154,13 +164,8 @@
     }
 
     function persistConfig() {
-      if (!state.gistId) {
-        localStorage.removeItem(STORAGE_KEY);
-        return;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        gistId: state.gistId
-      }));
+      const current = window.OfficeJurGistSettings?.load?.() || {};
+      window.OfficeJurGistSettings?.save?.({ ...current, gistId: state.gistId });
     }
 
     function syncInputs() {
@@ -180,9 +185,10 @@
       setStatus('Carregando backup...');
 
       try {
+        const settings = window.OfficeJurGistSettings?.load?.() || {};
         const gistClient = window.OfficeJurGistClient;
         if (!gistClient) throw new Error('Cliente compartilhado do Gist indisponível.');
-        const gist = await gistClient.gist(gistId, '');
+        const gist = await gistClient.gist(gistId, settings.token || '');
         const gistFiles = gist && gist.files ? Object.values(gist.files) : [];
         const selectedFile = gist?.files?.[DEFAULT_FILE_NAME]
           || gistFiles.find((file) => String(file?.filename || '').toLowerCase().endsWith('.json'));
@@ -207,7 +213,7 @@
         render();
 
         const exportedAt = payload && payload.exportedAt ? formatDateTime(payload.exportedAt) : 'data não informada';
-        setStatus(`Backup carregado com sucesso. Exportado em ${exportedAt}.`);
+        setStatus(`Sincronizado com sucesso. Exportado em ${exportedAt}.`);
       } catch (error) {
         state.payload = null;
         state.db = null;
@@ -222,7 +228,7 @@
 
     function setLoading(loading) {
       nodes.loadButton.disabled = loading;
-      nodes.loadButton.textContent = loading ? 'Carregando...' : 'Carregar backup';
+      nodes.loadButton.textContent = loading ? 'Sincronizando...' : 'Sincronizar agora';
     }
 
     function getBackupInfo(payload) {
@@ -586,8 +592,12 @@
       renderViewNav();
 
       if (!state.db) {
+        nodes.attentionSummary.textContent = state.gistId
+          ? 'Sincronize o Gist para atualizar as pendências.'
+          : 'Configure o Gist para começar.';
         renderBackupMeta(null);
         renderStatsEmpty();
+        renderFocusActions(null);
         nodes.criticalTableContainer.innerHTML = '<div class="empty">Nenhum backup carregado.</div>';
         nodes.processGrid.innerHTML = '<div class="empty">Os processos monitorados aparecerão aqui após a leitura do backup.</div>';
         return;
@@ -597,6 +607,8 @@
       const stats = computeGlobalStats(state.db, state.rows);
       renderBackupMeta(stats);
       renderStats(stats);
+      renderAttention(stats);
+      renderFocusActions(stats);
       renderCriticalTable(filteredRows, stats);
       renderProcesses(stats.processSummaries);
     }
@@ -673,6 +685,31 @@
         statCard(String(stats.overdue), 'Guias vencidas', 'Precisam de atenção imediata.', 'danger'),
         statCard(String(stats.dueSoon), 'Vencendo em breve', 'Hoje e próximos dias úteis.', 'warn')
       ].join('');
+    }
+
+    function renderAttention(stats) {
+      if (stats.overdue) {
+        nodes.attentionSummary.textContent = `Comece pelas ${stats.overdue} guia(s) vencida(s): elas exigem atenção imediata.`;
+      } else if (stats.dueSoon) {
+        nodes.attentionSummary.textContent = `Revise as ${stats.dueSoon} guia(s) que vencem hoje ou nos próximos dias úteis.`;
+      } else if (stats.stale) {
+        nodes.attentionSummary.textContent = `${stats.stale} processo(s) estão sem sincronização recente.`;
+      } else {
+        nodes.attentionSummary.textContent = 'Nenhuma pendência imediata. Continue acompanhando os próximos vencimentos.';
+      }
+    }
+
+    function renderFocusActions(stats) {
+      const actions = stats ? [
+        { status: 'overdue', value: stats.overdue, label: 'Vencidas', help: 'Resolver primeiro', tone: 'danger' },
+        { status: 'due_soon', value: stats.dueSoon, label: 'Próximas', help: 'Hoje e dias úteis', tone: 'warn' },
+        { status: 'open', value: stats.open, label: 'Em aberto', help: 'Planejar acompanhamento', tone: 'ok' }
+      ] : [
+        { status: 'critical', value: 0, label: 'Vencimentos', help: 'Aguardando sincronização', tone: '' },
+        { status: 'open', value: 0, label: 'Em aberto', help: 'Aguardando sincronização', tone: '' },
+        { status: 'paid', value: 0, label: 'Pagas', help: 'Aguardando sincronização', tone: '' }
+      ];
+      nodes.focusActions.innerHTML = actions.map((item) => `<button type="button" class="focus-action ${item.tone ? `focus-${item.tone}` : ''}" data-status="${item.status}"><strong>${item.value}</strong><span>${item.label}</span><small>${item.help}</small></button>`).join('');
     }
 
     function renderCriticalTable(rows, stats) {

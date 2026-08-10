@@ -17,6 +17,7 @@
     "officejur::calculos-juridicos::data",
     "officejur::calculos-juridicos::sync-state",
     "officejur::financeiro::sync-state",
+    "officejur::documentos::sync-state",
     "officejur::controle-pagamentos::data",
     "officejur::controle-pagamentos::sync-state",
     "officejur-gist-settings",
@@ -28,6 +29,7 @@
   const PROTECTED_DATABASES = Object.freeze([
     "officejur-financeiro",
     "officejur-financeiro-documentos",
+    "officejur-documentos-lab",
   ]);
   const HANDOFF_PREFIX = "officejur::documentos::handoff:";
   const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || min));
