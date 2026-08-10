@@ -21,11 +21,12 @@ O protótipo agora possui um contrato local e um primeiro engine WASM instalado:
 - `assets/office-engine.worker.js` isola o processamento do thread da interface;
 - `assets/engine.js` carrega o worker sob demanda e expõe `probe()` e `inspect()`;
 - `assets/engine/office-oxide-adapter.js` adapta `office-oxide-wasm` para leitura de texto, Markdown e HTML;
+- `fflate@0.8.3` permite regravar a cópia ZIP OOXML sem alterar o original;
 - o original importado é preservado em `originalFile`, enquanto `file` representa a versão corrente.
 
-O pacote `office-oxide-wasm@0.1.8` é copiado durante o build para os assets do Lab. O runtime web tem aproximadamente 14 KB e o WASM 1,05 MB; o manifest fixa SHA-256 dos dois arquivos. A API pública desta versão lê e converte o conteúdo, mas não fornece ainda um editor visual nem uma operação de regravação binária.
+O pacote `office-oxide-wasm@0.1.8` é copiado durante o build para os assets do Lab. O runtime web tem aproximadamente 14 KB e o WASM 1,05 MB; o manifest fixa SHA-256 dos assets. A API pública desta versão lê e converte o conteúdo; a regravação experimental é feita separadamente sobre o ZIP OOXML por `fflate`.
 
-O aceite desta etapa é a leitura local de um DOCX, seguida de XLSX e PPTX. Isso valida o transporte de `Blob`, o worker, o carregamento no GitHub Pages e a preservação do original. A próxima decisão será entre implementar edições estruturais sobre uma IR ou adicionar uma camada de editor visual.
+A edição atual substitui somente a primeira ocorrência de texto em `word/document.xml`, na primeira planilha `xl/worksheets/*.xml` ou no primeiro slide `ppt/slides/*.xml`. Ela não promete fidelidade de layout, não edita imagens, tabelas ou estilos e deve ser tratada como ferramenta experimental. A próxima decisão continua sendo entre ampliar esse writer estrutural ou adicionar uma camada de editor visual.
 
 ## Referências avaliadas
 

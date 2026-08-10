@@ -28,6 +28,9 @@
     engineStatus: $('#engine-status'),
     enginePreview: $('#engine-preview'),
     enginePreviewText: $('#engine-preview-text'),
+    engineSearch: $('#engine-search'),
+    engineReplacement: $('#engine-replacement'),
+    engineReplace: $('#engine-replace'),
     dialog: $('#document-dialog'),
     form: $('#document-form'),
     clientSelect: $('#client-select'),
@@ -153,6 +156,7 @@
     els.csvEditor.hidden = !isCsv;
     els.officeEditor.hidden = isCsv;
     els.engineInspect.disabled = isCsv || !documentRecord.file;
+    els.engineReplace.disabled = isCsv || !documentRecord.file;
     els.enginePreview.hidden = true;
     els.enginePreviewText.textContent = '';
     if (isCsv) {
@@ -270,6 +274,34 @@
     }
   }
 
+  async function replaceTextWithEngine() {
+    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
+    const search = els.engineSearch.value;
+    const replacement = els.engineReplacement.value;
+    if (!documentRecord?.file || documentRecord.extension === 'csv') return;
+    if (!search) { setStatus('Informe o texto atual antes de substituir.', true); els.engineSearch.focus(); return; }
+    const client = getEngineClient();
+    if (!client) { setEngineStatus('Web Worker indisponível neste navegador', true); return; }
+    els.engineReplace.disabled = true;
+    setEngineStatus('Regravando cópia local…');
+    try {
+      const result = await client.replaceText({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType, search, replacement });
+      documentRecord.file = result.blob;
+      documentRecord.engine = { status: 'text-replaced', at: now(), path: result.path, count: result.count };
+      documentRecord.updatedAt = now();
+      await storage.save(documentRecord);
+      state.documents = await storage.list();
+      render();
+      setStatus(`${result.count} ocorrência substituída localmente; o original foi preservado.`);
+      setEngineStatus('Cópia editada localmente');
+    } catch (error) {
+      setEngineStatus(error.message, true);
+      setStatus('A edição estrutural não foi aplicada.', true);
+    } finally {
+      els.engineReplace.disabled = !documentRecord.file;
+    }
+  }
+
   async function downloadCurrent() {
     const documentRecord = state.documents.find((item) => item.id === state.selectedId);
     if (!documentRecord) return;
@@ -303,6 +335,7 @@
   $('#save-document').addEventListener('click', () => void saveCurrent());
   $('#download-document').addEventListener('click', () => void downloadCurrent());
   els.engineInspect.addEventListener('click', () => void inspectWithEngine());
+  els.engineReplace.addEventListener('click', () => void replaceTextWithEngine());
   $('#editor-view').addEventListener('contextmenu', (event) => { if (event.target.closest('#editor-title')) event.preventDefault(); });
   $('#editor-view').addEventListener('dblclick', (event) => { if (event.target.closest('#editor-title')) void removeCurrent(); });
   els.file.addEventListener('change', () => { const file = els.file.files?.[0]; if (file) { els.type.value = extension(file.name); if (!els.name.value) els.name.value = baseName(file.name); } });

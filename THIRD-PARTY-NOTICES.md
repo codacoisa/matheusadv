@@ -10,6 +10,7 @@ O OfficeJur utiliza os projetos de código aberto abaixo. As versões são fixad
 | Projeto | Versão | Uso no OfficeJur | Licença e origem |
 | --- | --- | --- | --- |
 | [office-oxide-wasm](https://github.com/yfedoseev/office_oxide) | 0.1.8 | Leitura local de DOCX, XLSX e PPTX no protótipo Documentos | MIT OR Apache-2.0 — runtime e textos de licença copiados para os assets publicados |
+| [fflate](https://github.com/101arrowz/fflate) | 0.8.3 | Descompactação e regravação local das cópias OOXML | MIT — runtime e texto de licença copiados para os assets publicados |
 | [jsPDF](https://github.com/parallax/jsPDF) | 4.2.1 | Geração local dos PDFs dos módulos de documentos | MIT — [licença preservada](vendor-licenses/jspdf.txt) |
 | [PDF.js](https://github.com/mozilla/pdf.js) | 6.2.108 | Leitura e análise local de PDFs no Validador Projudi | Apache-2.0 |
 | [PKI.js](https://github.com/PeculiarVentures/PKI.js) | 3.4.0 | Leitura e validação das assinaturas P7S | BSD-3-Clause |

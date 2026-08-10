@@ -46,6 +46,17 @@
     });
   }
 
+  async function replaceText(data) {
+    if (!adapter) throw new Error('O engine WASM ainda não foi instalado neste build.');
+    if (typeof adapter.replaceText !== 'function') throw new Error('O adaptador não implementa replaceText().');
+    return adapter.replaceText({
+      bytes: new Uint8Array(data.bytes),
+      extension: data.extension,
+      search: data.search,
+      replacement: data.replacement,
+    });
+  }
+
   self.onmessage = (event) => {
     const { id, type, data = {} } = event.data || {};
     if (!id) return;
@@ -53,6 +64,7 @@
       .then(() => {
         if (type === 'initialize') return initialize(data);
         if (type === 'inspect') return inspect(data);
+        if (type === 'replace-text') return replaceText(data);
         throw new Error(`Operação do engine desconhecida: ${type}.`);
       })
       .then((result) => {

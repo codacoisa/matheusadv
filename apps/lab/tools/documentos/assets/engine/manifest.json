@@ -12,6 +12,7 @@
   "formats": ["docx", "xlsx", "pptx"],
   "assets": {
     "runtime": { "path": "./office-oxide/office_oxide.js", "bytes": 14492, "sha256": "3c5c08c993ecf22e92c9fc4091a6c8fef5f2d59883218210d783ef903635136d" },
-    "wasm": { "path": "./office-oxide/office_oxide_bg.wasm", "bytes": 1047437, "sha256": "d5f6dc626f1fdff85f9b3a53dfbca1773d27678540030c227985716bd3939030" }
+    "wasm": { "path": "./office-oxide/office_oxide_bg.wasm", "bytes": 1047437, "sha256": "d5f6dc626f1fdff85f9b3a53dfbca1773d27678540030c227985716bd3939030" },
+    "zipRuntime": { "engine": "fflate", "version": "0.8.3", "path": "./fflate.js", "bytes": 90922, "sha256": "b7ca4450b19559a1d50eb381adcee94b82449674be4cd17789d9beba7e6122a1", "license": "MIT" }
   }
 }

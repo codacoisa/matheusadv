@@ -28,7 +28,11 @@ class FakeWorker {
         });
         return;
       }
-      this.emit('message', { data: { id: message.id, ok: true, result: { format: 'docx', plainText: 'fixture', markdown: 'fixture', html: '<p>fixture</p>' } } });
+      if (message.type === 'inspect') {
+        this.emit('message', { data: { id: message.id, ok: true, result: { format: 'docx', plainText: 'fixture', markdown: 'fixture', html: '<p>fixture</p>' } } });
+        return;
+      }
+      this.emit('message', { data: { id: message.id, ok: true, result: { bytes: new Uint8Array([80, 75, 3, 4]).buffer, path: 'word/document.xml', count: 1 } } });
     });
   }
 
@@ -51,6 +55,9 @@ test('o cliente carrega o manifest uma vez e expõe o engine disponível', async
   assert.equal(first.manifest.engine, 'office-oxide-wasm');
   const result = await client.inspect({ file: new Blob(['fixture']), extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   assert.equal(result.plainText, 'fixture');
+  const edited = await client.replaceText({ file: new Blob(['fixture']), extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', search: 'fixture', replacement: 'editado' });
+  assert.equal(edited.count, 1);
+  assert.equal(edited.path, 'word/document.xml');
   client.close();
 });
 

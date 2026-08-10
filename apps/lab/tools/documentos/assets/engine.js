@@ -71,7 +71,20 @@
       return request('inspect', { bytes, extension, mimeType }, [bytes]);
     }
 
-    return { close, inspect, probe };
+    async function replaceText({ file, extension, mimeType, search, replacement }) {
+      if (!(file instanceof Blob)) throw new DocumentEngineError('A edição exige um arquivo local.', 'INVALID_FILE');
+      const state = await probe();
+      if (!state.available) throw new DocumentEngineError(state.reason || 'Engine WASM indisponível.', 'ENGINE_UNAVAILABLE');
+      const bytes = await file.arrayBuffer();
+      const result = await request('replace-text', { bytes, extension, search, replacement }, [bytes]);
+      return {
+        blob: new Blob([result.bytes], { type: mimeType || file.type || 'application/octet-stream' }),
+        path: result.path,
+        count: result.count,
+      };
+    }
+
+    return { close, inspect, probe, replaceText };
   }
 
   root.OfficeJurDocumentEngine = { DocumentEngineError, create, DEFAULT_MANIFEST_URL };

@@ -379,6 +379,12 @@ test('Documentos preserva o binário Office e carrega o engine WASM local', asyn
   await page.locator('#engine-inspect').click();
   await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur WASM');
   await expect(page.getByText('Conteúdo DOCX lido localmente; o original foi preservado.')).toBeVisible();
+  await page.locator('#engine-search').fill('OfficeJur WASM');
+  await page.locator('#engine-replacement').fill('OfficeJur editado');
+  await page.locator('#engine-replace').click();
+  await expect(page.getByText('1 ocorrência substituída localmente; o original foi preservado.')).toBeVisible();
+  await page.locator('#engine-inspect').click();
+  await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur editado');
 });
 
 test('Documentos inspeciona XLSX e PPTX com o mesmo engine local', async ({ page }) => {

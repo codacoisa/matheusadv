@@ -104,7 +104,19 @@
               <div class="preview-head"><strong>Texto extraído localmente</strong><span>O binário original não foi alterado</span></div>
               <pre id="engine-preview-text"></pre>
             </div>
-            <p class="engine-note"><strong>Processamento Office local em avaliação.</strong> Esta etapa lê DOCX, XLSX e PPTX no navegador e oferece uma prévia textual. A edição visual e a regravação do binário exigem uma camada adicional.</p>
+            <div class="engine-edit">
+              <p class="engine-edit-copy"><strong>Edição estrutural experimental.</strong> Substitui a primeira ocorrência de texto no XML do arquivo e salva uma nova cópia local. Formatação visual e edição de layout não fazem parte desta etapa.</p>
+              <div class="form-grid">
+                <label for="engine-search">Texto atual
+                  <input id="engine-search" type="text" autocomplete="off">
+                </label>
+                <label for="engine-replacement">Novo texto
+                  <input id="engine-replacement" type="text" autocomplete="off">
+                </label>
+              </div>
+              <button id="engine-replace" class="button secondary" type="button">Substituir e salvar cópia</button>
+            </div>
+            <p class="engine-note"><strong>Processamento Office local em avaliação.</strong> O original permanece preservado no IndexedDB; a cópia editada é baixada pelo botão existente. A edição visual completa continua sendo uma etapa separada.</p>
           </div>
         </section>
       </section>
