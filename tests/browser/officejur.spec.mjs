@@ -366,6 +366,39 @@ test('Documentos começa vazio e exige vínculo com cliente', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Criar documento' })).toBeDisabled();
 });
 
+test('Documentos cria DOCX com o modelo institucional da implantação', async ({ page }) => {
+  await prepareCalculationPage(page, 'lab/documentos/');
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await page.locator('#client-select').selectOption('client-test');
+  await page.locator('#document-name').fill('Petição com timbre');
+  await expect(page.locator('#institutional-template-field')).toBeVisible();
+  await expect(page.locator('#institutional-template')).not.toBeChecked();
+  await expect(page.locator('#institutional-template-detail')).toContainText('Gregório & Morais');
+  await page.locator('#document-type').selectOption('xlsx');
+  await expect(page.locator('#institutional-template-field')).toBeHidden();
+  await page.locator('#document-type').selectOption('docx');
+  await expect(page.locator('#institutional-template-field')).toBeVisible();
+  await page.locator('#institutional-template').check();
+  await page.getByRole('button', { name: 'Criar documento' }).click();
+
+  await expect.poll(() => page.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('officejur-documentos-lab', 3);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const records = await new Promise((resolve, reject) => {
+      const request = database.transaction('documents', 'readonly').objectStore('documents').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    const configured = window.OFFICEJUR_CONFIG.documents.institutionalDocxTemplate;
+    const template = (await (await fetch(configured.base64Url)).text()).replace(/\s+/g, '');
+    return records[0]?.source === 'institutional-template' && records[0]?.dataBase64 === template;
+  })).toBe(true);
+});
+
 test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();

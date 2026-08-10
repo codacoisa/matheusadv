@@ -9,6 +9,8 @@ upload automático ou integração com servidor.
 - vínculo obrigatório com um cliente lido do Financeiro do OfficeJur;
 - importação de DOCX, XLSX, PPTX e CSV com formato detectado pelo arquivo;
 - criação de arquivos Office vazios no navegador;
+- criação opcional de DOCX a partir do modelo institucional definido internamente
+  em `config/office.js`;
 - biblioteca organizada em pastas por cliente;
 - edição de DOCX, XLSX e PPTX com o OnlyOffice em modal de 90% da tela e
   catálogo oficial completo em português brasileiro (`pt-BR`);
@@ -54,6 +56,16 @@ O armazenamento usa `dataBase64` para a versão corrente e
 `originalDataBase64` para a versão originalmente importada. Registros antigos
 com `Blob` ou `File` são migrados para Base64 na primeira leitura após a
 atualização. Nenhum binário estruturado permanece gravado no IndexedDB.
+
+## Modelo institucional
+
+O modelo DOCX é uma configuração da implantação, não uma preferência alterável
+pela interface. O arquivo fica versionado como texto Base64 em
+`config/document-templates/modelo-institucional.docx.base64`; os metadados, a
+ativação e o hash SHA-256 ficam em `config/office.js`. O build publica esse
+recurso junto da configuração institucional. Ao marcar **Usar modelo do
+escritório**, o Documentos valida a integridade do modelo e cria uma cópia no
+IndexedDB, sem modificar o arquivo-base.
 
 ## Licenciamento
 

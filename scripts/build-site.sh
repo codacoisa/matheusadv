@@ -28,6 +28,7 @@ cp "$ROOT_DIR/apps/portal/index.html" "$SITE_DIR/index.html"
 cp -R "$ROOT_DIR/packages/ui/assets/." "$SITE_DIR/assets/"
 cp -R "$ROOT_DIR/apps/portal/assets/." "$SITE_DIR/assets/"
 cp "$ROOT_DIR/config/office.js" "$SITE_DIR/assets/office-config.js"
+cp -R "$ROOT_DIR/config/document-templates" "$SITE_DIR/assets/document-templates"
 cp "$ROOT_DIR/packages/ui/office-context.js" "$SITE_DIR/assets/office-context.js"
 cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/assets/fontawesome-7.3.0.min.js"
 

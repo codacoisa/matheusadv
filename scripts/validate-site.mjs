@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 
@@ -316,6 +317,20 @@ for (const asset of institutionalAssets) {
     console.error(`Asset institucional compartilhado ausente: ${asset}.`);
     process.exit(1);
   }
+}
+
+const documentTemplatePath = "config/document-templates/modelo-institucional.docx.base64";
+const publishedDocumentTemplatePath = join(root, "assets/document-templates/modelo-institucional.docx.base64");
+if (!existsSync(documentTemplatePath) || !existsSync(publishedDocumentTemplatePath)) {
+  console.error("Modelo institucional DOCX ausente na configuração ou no site publicado.");
+  process.exit(1);
+}
+const configuredTemplateHash = officeConfigSource.match(/institutionalDocxTemplate[\s\S]*?sha256:\s*["']([a-f0-9]{64})["']/i)?.[1];
+const documentTemplateBytes = Buffer.from(readFileSync(documentTemplatePath, "utf8").replace(/\s+/g, ""), "base64");
+const documentTemplateHash = createHash("sha256").update(documentTemplateBytes).digest("hex");
+if (documentTemplateBytes[0] !== 0x50 || documentTemplateBytes[1] !== 0x4b || configuredTemplateHash !== documentTemplateHash) {
+  console.error("O modelo institucional DOCX ou seu hash em config/office.js é inválido.");
+  process.exit(1);
 }
 
 const duplicatedInstitutionalSources = [];

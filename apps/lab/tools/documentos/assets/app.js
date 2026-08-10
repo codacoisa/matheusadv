@@ -5,6 +5,7 @@
   const templates = window.OfficeJurDocumentTemplates;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
+  const institutionalTemplateConfig = window.OFFICEJUR_CONFIG?.documents?.institutionalDocxTemplate || null;
   const $ = (selector) => document.querySelector(selector);
   const AUTO_SAVE_INTERVAL = 10000;
   const AUTO_SAVE_KEY = 'officejur.documentos.autosave';
@@ -28,6 +29,8 @@
     dialog: $('#document-dialog'), form: $('#document-form'), dialogEyebrow: $('#dialog-eyebrow'), dialogTitle: $('#dialog-title'),
     dialogCopy: $('#dialog-copy'), clientSelect: $('#client-select'), clientEmpty: $('#client-empty'), name: $('#document-name'),
     type: $('#document-type'), createFormatField: $('#create-format-field'), importFileField: $('#import-file-field'),
+    institutionalTemplateField: $('#institutional-template-field'), institutionalTemplate: $('#institutional-template'),
+    institutionalTemplateDetail: $('#institutional-template-detail'),
     file: $('#document-file'), filePickerTitle: $('#file-picker-title'), confirm: $('#confirm-document'),
   };
 
@@ -224,6 +227,42 @@
     els.confirm.disabled = missingClient || missingImport;
   }
 
+  function configuredInstitutionalTemplate() {
+    return institutionalTemplateConfig?.enabled && institutionalTemplateConfig?.base64Url
+      ? institutionalTemplateConfig
+      : null;
+  }
+
+  function renderInstitutionalTemplateChoice() {
+    const template = configuredInstitutionalTemplate();
+    const visible = state.dialogMode === 'create' && els.type.value === 'docx' && Boolean(template);
+    els.institutionalTemplateField.hidden = !visible;
+    els.institutionalTemplate.disabled = !visible;
+    els.institutionalTemplateDetail.textContent = template?.label || '';
+  }
+
+  async function sha256(bytes) {
+    if (!globalThis.crypto?.subtle) return '';
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function loadInstitutionalTemplate() {
+    const template = configuredInstitutionalTemplate();
+    if (!template) throw new Error('O modelo institucional não está configurado nesta implantação.');
+    const response = await fetch(template.base64Url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`O modelo institucional não foi publicado (${response.status}).`);
+    const dataBase64 = (await response.text()).replace(/\s+/g, '');
+    const bytes = storage.base64ToBytes(dataBase64);
+    if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error('O modelo institucional publicado não é um DOCX válido.');
+    if (template.sha256) {
+      const actualHash = await sha256(bytes);
+      if (actualHash && actualHash !== String(template.sha256).toLowerCase())
+        throw new Error('A integridade do modelo institucional não pôde ser confirmada.');
+    }
+    return dataBase64;
+  }
+
   function renderClients() {
     const previous = els.clientSelect.value;
     els.clientSelect.replaceChildren();
@@ -369,6 +408,7 @@
     els.confirm.textContent = mode === 'import' ? 'Importar arquivo' : 'Criar documento';
     els.filePickerTitle.textContent = 'Escolher arquivo';
     renderClients();
+    renderInstitutionalTemplateChoice();
     els.dialog.showModal();
     if (state.clients.length) els.clientSelect.focus();
   }
@@ -394,6 +434,9 @@
       if (selectedExtension === 'csv') content = await file.text();
     } else if (selectedExtension === 'csv') {
       dataBase64 = storage.textToBase64('');
+    } else if (selectedExtension === 'docx' && els.institutionalTemplate.checked) {
+      try { dataBase64 = await loadInstitutionalTemplate(); }
+      catch (error) { setStatus(`Não foi possível usar o modelo do escritório: ${error.message}`, true); return; }
     } else {
       if (!templates?.createBlank) { setStatus('Os modelos Office não estão disponíveis neste build.', true); return; }
       try { dataBase64 = storage.bytesToBase64(new Uint8Array(await templates.createBlank(selectedExtension))); }
@@ -402,7 +445,8 @@
 
     const record = {
       id: id(), clientId, clientName: clientName(clientId), name: documentName, extension: selectedExtension,
-      mimeType: file?.type || mimeTypes[selectedExtension], source: file ? 'imported' : 'created',
+      mimeType: file?.type || mimeTypes[selectedExtension],
+      source: file ? 'imported' : (selectedExtension === 'docx' && els.institutionalTemplate.checked ? 'institutional-template' : 'created'),
       fileName: `${documentName}.${selectedExtension}`, content, createdAt: timestamp, updatedAt: timestamp,
       dataBase64, originalDataBase64: dataBase64,
     };
@@ -602,6 +646,7 @@
     if (file && !els.name.value) els.name.value = baseName(file.name);
     updateDialogConfirmation();
   });
+  els.type.addEventListener('change', renderInstitutionalTemplateChoice);
 
   els.autoSaveToggle.checked = autoSaveEnabled();
   els.autoSaveToggle.addEventListener('change', () => {

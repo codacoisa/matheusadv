@@ -97,6 +97,11 @@ dialog::backdrop { background: rgba(16,26,47,.75); backdrop-filter: blur(3px); }
 .dialog-copy, .field-help { color: var(--muted); }
 .dialog-copy { margin: 10px 0 18px; }
 .document-dialog label:not(.file-picker) { display: grid; gap: 6px; margin-top: 13px; color: #344054; font-size: 12px; font-weight: 700; }
+.document-dialog label.template-choice { display: flex; align-items: center; gap: 11px; border: 1px solid #e1d4ae; border-radius: 9px; padding: 12px; background: #fffbf2; cursor: pointer; }
+.document-dialog label.template-choice[hidden] { display: none; }
+.template-choice input { flex: 0 0 auto; width: 18px; min-height: 18px; margin: 0; accent-color: var(--gold); }
+.template-choice span, .template-choice strong, .template-choice small { display: block; }
+.template-choice small { margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 500; }
 .field-help { font-size: 11px; }
 .field-help a { color: var(--gold); }
 .dialog-actions { justify-content: flex-end; margin-top: 22px; }

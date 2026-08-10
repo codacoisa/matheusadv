@@ -25,8 +25,20 @@
     copyrightStartYear: 2026
   });
 
+  // Recursos institucionais definidos pela implantação. Para trocar o modelo,
+  // substitua o arquivo Base64 em config/document-templates e atualize os metadados abaixo.
+  const documents = Object.freeze({
+    institutionalDocxTemplate: Object.freeze({
+      enabled: true,
+      label: 'Modelo institucional Gregório & Morais',
+      fileName: 'Modelo v3b.docx',
+      base64Url: assetUrl('document-templates/modelo-institucional.docx.base64'),
+      sha256: 'd968b58d915411c69e2be157748caa72c965cc0a2bdeef64f19d07bd34d44e95'
+    })
+  });
+
   // Política da implantação: o navegador não pode ampliá-la por configurações locais.
   const gistAccessLease = Object.freeze({ leaseHours: 3, graceMinutes: 180, minLeaseMinutes: 15, maxLeaseHours: 24 });
 
-  window.OFFICEJUR_CONFIG = Object.freeze({ office, installation, product, gistAccessLease });
+  window.OFFICEJUR_CONFIG = Object.freeze({ office, installation, product, documents, gistAccessLease });
 })();
