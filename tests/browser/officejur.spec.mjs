@@ -381,6 +381,22 @@ test('Documentos cria Office em branco, abre editor visual e permite excluir', a
   await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
 });
 
+test('Documentos permite limpar a biblioteca local com confirmação', async ({ page }) => {
+  await prepareCalculationPage(page, 'lab/documentos/');
+  for (const name of ['Rascunho um', 'Rascunho dois']) {
+    await page.getByRole('button', { name: 'Novo documento' }).click();
+    await page.locator('#client-select').selectOption('client-test');
+    await page.locator('#document-name').fill(name);
+    await page.getByRole('button', { name: 'Salvar documento' }).click();
+  }
+  await expect(page.locator('#document-count')).toHaveText('2');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#clear-library').click();
+  await expect(page.getByText('Biblioteca local limpa.')).toBeVisible();
+  await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
+  await expect(page.locator('#clear-library')).toBeDisabled();
+});
+
 test('Documentos preserva o binário Office e carrega o engine WASM local', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();

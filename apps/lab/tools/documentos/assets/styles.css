@@ -50,6 +50,7 @@ input, select, textarea { width: 100%; border: 1px solid var(--line); border-rad
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid rgba(189,162,255,.5); outline-offset: 2px; }
 select option { color: #14152a; background: #f4f1ff; }
 .document-list { display: grid; gap: 7px; margin-top: 18px; }
+.library-clear { width: 100%; margin-top: 12px; }
 .document-item { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; border: 1px solid transparent; border-radius: 10px; padding: 9px; color: inherit; text-align: left; background: transparent; }
 .document-item:hover, .document-item.active { border-color: rgba(189,162,255,.32); background: rgba(189,162,255,.1); }
 .format-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 8px; color: #17122a; background: var(--gold); font-size: 9px; font-weight: 900; }

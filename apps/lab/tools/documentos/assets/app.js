@@ -14,6 +14,7 @@
     count: $('#document-count'),
     list: $('#document-list'),
     search: $('#document-search'),
+    clearLibrary: $('#clear-library'),
     empty: $('#editor-empty'),
     editor: $('#editor-view'),
     editorType: $('#editor-type'),
@@ -98,6 +99,7 @@
   function renderList() {
     const documents = filteredDocuments();
     els.count.textContent = String(state.documents.length);
+    els.clearLibrary.disabled = state.documents.length === 0;
     els.list.replaceChildren();
     if (!documents.length) {
       const empty = document.createElement('p');
@@ -367,6 +369,16 @@
     setStatus('Documento removido deste navegador.'); render();
   }
 
+  async function clearLibrary() {
+    if (!state.documents.length || !confirm(`Excluir os ${state.documents.length} documentos locais desta biblioteca?`)) return;
+    await Promise.all(state.documents.map((documentRecord) => storage.remove(documentRecord.id)));
+    state.documents = [];
+    state.selectedId = '';
+    state.officeEditor = { id: '', originalText: '' };
+    setStatus('Biblioteca local limpa.');
+    render();
+  }
+
   $('#new-document').addEventListener('click', openDialog);
   $('#import-document').addEventListener('click', openDialog);
   document.querySelectorAll('[data-action="new"]').forEach((button) => button.addEventListener('click', openDialog));
@@ -374,6 +386,7 @@
   $('#cancel-dialog').addEventListener('click', closeDialog);
   els.form.addEventListener('submit', saveNewDocument);
   els.search.addEventListener('input', () => { state.query = els.search.value; renderList(); });
+  els.clearLibrary.addEventListener('click', () => void clearLibrary());
   els.list.addEventListener('click', (event) => { const button = event.target.closest('[data-id]'); if (button) { state.selectedId = button.dataset.id; render(); } });
   els.csvContent.addEventListener('input', renderCsvPreview);
   $('#save-document').addEventListener('click', () => void saveCurrent());
