@@ -421,12 +421,9 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await expect(nativeButton('redo')).toBeEnabled();
   await nativeButton('redo').click();
   await expect(nativeButton('print')).toBeEnabled();
-  await office.locator('body').evaluate(() => {
-    const main = window.DE?.getController?.('Main');
-    main.api.asc_Print = () => { document.body.dataset.printRequested = 'true'; };
-  });
   await nativeButton('print').click();
-  await expect(office.locator('body')).toHaveAttribute('data-print-requested', 'true');
+  await expect(page.locator('#office-status')).toContainText('Preparando documento para impressão', { timeout: 10_000 });
+  await expect(page.locator('.office-print-frame')).toHaveAttribute('src', /^blob:/, { timeout: 60_000 });
   await office.locator('a[data-tab="file"]').click();
   await expect(office.locator('#file-menu-panel')).toBeVisible();
   await office.locator('#fm-btn-return').click();

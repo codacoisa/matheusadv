@@ -26,7 +26,51 @@ index dc72abb..a582847 100644
    | 'document:save'
    | 'document:get-state';
  
-@@ -156,6 +164,18 @@ async function handleMessage(event: MessageEvent): Promise<void> {
+@@ -25,6 +33,7 @@ const EMBED_QUERY_KEYS = ['embed', 'embedded'];
+ let initialized = false;
+ let parentOrigin = '*';
+ let isEmbedMode = false;
++let printRequestInProgress = false;
+-
++
+ function getQueryValue(key: string): string | null {
+   return new URLSearchParams(window.location.search).get(key);
+@@ -69,6 +78,34 @@ function postToParent(type: string, payload: EmbedResponsePayload = {}, id?: str
+   );
+ }
+ 
++async function handleNativePrintRequest(event: MessageEvent): Promise<void> {
++  if (event.origin !== window.location.origin || event.data?.type !== 'ranuts:document-native-print') {
++    return;
++  }
++  if (printRequestInProgress) {
++    return;
++  }
++
++  printRequestInProgress = true;
++  postToParent('document:print-started');
++  try {
++    const file = await requestSaveDocument('PDF');
++    postToParent('document:print-ready', {
++      file,
++      fileName: file.name,
++      mimeType: file.type || 'application/pdf',
++      size: file.size,
++    });
++  } catch (error) {
++    postToParent('document:error', {
++      message: error instanceof Error ? error.message : String(error),
++      operation: 'print',
++    });
++  } finally {
++    printRequestInProgress = false;
++  }
++}
++
+ function makeFileFromPayload(payload: Record<string, any>): File {
+   const fileName = payload.fileName || payload.name || 'document.xlsx';
+ 
+@@ -156,6 +193,18 @@ async function handleMessage(event: MessageEvent): Promise<void> {
          postToParent('document:readonly-changed', { readonly: getReadonlyMode() }, message.id);
          break;
  
@@ -45,7 +89,15 @@ index dc72abb..a582847 100644
        case 'document:save': {
          const file = await requestSaveDocument(payload.targetExt || 'XLSX', {
            returnOriginalOnTimeout: Boolean(payload.returnOriginalOnTimeout),
-@@ -215,4 +235,21 @@ export function initEmbedApi(): void {
+@@ -210,4 +259,7 @@ export function initEmbedApi(): void {
+   document.body.classList.add('embed-mode');
++  window.addEventListener('message', (event) => {
++    void handleNativePrintRequest(event);
++  });
+   window.addEventListener('message', (event) => {
+     void handleMessage(event);
+   });
+@@ -215,4 +267,21 @@ export function initEmbedApi(): void {
    window.addEventListener('load', () => {
      postToParent('document:ready');
    });
@@ -4728,7 +4780,21 @@ index 9ea61a4..4691182 100644
                  (t = t || this.active || i),
                  this.$el.show(),
                  this.scroller.update(),
-@@ -110937,7 +115423,8 @@ var FONT_TYPE_RECENT = 4,
+@@ -89312,6 +93798,13 @@ var FONT_TYPE_RECENT = 4,
+               'file' == t ? this.leftMenu.showMenu('file') : this.leftMenu.menuFile.hide();
+             },
+             clickToolbarPrint: function () {
++              if (window.parent !== window) {
++                try {
++                  if (new URLSearchParams(window.parent.location.search).has('embed')) {
++                    return void window.parent.postMessage({ type: 'ranuts:document-native-print' }, window.location.origin);
++                  }
++                } catch (t) {}
++              }
+               this.mode.canPreviewPrint
+                 ? this.leftMenu.showMenu('file:printpreview')
+                 : this.mode.canPrint && this.clickMenuFileItem(null, 'print');
+@@ -110937,7 +115430,8 @@ var FONT_TYPE_RECENT = 4,
      'locale',
      'device_scale',
      'documenteditor/main/locale/en.json',
@@ -4738,7 +4804,7 @@ index 9ea61a4..4691182 100644
      var a;
      (n.History && n.History.started) ||
        (n.history.start(),
-@@ -111020,7 +115507,7 @@ var FONT_TYPE_RECENT = 4,
+@@ -111020,7 +115514,7 @@ var FONT_TYPE_RECENT = 4,
              a.start();
            });
          },

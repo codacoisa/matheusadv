@@ -13,6 +13,8 @@
   let officeOpenId = '';
   let officeSave = null;
   let autoSaveTimer = null;
+  let officePrintFrame = null;
+  let officePrintUrl = '';
 
   const els = {
     status: $('#status'), count: $('#document-count'), clientCount: $('#client-count'), folders: $('#client-folders'),
@@ -74,6 +76,30 @@
     const target = officeTarget();
     if (!officeReady || !target) throw new Error('O editor ainda não está pronto.');
     target.postMessage({ type, payload }, window.location.origin);
+  }
+
+  function printOfficeFile(file) {
+    if (!(file instanceof Blob)) throw new Error('O OnlyOffice não retornou o PDF para impressão.');
+    if (officePrintFrame) officePrintFrame.remove();
+    if (officePrintUrl) URL.revokeObjectURL(officePrintUrl);
+
+    officePrintUrl = URL.createObjectURL(file);
+    officePrintFrame = document.createElement('iframe');
+    officePrintFrame.className = 'office-print-frame';
+    officePrintFrame.title = 'Documento preparado para impressão';
+    officePrintFrame.addEventListener('load', () => {
+      window.setTimeout(() => {
+        try {
+          officePrintFrame?.contentWindow?.focus();
+          officePrintFrame?.contentWindow?.print();
+          setOfficeStatus('Documento enviado para impressão.');
+        } catch (error) {
+          setOfficeStatus(`Não foi possível abrir a impressão: ${error.message}`, true);
+        }
+      }, 150);
+    }, { once: true });
+    officePrintFrame.src = officePrintUrl;
+    document.body.append(officePrintFrame);
   }
 
   function openOfficeRecord(documentRecord) {
@@ -143,6 +169,15 @@
       setOfficeStatus('Nome atualizado no editor');
       try { sendOfficeCommand('document:focus'); }
       catch { /* O documento pode estar concluindo a abertura. */ }
+      return;
+    }
+    if (message.type === 'document:print-started') {
+      setOfficeStatus('Preparando documento para impressão…');
+      return;
+    }
+    if (message.type === 'document:print-ready') {
+      try { printOfficeFile(payload.file); }
+      catch (error) { setOfficeStatus(error.message, true); }
       return;
     }
     if (message.type === 'document:saved') {

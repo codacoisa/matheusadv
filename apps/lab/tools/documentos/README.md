@@ -33,7 +33,8 @@ Também usa `document:rename`, `document:focus` e `document:changed` para
 sincronizar o título, devolver o foco ao documento e acionar o salvamento
 automático somente quando houver alterações. O comando Salvar da faixa nativa
 do OnlyOffice publica o arquivo editado pela mesma ponte usada pelo botão do
-pop-up.
+pop-up. O comando Imprimir gera um PDF pelo conversor WASM e o entrega a um
+quadro temporário, que abre a caixa de impressão do navegador.
 
 O Microsoft Word descreve o AutoSave como um salvamento realizado a cada
 "poucos segundos", sem publicar um intervalo exato. Este protótipo adota 10
