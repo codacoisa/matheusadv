@@ -15,7 +15,9 @@ test('Documentos integra o editor OnlyOffice', () => {
   assert.match(index, /locale=pt-BR/);
   assert.match(app, /document:open-file/);
   assert.match(app, /document:save/);
+  assert.match(app, /document:rename/);
   assert.match(app, /document:saved/);
+  assert.match(app, /AUTO_SAVE_INTERVAL = 10000/);
   assert.match(app, /dataBase64/);
   assert.match(app, /originalDataBase64/);
   assert.doesNotMatch(app, /engineApi|office-oxide/);
@@ -41,6 +43,9 @@ test('o build publica o submódulo e a licença AGPL do editor', () => {
   assert.match(build, /pnpm --dir "\$RANUTS_EDITOR_SOURCE" run build/);
   assert.match(build, /AGPL-3\.0\.LICENSE/);
   assert.match(patch, /packages\/shared\/src\/document-utils\.ts/);
+  assert.match(patch, /documenteditor\/main\/locale\/en\.json/);
   assert.match(patch, /pt-br\.json/);
+  assert.match(patch, /"DE\.Views\.Toolbar\.capBtnInsImage": "Imagem"/);
+  assert.match(patch, /"DE\.Views\.Toolbar\.capBtnDateTime": "Data e Hora"/);
   assert.match(validator, /thirdPartyHtmlPrefixes = \["lab\/documentos\/editor\/"\]/);
 });

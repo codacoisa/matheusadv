@@ -360,9 +360,14 @@ test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }
   await expect(page.getByRole('button', { name: /Abrir Planilha de teste/ })).toBeVisible();
   await expect(page.locator('#editor-dialog')).toBeVisible();
   await page.locator('#csv-content').fill('Nome;Valor\nTeste;10');
-  await page.getByRole('button', { name: 'Salvar' }).click();
-  await expect(page.getByText('Alterações salvas neste navegador.')).toBeVisible();
+  await expect(page.locator('#autosave-toggle')).toBeChecked();
+  await expect(page.locator('#office-status')).toContainText('Salvo automaticamente', { timeout: 15_000 });
   await expect(page.locator('#csv-preview')).toContainText('Teste');
+  await page.locator('#close-editor').click();
+  await page.getByRole('button', { name: 'Renomear Planilha de teste' }).click();
+  await page.getByRole('textbox', { name: 'Novo nome do arquivo' }).fill('Planilha renomeada');
+  await page.locator('[data-rename-form]').getByRole('button', { name: 'Salvar' }).click();
+  await expect(page.getByRole('button', { name: /Abrir Planilha renomeada/ })).toBeVisible();
 });
 
 test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a edição', async ({ page }) => {
@@ -373,14 +378,19 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await page.locator('#document-type').selectOption('docx');
   await page.getByRole('button', { name: 'Criar documento' }).click();
   await expect(page.locator('#editor-dialog')).toBeVisible();
-  await expect(page.locator('#editor-dialog')).toHaveCSS('width', /.+/);
+  const modalRatio = await page.locator('#editor-dialog').evaluate((dialog) => dialog.getBoundingClientRect().width / window.innerWidth);
+  expect(modalRatio).toBeCloseTo(0.9, 2);
   await expect(page.locator('#office-editor-frame')).toBeVisible();
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
-  await expect(office.getByText('Início', { exact: true })).toBeVisible();
+  await expect(office.getByText('Página Inicial', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#editor-name')).toBeHidden();
+  await page.locator('#editor-name-trigger').click();
   await page.locator('#editor-name').fill('Rascunho revisado');
-  await page.locator('#editor-name').press('Tab');
+  await page.locator('#editor-name-form').getByRole('button', { name: 'Salvar nome' }).click();
   await expect(page.getByText('Arquivo renomeado para “Rascunho revisado”.')).toBeVisible();
+  await expect(page.locator('#editor-name-trigger')).toHaveText('Rascunho revisado');
+  await expect(office.locator('#title-doc-name')).toHaveValue('Rascunho revisado.docx');
   await page.locator('#save-document').click();
   await expect(page.getByText('Alterações salvas neste navegador.')).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());

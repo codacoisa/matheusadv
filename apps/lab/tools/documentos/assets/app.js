@@ -6,16 +6,21 @@
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const $ = (selector) => document.querySelector(selector);
-  const state = { clients: [], documents: [], selectedId: '', query: '', dialogMode: 'create' };
+  const AUTO_SAVE_INTERVAL = 10000;
+  const AUTO_SAVE_KEY = 'officejur.documentos.autosave';
+  const state = { clients: [], documents: [], selectedId: '', query: '', dialogMode: 'create', dirty: false };
   let officeReady = false;
   let officeOpenId = '';
   let officeSave = null;
+  let autoSaveTimer = null;
 
   const els = {
     status: $('#status'), count: $('#document-count'), clientCount: $('#client-count'), folders: $('#client-folders'),
     libraryEmpty: $('#library-empty'), search: $('#document-search'), clearLibrary: $('#clear-library'),
-    editorDialog: $('#editor-dialog'), editorFormat: $('#editor-format'), editorName: $('#editor-name'), editorClient: $('#editor-client'),
+    editorDialog: $('#editor-dialog'), editorFormat: $('#editor-format'), editorNameTrigger: $('#editor-name-trigger'),
+    editorNameForm: $('#editor-name-form'), editorName: $('#editor-name'), cancelEditorName: $('#cancel-editor-name'), editorClient: $('#editor-client'),
     deleteDocument: $('#delete-document'), saveDocument: $('#save-document'), downloadDocument: $('#download-document'),
+    autoSaveToggle: $('#autosave-toggle'),
     csvEditor: $('#csv-editor'), csvContent: $('#csv-content'), csvPreview: $('#csv-preview'),
     officeEditor: $('#office-editor'), officeFrame: $('#office-editor-frame'), officeStatus: $('#office-status'),
     dialog: $('#document-dialog'), form: $('#document-form'), dialogEyebrow: $('#dialog-eyebrow'), dialogTitle: $('#dialog-title'),
@@ -38,6 +43,20 @@
   const baseName = (name) => String(name || '').replace(/\.[^.]+$/, '') || 'Documento sem título';
   const currentRecord = () => state.documents.find((item) => item.id === state.selectedId) || null;
   const clientName = (clientId) => state.clients.find((client) => client.id === clientId)?.name || 'Cliente removido';
+
+  function autoSaveEnabled() {
+    try { return localStorage.getItem(AUTO_SAVE_KEY) !== 'off'; }
+    catch { return true; }
+  }
+
+  function setAutoSavePreference(enabled) {
+    try { localStorage.setItem(AUTO_SAVE_KEY, enabled ? 'on' : 'off'); }
+    catch { /* O armazenamento pode estar indisponível em navegação privada. */ }
+  }
+
+  function autoSaveTime() {
+    return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
 
   function setStatus(message, error = false) {
     els.status.textContent = message;
@@ -80,15 +99,16 @@
     renderLibrary();
   }
 
-  async function persistOfficeSave(file, payload, documentRecord) {
+  async function persistOfficeSave(file, payload, documentRecord, automatic = false) {
     if (!file || !documentRecord) throw new Error('O OnlyOffice não retornou o arquivo editado.');
     documentRecord.dataBase64 = await storage.blobToBase64(file);
     documentRecord.fileName = payload.fileName || `${documentRecord.name}.${documentRecord.extension}`;
     documentRecord.updatedAt = now();
     await storage.save(documentRecord);
     await refreshDocuments();
-    setStatus('Alterações salvas neste navegador.');
-    setOfficeStatus('Alterações salvas.');
+    state.dirty = false;
+    setStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}.` : 'Alterações salvas neste navegador.');
+    setOfficeStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}` : 'Alterações salvas.');
     renderEditor();
   }
 
@@ -106,11 +126,23 @@
       return;
     }
     if (message.type === 'document:opened') {
+      state.dirty = false;
       setOfficeStatus('Documento aberto para edição');
       return;
     }
+    if (message.type === 'document:changed') {
+      state.dirty = Boolean(payload.modified);
+      if (state.dirty) setOfficeStatus(els.autoSaveToggle.checked ? 'Alterações pendentes · salvamento automático ativo' : 'Alterações pendentes');
+      return;
+    }
+    if (message.type === 'document:renamed') {
+      setOfficeStatus('Nome atualizado no editor');
+      return;
+    }
     if (message.type === 'document:saved') {
-      void persistOfficeSave(payload.file, payload, currentRecord()).then(() => resolveOfficeSave()).catch((error) => {
+      const automatic = Boolean(officeSave?.automatic);
+      const savedRecord = state.documents.find((record) => record.id === officeSave?.documentId) || null;
+      void persistOfficeSave(payload.file, payload, savedRecord, automatic).then(() => resolveOfficeSave()).catch((error) => {
         resolveOfficeSave(error);
         setOfficeStatus(error.message, true);
         setStatus(`Não foi possível salvar: ${error.message}`, true);
@@ -200,7 +232,7 @@
         </article>`).join('');
       folder.innerHTML = `
         <header class="folder-head">
-          <div class="folder-title"><span class="folder-symbol" aria-hidden="true"></span><span><strong>${escape(clientName(clientId))}</strong><small>Pasta vinculada ao Financeiro</small></span></div>
+          <div class="folder-title"><span class="folder-symbol" aria-hidden="true"></span><span><strong>${escape(clientName(clientId))}</strong><small>Documentos vinculados a este cliente</small></span></div>
           <span class="folder-count">${records.length} ${records.length === 1 ? 'arquivo' : 'arquivos'}</span>
         </header>
         <div class="file-grid">${cards}</div>`;
@@ -238,7 +270,8 @@
     if (!documentRecord) return;
     els.editorFormat.textContent = formatNames[documentRecord.extension];
     els.editorFormat.className = `format-icon format-${documentRecord.extension}`;
-    els.editorName.value = documentRecord.name;
+    els.editorNameTrigger.textContent = documentRecord.name;
+    if (els.editorNameForm.hidden) els.editorName.value = documentRecord.name;
     els.editorClient.textContent = `${clientName(documentRecord.clientId)} · atualizado em ${formatUpdatedAt(documentRecord.updatedAt)}`;
     const isCsv = documentRecord.extension === 'csv';
     els.csvEditor.hidden = !isCsv;
@@ -337,12 +370,44 @@
     const documentRecord = state.documents.find((record) => record.id === recordId);
     if (!documentRecord) return;
     state.selectedId = recordId;
+    state.dirty = false;
     if (officeOpenId !== recordId) officeOpenId = '';
     if (!els.editorDialog.open) els.editorDialog.showModal();
     renderEditor();
+    syncAutoSaveTimer();
   }
 
-  function closeEditor() { els.editorDialog.close(); }
+  async function closeEditor() {
+    if (state.dirty && els.autoSaveToggle.checked) await saveCurrent({ automatic: true });
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+    hideEditorRename();
+    els.editorDialog.close();
+  }
+
+  function showEditorRename() {
+    const documentRecord = currentRecord();
+    if (!documentRecord) return;
+    els.editorName.value = documentRecord.name;
+    els.editorNameTrigger.hidden = true;
+    els.editorNameForm.hidden = false;
+    els.editorName.focus();
+    els.editorName.select();
+  }
+
+  function hideEditorRename() {
+    els.editorNameForm.hidden = true;
+    els.editorNameTrigger.hidden = false;
+  }
+
+  function syncAutoSaveTimer() {
+    clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+    if (!els.autoSaveToggle.checked || !els.editorDialog.open) return;
+    autoSaveTimer = setInterval(() => {
+      if (state.dirty && !officeSave) void saveCurrent({ automatic: true });
+    }, AUTO_SAVE_INTERVAL);
+  }
 
   async function renameRecord(documentRecord, requestedName) {
     const newName = baseName(String(requestedName || '').trim());
@@ -352,36 +417,47 @@
     documentRecord.updatedAt = now();
     await storage.save(documentRecord);
     await refreshDocuments();
-    if (state.selectedId === documentRecord.id) renderEditor();
+    if (state.selectedId === documentRecord.id) {
+      renderEditor();
+      if (documentRecord.extension !== 'csv' && officeReady && officeOpenId === documentRecord.id) {
+        try { sendOfficeCommand('document:rename', { fileName: documentRecord.fileName }); }
+        catch (error) { setOfficeStatus(`Nome salvo na biblioteca, mas não atualizado no editor: ${error.message}`, true); }
+      }
+    }
     setStatus(`Arquivo renomeado para “${newName}”.`);
   }
 
   async function renameSelected() {
     const documentRecord = currentRecord();
     if (documentRecord) await renameRecord(documentRecord, els.editorName.value);
+    hideEditorRename();
   }
 
-  async function saveCurrent() {
+  async function saveCurrent({ automatic = false } = {}) {
     const documentRecord = currentRecord();
     if (!documentRecord) return;
     try {
-      await renameSelected();
+      if (automatic && !state.dirty) return;
       if (documentRecord.extension === 'csv') {
         documentRecord.content = els.csvContent.value;
         documentRecord.dataBase64 = storage.textToBase64(documentRecord.content);
         documentRecord.updatedAt = now();
         await storage.save(documentRecord);
         await refreshDocuments();
-        setStatus('Alterações salvas neste navegador.');
-        setOfficeStatus('Alterações salvas.');
+        state.dirty = false;
+        setStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}.` : 'Alterações salvas neste navegador.');
+        setOfficeStatus(automatic ? `Salvo automaticamente às ${autoSaveTime()}` : 'Alterações salvas.');
         return;
       }
       if (!officeReady || officeOpenId !== documentRecord.id) throw new Error('Aguarde o documento abrir no editor antes de salvar.');
-      if (officeSave) throw new Error('Já existe uma solicitação de salvamento em andamento.');
-      setOfficeStatus('Salvando alterações…');
+      if (officeSave) {
+        if (automatic) return;
+        throw new Error('Já existe uma solicitação de salvamento em andamento.');
+      }
+      setOfficeStatus(automatic ? 'Salvando automaticamente…' : 'Salvando alterações…');
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => resolveOfficeSave(new Error('O editor demorou para retornar o arquivo.')), 30000);
-        officeSave = { resolve, reject, timer };
+        officeSave = { resolve, reject, timer, automatic, documentId: documentRecord.id };
         try { sendOfficeCommand('document:save', { targetExt: documentRecord.extension.toUpperCase() }); }
         catch (error) { resolveOfficeSave(error); }
       });
@@ -412,7 +488,8 @@
     const documentRecord = currentRecord();
     if (!documentRecord || !confirm(`Excluir “${documentRecord.name}” da biblioteca?`)) return;
     await storage.remove(documentRecord.id);
-    closeEditor();
+    state.dirty = false;
+    await closeEditor();
     state.selectedId = '';
     officeOpenId = '';
     await refreshDocuments();
@@ -439,7 +516,7 @@
   document.querySelectorAll('[data-action="new"]').forEach((button) => button.addEventListener('click', () => openDocumentDialog('create')));
   $('#close-dialog').addEventListener('click', closeDocumentDialog);
   $('#cancel-dialog').addEventListener('click', closeDocumentDialog);
-  $('#close-editor').addEventListener('click', closeEditor);
+  $('#close-editor').addEventListener('click', () => void closeEditor());
   els.form.addEventListener('submit', (event) => void saveNewDocument(event));
   els.search.addEventListener('input', () => { state.query = els.search.value; renderLibrary(); });
   els.clearLibrary.addEventListener('click', () => void clearLibrary());
@@ -455,15 +532,34 @@
     form.querySelector('input').focus();
     form.querySelector('input').select();
   });
-  els.folders.addEventListener('submit', (event) => {
+  els.folders.addEventListener('submit', async (event) => {
     const form = event.target.closest('[data-rename-form]');
     if (!form) return;
     event.preventDefault();
     const documentRecord = state.documents.find((record) => record.id === form.dataset.renameForm);
-    if (documentRecord) void renameRecord(documentRecord, form.querySelector('input').value);
+    if (!documentRecord) return;
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try { await renameRecord(documentRecord, form.querySelector('input').value); }
+    catch (error) {
+      button.disabled = false;
+      setStatus(`Não foi possível renomear: ${error.message}`, true);
+    }
   });
-  els.csvContent.addEventListener('input', renderCsvPreview);
-  els.editorName.addEventListener('change', () => void renameSelected());
+  els.csvContent.addEventListener('input', () => {
+    state.dirty = true;
+    setOfficeStatus(els.autoSaveToggle.checked ? 'Alterações pendentes · salvamento automático ativo' : 'Alterações pendentes');
+    renderCsvPreview();
+  });
+  els.editorNameTrigger.addEventListener('click', showEditorRename);
+  els.editorNameForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void renameSelected().catch((error) => setStatus(`Não foi possível renomear: ${error.message}`, true));
+  });
+  els.cancelEditorName.addEventListener('click', hideEditorRename);
+  els.editorName.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); hideEditorRename(); }
+  });
   els.saveDocument.addEventListener('click', () => void saveCurrent());
   els.downloadDocument.addEventListener('click', () => void downloadCurrent());
   els.deleteDocument.addEventListener('click', () => void removeCurrent());
@@ -473,6 +569,13 @@
     els.filePickerTitle.textContent = file?.name || 'Escolher arquivo';
     if (file && !els.name.value) els.name.value = baseName(file.name);
     updateDialogConfirmation();
+  });
+
+  els.autoSaveToggle.checked = autoSaveEnabled();
+  els.autoSaveToggle.addEventListener('change', () => {
+    setAutoSavePreference(els.autoSaveToggle.checked);
+    syncAutoSaveTimer();
+    setOfficeStatus(els.autoSaveToggle.checked ? 'Salvamento automático ativo · a cada 10 segundos' : 'Salvamento automático desativado');
   });
 
   if (!storage || !financeStorage || !financeDataStore) {

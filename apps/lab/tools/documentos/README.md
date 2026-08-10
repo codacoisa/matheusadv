@@ -10,11 +10,14 @@ upload automático ou integração com servidor.
 - importação de DOCX, XLSX, PPTX e CSV com formato detectado pelo arquivo;
 - criação de arquivos Office vazios no navegador;
 - biblioteca organizada em pastas por cliente;
-- edição de DOCX, XLSX e PPTX com o OnlyOffice em modal amplo e interface
-  principal em português brasileiro (`pt-BR`);
-- renomeação no cartão do arquivo e durante a edição;
+- edição de DOCX, XLSX e PPTX com o OnlyOffice em modal de 90% da tela e
+  catálogo oficial completo em português brasileiro (`pt-BR`);
+- renomeação no cartão do arquivo e, após clicar no título, durante a edição,
+  com atualização imediata do nome exibido pelo OnlyOffice;
 - edição direta de CSV, com pré-visualização tabular;
-- salvamento do arquivo editado em Base64 no IndexedDB e download pelo navegador;
+- salvamento manual ou automático a cada 10 segundos, com preferência
+  persistida no navegador;
+- armazenamento do arquivo editado em Base64 no IndexedDB e download pelo navegador;
 - exclusão apenas da cópia mantida neste navegador.
 
 ## Editor Office
@@ -26,6 +29,13 @@ O build fixa o submódulo no commit público `fcaa66e` e aplica o patch
 português, sem depender de commits privados ou locais.
 O aplicativo principal envia o arquivo por `postMessage` e recebe os eventos
 `document:ready`, `document:opened`, `document:saved` e `document:error`.
+Também usa `document:rename` e `document:changed` para sincronizar o título e
+acionar o salvamento automático somente quando houver alterações.
+
+O Microsoft Word descreve o AutoSave como um salvamento realizado a cada
+"poucos segundos", sem publicar um intervalo exato. Este protótipo adota 10
+segundos para equilibrar recuperação rápida e o custo de reconverter o arquivo
+Office no navegador. Referência: [Microsoft Support](https://support.microsoft.com/en-gb/office/what-is-autosave-6d6bd723-ebfd-4e40-b5f6-ae6e8088f7a5).
 
 O build do site executa `pnpm install --frozen-lockfile` e `pnpm run build` no
 submódulo, copia o `dist` para `lab/documentos/editor/` e inclui a licença AGPL
