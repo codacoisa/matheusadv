@@ -36,6 +36,10 @@ do OnlyOffice publica o arquivo editado pela mesma ponte usada pelo botão do
 pop-up. O comando Imprimir gera um PDF pelo conversor WASM e o entrega a um
 quadro temporário, que abre a caixa de impressão do navegador.
 
+No Safari, a recuperação de foco ativa primeiro o iframe interno e depois a
+área editável do OnlyOffice. Ela é repetida por um quadro de animação e após
+cliques na página, evitando o cursor visual sem entrada de teclado.
+
 O Microsoft Word descreve o AutoSave como um salvamento realizado a cada
 "poucos segundos", sem publicar um intervalo exato. Este protótipo adota 10
 segundos para equilibrar recuperação rápida e o custo de reconverter o arquivo

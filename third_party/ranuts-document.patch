@@ -2,12 +2,13 @@ diff --git a/lib/embed-api.ts b/lib/embed-api.ts
 index dc72abb..a582847 100644
 --- a/lib/embed-api.ts
 +++ b/lib/embed-api.ts
-@@ -1,7 +1,13 @@
+@@ -1,7 +1,14 @@
  import { setDocmentObj } from '@ranuts/shared/store';
  import { handleDocumentOperation, loadEditorApi } from './converter';
  import { openDocumentFromUrl } from './document';
 -import { getReadonlyMode, requestSaveDocument, setReadonlyMode } from './onlyoffice-editor';
 +import {
++  blurOpenDocument,
 +  focusOpenDocument,
 +  getReadonlyMode,
 +  renameOpenDocument,
@@ -17,16 +18,17 @@ index dc72abb..a582847 100644
  
  type EmbedMessageType =
    | 'document:open'
-@@ -9,6 +15,8 @@ type EmbedMessageType =
+@@ -9,6 +16,9 @@ type EmbedMessageType =
    | 'document:open-file'
    | 'document:open-buffer'
    | 'document:set-readonly'
 +  | 'document:rename'
++  | 'document:blur'
 +  | 'document:focus'
    | 'document:save'
    | 'document:get-state';
  
-@@ -25,6 +33,7 @@ const EMBED_QUERY_KEYS = ['embed', 'embedded'];
+@@ -25,6 +35,7 @@ const EMBED_QUERY_KEYS = ['embed', 'embedded'];
  let initialized = false;
  let parentOrigin = '*';
  let isEmbedMode = false;
@@ -35,7 +37,7 @@ index dc72abb..a582847 100644
 +
  function getQueryValue(key: string): string | null {
    return new URLSearchParams(window.location.search).get(key);
-@@ -69,6 +78,34 @@ function postToParent(type: string, payload: EmbedResponsePayload = {}, id?: str
+@@ -69,6 +80,34 @@ function postToParent(type: string, payload: EmbedResponsePayload = {}, id?: str
    );
  }
  
@@ -70,7 +72,7 @@ index dc72abb..a582847 100644
  function makeFileFromPayload(payload: Record<string, any>): File {
    const fileName = payload.fileName || payload.name || 'document.xlsx';
  
-@@ -156,6 +193,18 @@ async function handleMessage(event: MessageEvent): Promise<void> {
+@@ -156,6 +195,23 @@ async function handleMessage(event: MessageEvent): Promise<void> {
          postToParent('document:readonly-changed', { readonly: getReadonlyMode() }, message.id);
          break;
  
@@ -86,10 +88,15 @@ index dc72abb..a582847 100644
 +        postToParent('document:focused', {}, message.id);
 +        break;
 +
++      case 'document:blur':
++        blurOpenDocument();
++        postToParent('document:blurred', {}, message.id);
++        break;
++
        case 'document:save': {
          const file = await requestSaveDocument(payload.targetExt || 'XLSX', {
            returnOriginalOnTimeout: Boolean(payload.returnOriginalOnTimeout),
-@@ -210,4 +259,7 @@ export function initEmbedApi(): void {
+@@ -210,4 +264,7 @@ export function initEmbedApi(): void {
    document.body.classList.add('embed-mode');
 +  window.addEventListener('message', (event) => {
 +    void handleNativePrintRequest(event);
@@ -97,7 +104,7 @@ index dc72abb..a582847 100644
    window.addEventListener('message', (event) => {
      void handleMessage(event);
    });
-@@ -215,4 +267,21 @@ export function initEmbedApi(): void {
+@@ -215,4 +274,21 @@ export function initEmbedApi(): void {
    window.addEventListener('load', () => {
      postToParent('document:ready');
    });
@@ -131,7 +138,17 @@ index f732e9c..cac5064 100644
  import { getOnlyOfficeLang, t } from '@ranuts/shared/i18n';
  import { c_oAscFileType2 } from './file-types';
  import type { BinConversionResult, SaveEvent } from '@ranuts/shared/document-types';
-@@ -271,7 +271,13 @@ async function handleSaveDocument(event: SaveEvent) {
+@@ -26,6 +26,8 @@ const media: Record<string, string> = {};
+ // Editor operation queue to prevent concurrent operations
+ let editorOperationQueue: Promise<void> = Promise.resolve();
+ let isReadonlyMode = false;
++let focusAnimationFrame = 0;
++let focusTimeout = 0;
+-
++
+ type EmbeddedSaveRequest = {
+   targetExt?: string;
+@@ -271,7 +273,13 @@ async function handleSaveDocument(event: SaveEvent) {
          throw error;
        }
      } else if (isEmbedMode()) {
@@ -146,10 +163,11 @@ index f732e9c..cac5064 100644
      } else if (convertBinToDocumentAndDownloadFn) {
        await convertBinToDocumentAndDownloadFn(data.data, fileName, targetFormat);
      } else {
-@@ -428,9 +434,17 @@ export function createEditorInstance(config: {
+@@ -428,9 +436,18 @@ export function createEditorInstance(config: {
            },
            onDocumentReady: () => {
              console.log(`${t('documentLoaded')}${fileName}`);
++            installEditorFocusRecovery();
 +            window.setTimeout(focusOpenDocument, 0);
              // Note: For CSV files, the save dialog may show XLSX format,
              // but the actual save will be forced to CSV format in handleSaveDocument
@@ -164,7 +182,7 @@ index f732e9c..cac5064 100644
            onSave: handleSaveDocument,
            onDownloadAs: handleDownloadAs,
            // writeFile
-@@ -456,6 +470,36 @@ export function setReadonlyMode(readonly: boolean): void {
+@@ -456,6 +473,76 @@ export function setReadonlyMode(readonly: boolean): void {
    });
  }
  
@@ -195,7 +213,47 @@ index f732e9c..cac5064 100644
 +}
 +
 +export function focusOpenDocument(): void {
-+  (window.editor as any)?.grabFocus?.();
++  cancelPendingDocumentFocus();
++  const applyFocus = () => {
++    const editorFrame = document.querySelector<HTMLIFrameElement>('#iframe iframe, iframe[name="frameEditor"]');
++    editorFrame?.focus({ preventScroll: true });
++    editorFrame?.contentWindow?.focus();
++    (window.editor as any)?.grabFocus?.();
++  };
++
++  applyFocus();
++  focusAnimationFrame = window.requestAnimationFrame(applyFocus);
++  focusTimeout = window.setTimeout(applyFocus, 80);
++}
++
++export function blurOpenDocument(): void {
++  cancelPendingDocumentFocus();
++  (window.editor as any)?.blurFocus?.();
++}
++
++function cancelPendingDocumentFocus(): void {
++  if (focusAnimationFrame) window.cancelAnimationFrame(focusAnimationFrame);
++  if (focusTimeout) window.clearTimeout(focusTimeout);
++  focusAnimationFrame = 0;
++  focusTimeout = 0;
++}
++
++function installEditorFocusRecovery(attempt = 0): void {
++  try {
++    const editorFrame = document.querySelector<HTMLIFrameElement>('#iframe iframe, iframe[name="frameEditor"]');
++    const editorSurface = editorFrame?.contentDocument?.querySelector<HTMLElement>('#editor_sdk');
++    if (!editorSurface && attempt < 20) {
++      window.setTimeout(() => installEditorFocusRecovery(attempt + 1), 100);
++      return;
++    }
++    if (!editorSurface || editorSurface.dataset.ranutsFocusRecovery === 'ready') return;
++    editorSurface.dataset.ranutsFocusRecovery = 'ready';
++    editorSurface.addEventListener('pointerup', () => {
++      window.setTimeout(focusOpenDocument, 0);
++    }, true);
++  } catch (error) {
++    console.warn('Could not install editor focus recovery:', error);
++  }
 +}
 +
  export function getReadonlyMode(): boolean {

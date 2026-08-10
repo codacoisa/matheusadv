@@ -50,6 +50,8 @@ test('o build publica o submódulo e a licença AGPL do editor', () => {
   assert.match(patch, /ranuts:document-native-save/);
   assert.match(patch, /ranuts:document-native-print/);
   assert.match(patch, /grabFocus/);
+  assert.match(patch, /ranutsFocusRecovery/);
+  assert.match(patch, /contentWindow\?\.focus/);
   assert.match(patch, /documenteditor\/main\/locale\/en\.json/);
   assert.match(patch, /pt-br\.json/);
   assert.match(patch, /"DE\.Views\.Toolbar\.capBtnInsImage": "Imagem"/);

@@ -402,7 +402,9 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   expect(modalRatio).toBeCloseTo(0.9, 2);
   await expect(page.locator('#office-editor-frame')).toBeVisible();
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
-  const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
+  const officeHost = page.frameLocator('#office-editor-frame');
+  const officeFrame = officeHost.locator('iframe');
+  const office = officeHost.frameLocator('iframe');
   await expect(office.getByText('Página Inicial', { exact: true })).toBeVisible({ timeout: 30_000 });
   await page.locator('#autosave-toggle').uncheck();
   await expect(page.locator('#editor-name')).toBeHidden();
@@ -412,9 +414,16 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await expect(page.getByText('Arquivo renomeado para “Rascunho revisado”.')).toBeVisible();
   await expect(page.locator('#editor-name-trigger')).toHaveText('Rascunho revisado');
   await expect(office.locator('#title-doc-name')).toHaveValue('Rascunho revisado.docx');
+  await expect(officeFrame).toBeFocused();
   await expect(office.locator('#area_id')).toBeFocused();
+  await expect(office.locator('#editor_sdk')).toHaveAttribute('data-ranuts-focus-recovery', 'ready');
   await page.keyboard.type('Teste de foco');
   await expect(page.locator('#office-status')).toContainText('Alterações pendentes', { timeout: 10_000 });
+  await page.locator('#editor-name-trigger').click();
+  await page.locator('#cancel-editor-name').click();
+  await expect(officeFrame).toBeFocused();
+  await expect(office.locator('#area_id')).toBeFocused();
+  await page.keyboard.type(' após cancelar');
   const nativeButton = (name) => office.locator(`button:has(> i.icon--inverse.btn-${name})`);
   await expect(nativeButton('undo')).toBeEnabled();
   await nativeButton('undo').click();
@@ -429,6 +438,10 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await office.locator('#fm-btn-return').click();
   await nativeButton('save').click();
   await expect(page.getByText('Alterações salvas neste navegador.')).toBeVisible();
+  await expect(officeFrame).toBeFocused();
+  await expect(office.locator('#area_id')).toBeFocused();
+  await page.keyboard.type(' depois de salvar');
+  await expect(page.locator('#office-status')).toContainText('Alterações pendentes', { timeout: 10_000 });
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#delete-document').click();
   await expect(page.getByText('Nenhum arquivo na biblioteca')).toBeVisible();

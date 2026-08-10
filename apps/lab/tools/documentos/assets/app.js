@@ -78,6 +78,17 @@
     target.postMessage({ type, payload }, window.location.origin);
   }
 
+  function restoreOfficeFocus() {
+    const documentRecord = currentRecord();
+    if (!els.editorDialog.open || !officeReady || documentRecord?.extension === 'csv') return;
+    window.setTimeout(() => {
+      try {
+        els.officeFrame.focus({ preventScroll: true });
+        sendOfficeCommand('document:focus');
+      } catch { /* O documento pode estar sendo aberto ou fechado. */ }
+    }, 0);
+  }
+
   function printOfficeFile(file) {
     if (!(file instanceof Blob)) throw new Error('O OnlyOffice não retornou o PDF para impressão.');
     if (officePrintFrame) officePrintFrame.remove();
@@ -426,6 +437,10 @@
   function showEditorRename() {
     const documentRecord = currentRecord();
     if (!documentRecord) return;
+    if (documentRecord.extension !== 'csv' && officeReady) {
+      try { sendOfficeCommand('document:blur'); }
+      catch { /* O editor pode estar concluindo a abertura. */ }
+    }
     els.editorName.value = documentRecord.name;
     els.editorNameTrigger.hidden = true;
     els.editorNameForm.hidden = false;
@@ -436,6 +451,7 @@
   function hideEditorRename() {
     els.editorNameForm.hidden = true;
     els.editorNameTrigger.hidden = false;
+    restoreOfficeFocus();
   }
 
   function syncAutoSaveTimer() {
