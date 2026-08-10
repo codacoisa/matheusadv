@@ -65,6 +65,9 @@ select option { color: #14152a; background: #f4f1ff; }
 .editor-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; padding-bottom: 19px; border-bottom: 1px solid var(--line); }
 .editor-head h2 { overflow-wrap: anywhere; }
 .editor-notice, .engine-note { margin: 18px 0; border-left: 3px solid var(--gold); padding: 10px 13px; color: var(--muted); background: rgba(217,189,121,.08); }
+.engine-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 18px 0 0; }
+.engine-status { color: var(--gold); font-size: 12px; }
+.engine-status.error { color: var(--danger); }
 .csv-editor, .office-editor { margin-top: 22px; }
 .csv-editor > label span { font-weight: 500; }
 #csv-content { min-height: 210px; margin-top: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; resize: vertical; }

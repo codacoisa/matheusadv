@@ -6,7 +6,7 @@
   'use strict';
 
   const DATABASE = 'officejur-documentos-lab';
-  const VERSION = 1;
+  const VERSION = 2;
   const STORE = 'documents';
 
   function openDatabase(indexedDb = globalThis.indexedDB) {
@@ -34,12 +34,20 @@
     });
   }
 
+  function normalize(document) {
+    if (!document) return document;
+    return {
+      ...document,
+      originalFile: document.originalFile || document.file || null,
+    };
+  }
+
   async function list({ indexedDb } = {}) {
     const database = await openDatabase(indexedDb);
     try {
       return await new Promise((resolve, reject) => {
         const request = database.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-        request.onsuccess = () => resolve(request.result.sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt))));
+        request.onsuccess = () => resolve(request.result.map(normalize).sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt))));
         request.onerror = () => reject(request.error);
       });
     } finally { database.close(); }
@@ -50,7 +58,7 @@
     try {
       return await new Promise((resolve, reject) => {
         const request = database.transaction(STORE, 'readonly').objectStore(STORE).get(id);
-        request.onsuccess = () => resolve(request.result || null);
+        request.onsuccess = () => resolve(normalize(request.result || null));
         request.onerror = () => reject(request.error);
       });
     } finally { database.close(); }
@@ -58,7 +66,8 @@
 
   async function save(document, { indexedDb } = {}) {
     const database = await openDatabase(indexedDb);
-    try { await transaction(database, 'readwrite', (store) => store.put(document)); return document; }
+    const normalized = normalize(document);
+    try { await transaction(database, 'readwrite', (store) => store.put(normalized)); return normalized; }
     finally { database.close(); }
   }
 
@@ -68,5 +77,5 @@
     finally { database.close(); }
   }
 
-  return { DATABASE, STORE, VERSION, get, list, openDatabase, remove, save };
+  return { DATABASE, STORE, VERSION, get, list, normalize, openDatabase, remove, save };
 });

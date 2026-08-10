@@ -1,0 +1,12 @@
+{
+  "schema": "officejur/document-engine-manifest",
+  "version": 1,
+  "status": "not-installed",
+  "engine": "",
+  "adapter": "",
+  "wasm": "",
+  "source": "",
+  "commit": "",
+  "license": "",
+  "formats": []
+}

@@ -18,6 +18,7 @@
     <script src="../../financeiro/assets/storage.js?v=1" defer></script>
     <script src="../../financeiro/assets/data-store.js?v=1" defer></script>
     <script src="./assets/storage.js?v=1" defer></script>
+    <script src="./assets/engine.js?v=1" defer></script>
     <script src="./assets/app.js?v=1" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
@@ -95,7 +96,11 @@
             <label for="office-notes">Rascunho e anotações locais
               <textarea id="office-notes" placeholder="Registre aqui observações ou conteúdo de trabalho deste arquivo..."></textarea>
             </label>
-            <p class="engine-note"><strong>Motor Office em avaliação.</strong> O arquivo original permanece preservado localmente. A edição estrutural DOCX, XLSX e PPTX será conectada a um engine WASM em uma próxima etapa; este protótipo não altera o binário original.</p>
+            <div class="engine-actions">
+              <button id="engine-round-trip" class="button secondary" type="button">Testar round-trip</button>
+              <span id="engine-status" class="engine-status" role="status" aria-live="polite">Engine WASM não carregado</span>
+            </div>
+            <p class="engine-note"><strong>Motor Office em avaliação.</strong> O arquivo original permanece preservado localmente. O round-trip abaixo só será habilitado quando um engine WASM auditado estiver instalado neste build.</p>
           </div>
         </section>
       </section>

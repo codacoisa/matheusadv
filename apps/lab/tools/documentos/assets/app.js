@@ -2,10 +2,12 @@
   'use strict';
 
   const storage = window.OfficeJurLabDocuments;
+  const engineApi = window.OfficeJurDocumentEngine;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const $ = (selector) => document.querySelector(selector);
   const state = { clients: [], documents: [], selectedId: '', query: '', busy: false };
+  let engineClient = null;
   const els = {
     status: $('#status'),
     count: $('#document-count'),
@@ -22,6 +24,8 @@
     csvPreview: $('#csv-preview'),
     officeEditor: $('#office-editor'),
     officeNotes: $('#office-notes'),
+    engineRoundTrip: $('#engine-round-trip'),
+    engineStatus: $('#engine-status'),
     dialog: $('#document-dialog'),
     form: $('#document-form'),
     clientSelect: $('#client-select'),
@@ -49,6 +53,17 @@
   function setStatus(message, error = false) {
     els.status.textContent = message;
     els.status.classList.toggle('error', error);
+  }
+
+  function setEngineStatus(message, error = false) {
+    els.engineStatus.textContent = message;
+    els.engineStatus.classList.toggle('error', error);
+  }
+
+  function getEngineClient() {
+    if (!engineApi?.create) return null;
+    engineClient ||= engineApi.create();
+    return engineClient;
   }
 
   function createOption(value, label) {
@@ -135,6 +150,7 @@
     const isCsv = documentRecord.extension === 'csv';
     els.csvEditor.hidden = !isCsv;
     els.officeEditor.hidden = isCsv;
+    els.engineRoundTrip.disabled = isCsv || !documentRecord.file;
     if (isCsv) {
       els.csvContent.value = documentRecord.content || '';
       renderCsvPreview();
@@ -142,6 +158,24 @@
     } else {
       els.officeNotes.value = documentRecord.notes || '';
       els.editorNotice.textContent = documentRecord.fileName ? `Original preservado: ${documentRecord.fileName}. As anotações abaixo são salvas localmente.` : 'Documento criado sem arquivo binário. Use as anotações enquanto o motor Office está em avaliação.';
+      setEngineStatus(documentRecord.file ? 'Verificando engine WASM…' : 'Sem arquivo binário para testar');
+      void refreshEngineStatus(documentRecord);
+    }
+  }
+
+  async function refreshEngineStatus(documentRecord) {
+    if (!documentRecord.file) return;
+    const client = getEngineClient();
+    if (!client) {
+      setEngineStatus('Web Worker indisponível neste navegador', true);
+      return;
+    }
+    try {
+      const result = await client.probe();
+      if (state.selectedId !== documentRecord.id) return;
+      setEngineStatus(result.available ? `Engine disponível: ${result.manifest.engine}` : result.reason, !result.available);
+    } catch (error) {
+      if (state.selectedId === documentRecord.id) setEngineStatus(error.message, true);
     }
   }
 
@@ -179,10 +213,14 @@
     if (!formatNames[selectedExtension]) { setStatus('Formato não suportado. Use DOCX, XLSX, PPTX ou CSV.', true); return; }
     if (file && !['docx', 'xlsx', 'pptx', 'csv'].includes(selectedExtension)) { setStatus('Escolha um arquivo DOCX, XLSX, PPTX ou CSV.', true); return; }
     const timestamp = now();
+    const fileBytes = file ? await file.arrayBuffer() : null;
+    const fileBlob = fileBytes ? new Blob([fileBytes], { type: file.type || mimeTypes[selectedExtension] }) : null;
     const record = {
       id: id(), clientId, clientName: clientName(clientId), name: (els.name.value.trim() || baseName(file?.name) || 'Documento sem título'), extension: selectedExtension,
       mimeType: file?.type || mimeTypes[selectedExtension], source: file ? 'imported' : 'created', fileName: file?.name || '', content: selectedExtension === 'csv' && file ? await file.text() : '', notes: '', createdAt: timestamp, updatedAt: timestamp,
-      file: file ? new Blob([await file.arrayBuffer()], { type: file.type || mimeTypes[selectedExtension] }) : null,
+      file: fileBlob,
+      originalFile: fileBlob ? new Blob([fileBytes], { type: file.type || mimeTypes[selectedExtension] }) : null,
+      engine: { status: 'not-tested' },
     };
     await storage.save(record);
     state.documents = await storage.list();
@@ -202,6 +240,34 @@
     state.documents = await storage.list();
     setStatus('Alterações salvas localmente.');
     render();
+  }
+
+  async function runEngineRoundTrip() {
+    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
+    if (!documentRecord?.file || documentRecord.extension === 'csv') return;
+    const client = getEngineClient();
+    if (!client) {
+      setEngineStatus('Web Worker indisponível neste navegador', true);
+      return;
+    }
+    els.engineRoundTrip.disabled = true;
+    setEngineStatus('Executando round-trip local…');
+    try {
+      const editedFile = await client.roundTrip({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType });
+      documentRecord.file = editedFile;
+      documentRecord.engine = { status: 'round-tripped', at: now() };
+      documentRecord.updatedAt = now();
+      await storage.save(documentRecord);
+      state.documents = await storage.list();
+      setStatus('Round-trip concluído localmente; o original foi preservado.');
+      setEngineStatus('Round-trip concluído');
+      render();
+    } catch (error) {
+      setEngineStatus(error.message, true);
+      setStatus('O engine ainda não conseguiu processar este documento.', true);
+    } finally {
+      els.engineRoundTrip.disabled = !documentRecord.file;
+    }
   }
 
   async function downloadCurrent() {
@@ -236,6 +302,7 @@
   els.csvContent.addEventListener('input', renderCsvPreview);
   $('#save-document').addEventListener('click', () => void saveCurrent());
   $('#download-document').addEventListener('click', () => void downloadCurrent());
+  els.engineRoundTrip.addEventListener('click', () => void runEngineRoundTrip());
   $('#editor-view').addEventListener('contextmenu', (event) => { if (event.target.closest('#editor-title')) event.preventDefault(); });
   $('#editor-view').addEventListener('dblclick', (event) => { if (event.target.closest('#editor-title')) void removeCurrent(); });
   els.file.addEventListener('change', () => { const file = els.file.files?.[0]; if (file) { els.type.value = extension(file.name); if (!els.name.value) els.name.value = baseName(file.name); } });

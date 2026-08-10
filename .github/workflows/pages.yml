@@ -41,6 +41,9 @@ jobs:
         working-directory: apps/financeiro
         run: npm test
 
+      - name: Testar contrato do engine de documentos
+        run: npm run test:lab:documentos
+
       - name: Testar integração com Mercado Pago
         working-directory: apps/financeiro/worker
         run: npm test

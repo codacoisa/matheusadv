@@ -361,6 +361,24 @@ test('Documentos vincula cliente e salva CSV localmente', async ({ page }) => {
   await expect(page.locator('#csv-preview')).toContainText('Teste');
 });
 
+test('Documentos preserva o binário Office e diagnostica engine ausente', async ({ page }) => {
+  await prepareCalculationPage(page, 'lab/documentos/');
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await page.locator('#client-select').selectOption('client-test');
+  await page.locator('#document-name').fill('Contrato de teste');
+  await page.locator('#document-file').setInputFiles({
+    name: 'contrato.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    buffer: Buffer.from('PK\u0003\u0004 OfficeJur engine fixture'),
+  });
+  await page.getByRole('button', { name: 'Salvar documento' }).click();
+  await expect(page.getByRole('button', { name: /Contrato de teste/ })).toBeVisible();
+  await expect(page.locator('#engine-round-trip')).toBeEnabled();
+  await expect(page.locator('#engine-status')).toContainText('O engine WASM ainda não foi instalado');
+  await page.locator('#engine-round-trip').click();
+  await expect(page.getByText('O engine ainda não conseguiu processar este documento.')).toBeVisible();
+});
+
 test('páginas com tema institucional habilitam a barra de status no Safari', async ({ page }) => {
   const themedPages = [
     'calculos/',

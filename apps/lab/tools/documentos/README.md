@@ -13,6 +13,19 @@ Este módulo é experimental e, por enquanto, mantém os arquivos somente no nav
 
 DOCX, XLSX e PPTX ainda não são regravados por um motor Office nesta etapa. O módulo deixa a integração isolada para uma futura camada WASM; não baixa nem incorpora um editor remoto silenciosamente e não salva um arquivo inválido com extensão Office.
 
+## Camada de integração WASM
+
+O protótipo agora possui um contrato local, mas o engine ainda não está instalado:
+
+- `assets/engine/manifest.json` declara explicitamente se existe um engine auditado neste build;
+- `assets/office-engine.worker.js` isola o processamento do thread da interface;
+- `assets/engine.js` carrega o worker sob demanda e expõe `probe()` e `roundTrip()`;
+- o original importado é preservado em `originalFile`, enquanto `file` representa a versão corrente.
+
+Enquanto o manifest estiver com `status: "not-installed"`, nenhum código ou binário de terceiro é baixado. Para instalar um engine, o adaptador deverá expor `OfficeJurDocumentEngineAdapter.create()` e implementar `roundTrip({ bytes, extension, mimeType })`. A origem, o commit, a licença, o hash e o tamanho do bundle devem ser registrados no manifest e em `THIRD-PARTY-NOTICES.md` antes de ativar `status: "ready"`.
+
+O primeiro aceite técnico é um round-trip local de um DOCX, seguido de XLSX e PPTX. Isso valida o transporte de `Blob`, o worker, o carregamento no GitHub Pages e a preservação do original; não significa ainda que exista edição Office completa.
+
 ## Referências avaliadas
 
 - [ranuts/document](https://github.com/ranuts/document) — referência de editor/preview local no navegador, com suporte anunciado a DOCX, XLSX, PPTX e CSV. O repositório informa licença AGPL-3.0 e referências a `onlyoffice-x2t-wasm`, `sdkjs` e `web-apps`.
