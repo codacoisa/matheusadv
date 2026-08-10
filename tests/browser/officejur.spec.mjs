@@ -397,6 +397,30 @@ test('Documentos cria DOCX com o modelo institucional da implantação', async (
     const template = (await (await fetch(configured.base64Url)).text()).replace(/\s+/g, '');
     return records[0]?.source === 'institutional-template' && records[0]?.dataBase64 === template;
   })).toBe(true);
+  await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
+  const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
+  const printButton = office.locator('button:has(> i.icon--inverse.btn-print)');
+  await expect(printButton).toBeEnabled();
+  await printButton.click();
+  await expect(page.locator('#office-status')).toContainText(/Impressão aberta pelo OnlyOffice|Documento enviado para impressão/, { timeout: 60_000 });
+  await expect(page.locator('#office-status')).not.toHaveClass(/error/);
+});
+
+test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) => {
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.locator('#quick-client').click();
+  const street = page.locator('#client-form [name="street"]');
+
+  await street.fill('Rua das Flores Nº 10 QUADRA A lt 3');
+  await expect(street).toHaveValue('Rua das Flores 10 A 3');
+  await expect(page.locator('#street-warning')).toContainText('Preencha no campo Número');
+  await expect(page.locator('#toast')).toContainText('Preencha no campo Número');
+
+  await street.fill('Avenida Central');
+  await expect(page.locator('#street-warning')).toBeHidden();
+  await street.fill('Avenida Central qD. B');
+  await expect(street).toHaveValue('Avenida Central B');
+  await expect(page.locator('#street-warning')).toContainText('Preencha no campo Quadra');
 });
 
 test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }) => {
@@ -464,8 +488,7 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await nativeButton('redo').click();
   await expect(nativeButton('print')).toBeEnabled();
   await nativeButton('print').click();
-  await expect(page.locator('#office-status')).toContainText('Preparando documento para impressão', { timeout: 10_000 });
-  await expect(page.locator('.office-print-frame')).toHaveAttribute('src', /^blob:/, { timeout: 60_000 });
+  await expect(page.locator('#office-status')).toContainText(/Impressão aberta pelo OnlyOffice|Documento enviado para impressão/, { timeout: 60_000 });
   await office.locator('a[data-tab="file"]').click();
   await expect(office.locator('#file-menu-panel')).toBeVisible();
   await office.locator('#fm-btn-return').click();

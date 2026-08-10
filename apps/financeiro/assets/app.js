@@ -321,6 +321,46 @@
     $("#phone-hint").textContent =
       `${flagEmoji(select.value)} ${phoneCountryName(select.value)} · digite o número sem o DDI.`;
   }
+  const FORBIDDEN_STREET_PART = /(^|[\s,;:/()\-])(n[uú]mero|nº|n\.º|quadra|qd\.?|lote|lt\.?)(?=$|[\s,;:/().\-]|\d)/iu;
+  function streetRestriction(value) {
+    const match = FORBIDDEN_STREET_PART.exec(String(value || ""));
+    if (!match) return null;
+    const token = match[2], normalized = token.toLocaleLowerCase("pt-BR").replaceAll(".", "");
+    return {
+      token,
+      field: normalized.startsWith("q") ? "Quadra" : normalized.startsWith("l") ? "Lote" : "Número",
+      start: match.index + match[1].length,
+      end: match.index + match[1].length + token.length,
+    };
+  }
+  function streetRestrictionMessage(restriction) {
+    return `Não informe “${restriction.token}” no logradouro. Preencha no campo ${restriction.field}.`;
+  }
+  function clearStreetWarning() {
+    const warning = $("#street-warning");
+    warning.hidden = true;
+    warning.textContent = "";
+  }
+  function showStreetWarning(restriction, notify = true) {
+    const warning = $("#street-warning"), message = streetRestrictionMessage(restriction);
+    warning.textContent = message;
+    warning.hidden = false;
+    if (notify) toast(message);
+  }
+  function filterStreetInput(input) {
+    let value = input.value, restriction = streetRestriction(value), firstRestriction = restriction;
+    while (restriction) {
+      value = `${value.slice(0, restriction.start)}${value.slice(restriction.end)}`;
+      restriction = streetRestriction(value);
+    }
+    if (!firstRestriction) {
+      clearStreetWarning();
+      return true;
+    }
+    input.value = value.replace(/\s{2,}/g, " ").trimStart();
+    showStreetWarning(firstRestriction);
+    return false;
+  }
   function validCpf(value) {
     const d = String(value || "").replace(/\D/g, "");
     if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
@@ -404,6 +444,8 @@
       "rgIssuer",
       "street",
       "addressNumber",
+      "addressBlock",
+      "addressLot",
       "complement",
       "neighborhood",
       "city",
@@ -679,7 +721,11 @@
       email: client.email || "",
       street: client.street || "",
       number: client.addressNumber || "",
-      complement: client.complement || "",
+      complement: [
+        client.complement,
+        client.addressBlock ? `Quadra ${client.addressBlock}` : "",
+        client.addressLot ? `Lote ${client.addressLot}` : "",
+      ].filter(Boolean).join(", "),
       neighborhood: client.neighborhood || "",
       city: client.city || "",
       state: client.state || "",
@@ -2154,6 +2200,7 @@
       f.elements.state.value = String(c.state || "").toUpperCase();
     }
     syncPhoneField();
+    clearStreetWarning();
     $("#client-modal-title").textContent = c
       ? "Editar cliente"
       : "Novo cliente";
@@ -2376,6 +2423,8 @@
       address = [
         c.street,
         c.addressNumber,
+        c.addressBlock ? `Quadra ${c.addressBlock}` : "",
+        c.addressLot ? `Lote ${c.addressLot}` : "",
         c.complement,
         c.neighborhood,
         c.city,
@@ -3123,6 +3172,9 @@
     "blur",
     (e) => (e.target.value = titleCaseName(e.target.value)),
   );
+  $("#client-form [name=street]").addEventListener("input", (event) => {
+    filterStreetInput(event.currentTarget);
+  });
   ["nationality", "maritalStatus", "profession"].forEach((name) =>
     $("#client-form [name=" + name + "]").addEventListener(
       "blur",
@@ -3157,6 +3209,12 @@
     );
     if (missingField)
       return toast(`Informe ${missingField[1]} do cliente.`);
+    const forbiddenStreet = streetRestriction(fd.street);
+    if (forbiddenStreet) {
+      showStreetWarning(forbiddenStreet);
+      f.elements.street.focus();
+      return;
+    }
     if (hasDuplicateDocument(data.clients, fd.document, fd.id))
       return toast("Já existe um cliente cadastrado com este CPF.");
     const old = data.clients.find((x) => x.id === fd.id),

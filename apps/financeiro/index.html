@@ -23,7 +23,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=27" />
+    <link rel="stylesheet" href="./assets/styles.css?v=28" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <link rel="stylesheet" href="./assets/site-header.css?v=1" />
     <link rel="stylesheet" href="./assets/local-access-blocked.css?v=1" />
@@ -44,7 +44,7 @@
     <script src="./assets/gist-client.js?v=1" defer></script>
     <script src="./assets/gist-access-lease.js?v=4" defer></script>
     <script src="./assets/local-access-blocked.js?v=2" defer></script>
-    <script src="./assets/app.js?v=33" defer></script>
+    <script src="./assets/app.js?v=34" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -624,13 +624,19 @@
           ><label>RG<input name="rg" /></label
           ><label>Órgão expedidor<input name="rgIssuer" /></label
           ><label class="span-2"
-            >Endereço *<input
+            >Logradouro *<input
               name="street"
               required
               autocomplete="street-address"
-              placeholder="Logradouro" /></label
+              placeholder="Ex.: Rua das Flores"
+              aria-describedby="street-help street-warning" />
+              <small id="street-help">Informe somente o tipo e o nome do logradouro.</small>
+              <small id="street-warning" class="field-warning" role="alert" hidden></small>
+            </label
           ><label>Número<input name="addressNumber" /></label
           ><label>Complemento<input name="complement" /></label
+          ><label>Quadra<input name="addressBlock" /></label
+          ><label>Lote<input name="addressLot" /></label
           ><label>Bairro *<input name="neighborhood" required /></label
           ><label>Cidade *<input name="city" required /></label
           ><label>UF<input name="state" maxlength="2" /></label

@@ -194,6 +194,16 @@
       catch (error) { setOfficeStatus(error.message, true); }
       return;
     }
+    if (message.type === 'document:print-fallback') {
+      setOfficeStatus('Impressão aberta pelo OnlyOffice.');
+      setStatus('Este arquivo usou a impressão nativa do OnlyOffice porque a conversão para PDF não era compatível.');
+      return;
+    }
+    if (message.type === 'document:print-native') {
+      setOfficeStatus('Impressão aberta pelo OnlyOffice.');
+      setStatus('A impressão nativa preserva a formatação completa do documento DOCX.');
+      return;
+    }
     if (message.type === 'document:saved') {
       const automatic = Boolean(officeSave?.automatic);
       const savedRecord = officeSave

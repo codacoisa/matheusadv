@@ -19,6 +19,8 @@ test('Documentos integra o editor OnlyOffice', () => {
   assert.match(app, /document:rename/);
   assert.match(app, /document:focus/);
   assert.match(app, /document:print-ready/);
+  assert.match(app, /document:print-fallback/);
+  assert.match(app, /document:print-native/);
   assert.match(app, /office-print-frame/);
   assert.match(app, /document:saved/);
   assert.doesNotMatch(app, /data-rename-id|rename-file/);
@@ -68,6 +70,9 @@ test('o build publica o submódulo e a licença AGPL do editor', () => {
   assert.match(patch, /packages\/shared\/src\/document-utils\.ts/);
   assert.match(patch, /ranuts:document-native-save/);
   assert.match(patch, /ranuts:document-native-print/);
+  assert.match(patch, /requestNativeBrowserPrint/);
+  assert.match(patch, /document:print-fallback/);
+  assert.match(patch, /document:print-native/);
   assert.match(patch, /grabFocus/);
   assert.match(patch, /ranutsFocusRecovery/);
   assert.match(patch, /contentWindow\?\.focus/);

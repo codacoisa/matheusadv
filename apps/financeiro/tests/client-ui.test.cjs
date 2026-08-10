@@ -52,6 +52,18 @@ test("exigir os campos complementares do cliente", () => {
   assert.match(app, /city:\s*"cidade"/);
 });
 
+test("separar número, quadra e lote do logradouro do cliente", () => {
+  assert.match(html, /name="addressNumber"/);
+  assert.match(html, /name="addressBlock"/);
+  assert.match(html, /name="addressLot"/);
+  assert.match(html, /id="street-warning"[^>]*role="alert"/);
+  assert.match(app, /FORBIDDEN_STREET_PART/);
+  assert.match(app, /n\[uú\]mero\|nº\|n\\\.º\|quadra\|qd\\\.\?\|lote\|lt\\\.\?/);
+  assert.match(app, /Preencha no campo \$\{restriction\.field\}/);
+  assert.match(app, /client\.addressBlock \? `Quadra/);
+  assert.match(app, /client\.addressLot \? `Lote/);
+});
+
 test("remover do Gist o payload de PDFs excluídos", () => {
   assert.match(
     app,

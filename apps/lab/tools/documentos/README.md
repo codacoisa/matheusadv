@@ -35,8 +35,11 @@ Também usa `document:rename`, `document:focus` e `document:changed` para
 sincronizar o título, devolver o foco ao documento e acionar o salvamento
 automático somente quando houver alterações. O comando Salvar da faixa nativa
 do OnlyOffice publica o arquivo editado pela mesma ponte usada pelo botão do
-pop-up. O comando Imprimir gera um PDF pelo conversor WASM e o entrega a um
-quadro temporário, que abre a caixa de impressão do navegador.
+pop-up. O comando Imprimir usa a impressão nativa do OnlyOffice para DOCX,
+preservando documentos complexos com timbre, cabeçalhos e imagens sem depender
+da conversão WASM para PDF. Nos demais formatos, o conversor gera o PDF e o
+entrega a um quadro temporário que abre a caixa de impressão do navegador; se
+essa conversão falhar, a impressão nativa também é usada como alternativa.
 
 No Safari, a recuperação de foco ativa primeiro o iframe interno e depois a
 área editável do OnlyOffice. Ela é repetida por um quadro de animação e após

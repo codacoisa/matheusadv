@@ -2,7 +2,7 @@
 
 Módulo financeiro do OfficeJur. Controla clientes, casos, honorários, recebimentos, despesas, custas, repasses, contas e inadimplência.
 
-Clientes e casos possuem cadastros independentes. O cliente reúne dados pessoais e de contato; nome completo, CPF válido, data de nascimento e telefone são obrigatórios. O CPF não pode ser repetido entre clientes. Telefones marcados como WhatsApp possuem atalho direto para conversa.
+Clientes e casos possuem cadastros independentes. O cliente reúne dados pessoais e de contato; nome completo, CPF válido, data de nascimento e telefone são obrigatórios. O CPF não pode ser repetido entre clientes. Telefones marcados como WhatsApp possuem atalho direto para conversa. No endereço, logradouro, número, quadra e lote são campos separados; termos que identificam esses complementos são retirados do logradouro durante a digitação e o formulário indica o campo correto.
 
 Todo processo ou caso judicial, administrativo, extrajudicial ou consultivo deve apontar para um cliente previamente cadastrado. O número ou referência é único, desconsiderando diferenças de máscara, pontuação, espaços, acentos e maiúsculas. O sistema bloqueia casos sem cliente e também impede excluir clientes que ainda possuam casos ou pacotes.
 
