@@ -83,7 +83,6 @@
       container: app,
       settingsHref: "../configuracoes/",
       statusElement: syncStatus,
-      retryButton: document.querySelector("#sync-retry"),
       footer: document.querySelector("office-site-footer"),
     });
   }
@@ -120,6 +119,5 @@
   access?.subscribe((lease) => {
     if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlocked();
   });
-  document.querySelector("#sync-retry")?.addEventListener("click", () => void sync.fromGist());
   void initialize();
 })();

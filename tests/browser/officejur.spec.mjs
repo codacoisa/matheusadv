@@ -66,10 +66,19 @@ for (const appPath of pages) {
 }
 
 test('headers com sincronização automática não exibem ação manual', async ({ page }) => {
-  for (const route of ['financeiro/', 'lab/controle-pagamentos/']) {
+  const synchronizedRoutes = [
+    'calculos/',
+    'calculos/facil/',
+    'calculos/completo/',
+    'calculos/pensao/',
+    'calculos/trabalhista/',
+    'financeiro/',
+    'lab/controle-pagamentos/',
+  ];
+  for (const route of synchronizedRoutes) {
     await page.goto(route, { waitUntil: 'networkidle' });
-    await expect(page.locator('.topbar #sync-now')).toHaveCount(0);
-    await expect(page.locator('.topbar').getByRole('button', { name: 'Sincronizar', exact: true })).toHaveCount(0);
+    await expect(page.locator('.topbar #sync-now, .topbar #sync-retry')).toHaveCount(0);
+    await expect(page.locator('.topbar').getByRole('button', { name: /^(Sincronizar|Tentar novamente)$/ })).toHaveCount(0);
   }
 });
 
