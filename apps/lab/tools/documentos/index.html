@@ -18,6 +18,7 @@
     <script src="../../financeiro/assets/storage.js?v=1" defer></script>
     <script src="../../financeiro/assets/data-store.js?v=1" defer></script>
     <script src="./assets/storage.js?v=1" defer></script>
+    <script src="./assets/office-templates.js?v=1" defer></script>
     <script src="./assets/engine.js?v=1" defer></script>
     <script src="./assets/app.js?v=1" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
@@ -82,6 +83,7 @@
             </div>
             <div class="editor-actions">
               <button id="download-document" class="button secondary" type="button">Baixar</button>
+              <button id="delete-document" class="button danger" type="button">Excluir</button>
               <button id="save-document" class="button primary" type="button">Salvar</button>
             </div>
           </header>
@@ -93,11 +95,16 @@
             <div id="csv-preview" class="csv-preview"></div>
           </div>
           <div id="office-editor" class="office-editor" hidden>
+            <div id="office-visual" class="office-visual" hidden>
+              <div class="preview-head"><strong>Editor visual experimental</strong><span>Texto editável no navegador</span></div>
+              <div id="office-content" class="office-content" contenteditable="true" role="textbox" aria-label="Conteúdo textual do documento" aria-multiline="true" spellcheck="true"></div>
+              <p class="visual-editor-note">O salvamento regrava o texto no arquivo local e preserva o original importado. Layout, imagens, tabelas e estilos ainda não são editáveis nesta etapa.</p>
+            </div>
             <label for="office-notes">Rascunho e anotações locais
               <textarea id="office-notes" placeholder="Registre aqui observações ou conteúdo de trabalho deste arquivo..."></textarea>
             </label>
             <div class="engine-actions">
-              <button id="engine-inspect" class="button secondary" type="button">Inspecionar localmente</button>
+              <button id="engine-inspect" class="button secondary" type="button">Abrir para editar</button>
               <span id="engine-status" class="engine-status" role="status" aria-live="polite">Engine WASM não carregado</span>
             </div>
             <div id="engine-preview" class="engine-preview" hidden>
@@ -105,7 +112,7 @@
               <pre id="engine-preview-text"></pre>
             </div>
             <div class="engine-edit">
-              <p class="engine-edit-copy"><strong>Edição estrutural experimental.</strong> Substitui a primeira ocorrência de texto no XML do arquivo e salva uma nova cópia local. Formatação visual e edição de layout não fazem parte desta etapa.</p>
+              <p class="engine-edit-copy"><strong>Ferramenta técnica.</strong> Use-a somente quando precisar substituir um trecho específico sem abrir o editor visual.</p>
               <div class="form-grid">
                 <label for="engine-search">Texto atual
                   <input id="engine-search" type="text" autocomplete="off">
@@ -151,6 +158,7 @@
             <input id="document-file" type="file" accept=".docx,.xlsx,.pptx,.csv">
           </label>
         </div>
+        <p class="field-help">Sem escolher arquivo, o OfficeJur cria um arquivo Office vazio no navegador para você abrir e editar.</p>
         <p id="client-empty" class="field-help" hidden>Nenhum cliente foi encontrado. Cadastre um cliente no <a href="../../financeiro/">Financeiro</a> antes de criar documentos.</p>
         <div class="dialog-actions">
           <button id="cancel-dialog" class="button ghost" type="button">Cancelar</button>

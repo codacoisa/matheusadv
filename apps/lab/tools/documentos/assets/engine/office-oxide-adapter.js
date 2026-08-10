@@ -31,24 +31,26 @@ function replaceFirstText(files, extension, search, replacement) {
     let textOffset = 0;
     while ((match = pattern.exec(source))) {
       const value = decodeXml(match[2]);
-      if (value) {
-        const innerStart = match.index + match[1].length;
-        nodes.push({
-          end: textOffset + value.length,
-          innerEnd: innerStart + match[2].length,
-          innerStart,
-          start: textOffset,
-          value,
-        });
-        textOffset += value.length;
-      }
+      const innerStart = match.index + match[1].length;
+      nodes.push({
+        end: textOffset + value.length,
+        innerEnd: innerStart + match[2].length,
+        innerStart,
+        start: textOffset,
+        value,
+      });
+      textOffset += value.length;
     }
 
     const fullText = nodes.map((node) => node.value).join('');
-    const matchStart = fullText.indexOf(search);
+    if (!search && fullText) continue;
+    const matchStart = search ? fullText.indexOf(search) : 0;
     if (matchStart < 0) continue;
     const matchEnd = matchStart + search.length;
-    const affected = nodes.filter((node) => node.end > matchStart && node.start < matchEnd);
+    const affected = search
+      ? nodes.filter((node) => node.end > matchStart && node.start < matchEnd)
+      : nodes.filter((node) => node.value.length === 0).slice(0, 1);
+    if (!affected.length) continue;
     let edited = source;
     for (let index = affected.length - 1; index >= 0; index -= 1) {
       const node = affected[index];
@@ -84,7 +86,7 @@ export async function create({ manifest, baseUrl }) {
       }
     },
     replaceText({ bytes, extension, search, replacement }) {
-      if (!search) throw new Error('Informe o texto que deve ser substituído.');
+      if (typeof search !== 'string') throw new Error('Informe o texto que deve ser substituído.');
       if (typeof replacement !== 'string') throw new Error('Informe o novo texto.');
       const files = unzipSync(bytes);
       const replaced = replaceFirstText(files, extension, search, replacement);

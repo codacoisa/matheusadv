@@ -362,6 +362,25 @@ test('Documentos vincula cliente e salva CSV localmente', async ({ page }) => {
   await expect(page.locator('#csv-preview')).toContainText('Teste');
 });
 
+test('Documentos cria Office em branco, abre editor visual e permite excluir', async ({ page }) => {
+  await prepareCalculationPage(page, 'lab/documentos/');
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await page.locator('#client-select').selectOption('client-test');
+  await page.locator('#document-name').fill('Rascunho visual');
+  await page.locator('#document-type').selectOption('docx');
+  await page.getByRole('button', { name: 'Salvar documento' }).click();
+  await expect(page.getByRole('button', { name: /Rascunho visual/ })).toBeVisible();
+  await expect(page.locator('#engine-inspect')).toBeEnabled();
+  await page.locator('#engine-inspect').click();
+  await expect(page.locator('#office-visual')).toBeVisible();
+  await page.locator('#office-content').fill('Petição criada no editor visual local.');
+  await page.locator('#save-document').click();
+  await expect(page.getByText('Alterações salvas localmente.')).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.locator('#delete-document').click();
+  await expect(page.getByText('Nenhum documento aberto')).toBeVisible();
+});
+
 test('Documentos preserva o binário Office e carrega o engine WASM local', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();

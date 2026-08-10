@@ -2,11 +2,12 @@
   'use strict';
 
   const storage = window.OfficeJurLabDocuments;
+  const templates = window.OfficeJurDocumentTemplates;
   const engineApi = window.OfficeJurDocumentEngine;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const $ = (selector) => document.querySelector(selector);
-  const state = { clients: [], documents: [], selectedId: '', query: '', busy: false };
+  const state = { clients: [], documents: [], selectedId: '', query: '', busy: false, officeEditor: { id: '', originalText: '' } };
   let engineClient = null;
   const els = {
     status: $('#status'),
@@ -19,10 +20,13 @@
     editorTitle: $('#editor-title'),
     editorClient: $('#editor-client'),
     editorNotice: $('#editor-notice'),
+    deleteDocument: $('#delete-document'),
     csvEditor: $('#csv-editor'),
     csvContent: $('#csv-content'),
     csvPreview: $('#csv-preview'),
     officeEditor: $('#office-editor'),
+    officeVisual: $('#office-visual'),
+    officeContent: $('#office-content'),
     officeNotes: $('#office-notes'),
     engineInspect: $('#engine-inspect'),
     engineStatus: $('#engine-status'),
@@ -155,17 +159,22 @@
     const isCsv = documentRecord.extension === 'csv';
     els.csvEditor.hidden = !isCsv;
     els.officeEditor.hidden = isCsv;
+    els.deleteDocument.disabled = false;
     els.engineInspect.disabled = isCsv || !documentRecord.file;
     els.engineReplace.disabled = isCsv || !documentRecord.file;
     els.enginePreview.hidden = true;
     els.enginePreviewText.textContent = '';
+    if (state.officeEditor.id !== documentRecord.id) {
+      els.officeVisual.hidden = true;
+      els.officeContent.textContent = '';
+    }
     if (isCsv) {
       els.csvContent.value = documentRecord.content || '';
       renderCsvPreview();
       els.editorNotice.textContent = documentRecord.source === 'imported' ? 'Este CSV foi importado do dispositivo e pode ser editado diretamente.' : 'Este CSV é um documento novo salvo somente neste navegador.';
     } else {
       els.officeNotes.value = documentRecord.notes || '';
-      els.editorNotice.textContent = documentRecord.fileName ? `Original preservado: ${documentRecord.fileName}. As anotações abaixo são salvas localmente.` : 'Documento criado sem arquivo binário. Use as anotações enquanto o motor Office está em avaliação.';
+      els.editorNotice.textContent = documentRecord.fileName ? `Arquivo local: ${documentRecord.fileName}. O original importado permanece preservado.` : 'Documento Office local criado em branco. Abra-o para começar a editar o texto.';
       setEngineStatus(documentRecord.file ? 'Verificando engine WASM…' : 'Sem arquivo binário para testar');
       void refreshEngineStatus(documentRecord);
     }
@@ -221,13 +230,23 @@
     if (!formatNames[selectedExtension]) { setStatus('Formato não suportado. Use DOCX, XLSX, PPTX ou CSV.', true); return; }
     if (file && !['docx', 'xlsx', 'pptx', 'csv'].includes(selectedExtension)) { setStatus('Escolha um arquivo DOCX, XLSX, PPTX ou CSV.', true); return; }
     const timestamp = now();
-    const fileBytes = file ? await file.arrayBuffer() : null;
-    const fileBlob = fileBytes ? new Blob([fileBytes], { type: file.type || mimeTypes[selectedExtension] }) : null;
+    const documentName = els.name.value.trim() || baseName(file?.name) || 'Documento sem título';
+    let fileBytes = file ? await file.arrayBuffer() : null;
+    if (!file && selectedExtension !== 'csv') {
+      if (!templates?.createBlank) { setStatus('Os modelos Office em branco não estão disponíveis neste build.', true); return; }
+      try {
+        fileBytes = await templates.createBlank(selectedExtension);
+      } catch (error) {
+        setStatus(`Não foi possível criar o modelo vazio: ${error.message}`, true);
+        return;
+      }
+    }
+    const fileBlob = fileBytes ? new Blob([fileBytes], { type: file?.type || mimeTypes[selectedExtension] }) : null;
     const record = {
-      id: id(), clientId, clientName: clientName(clientId), name: (els.name.value.trim() || baseName(file?.name) || 'Documento sem título'), extension: selectedExtension,
-      mimeType: file?.type || mimeTypes[selectedExtension], source: file ? 'imported' : 'created', fileName: file?.name || '', content: selectedExtension === 'csv' && file ? await file.text() : '', notes: '', createdAt: timestamp, updatedAt: timestamp,
+      id: id(), clientId, clientName: clientName(clientId), name: documentName, extension: selectedExtension,
+      mimeType: file?.type || mimeTypes[selectedExtension], source: file ? 'imported' : 'created', fileName: file?.name || (fileBlob ? `${documentName}.${selectedExtension}` : ''), content: selectedExtension === 'csv' && file ? await file.text() : '', notes: '', createdAt: timestamp, updatedAt: timestamp,
       file: fileBlob,
-      originalFile: fileBlob ? new Blob([fileBytes], { type: file.type || mimeTypes[selectedExtension] }) : null,
+      originalFile: fileBlob ? new Blob([fileBytes], { type: file?.type || mimeTypes[selectedExtension] }) : null,
       engine: { status: 'not-tested' },
     };
     await storage.save(record);
@@ -241,13 +260,34 @@
   async function saveCurrent() {
     const documentRecord = state.documents.find((item) => item.id === state.selectedId);
     if (!documentRecord) return;
-    if (documentRecord.extension === 'csv') documentRecord.content = els.csvContent.value;
-    else documentRecord.notes = els.officeNotes.value;
-    documentRecord.updatedAt = now();
-    await storage.save(documentRecord);
-    state.documents = await storage.list();
-    setStatus('Alterações salvas localmente.');
-    render();
+    try {
+      if (documentRecord.extension === 'csv') {
+        documentRecord.content = els.csvContent.value;
+      } else {
+        documentRecord.notes = els.officeNotes.value;
+        if (state.officeEditor.id === documentRecord.id && !els.officeVisual.hidden) {
+          const editedText = els.officeContent.innerText.replace(/\r\n/g, '\n');
+          const originalText = state.officeEditor.originalText;
+          if (editedText !== originalText) {
+            const client = getEngineClient();
+            if (!client) throw new Error('Web Worker indisponível neste navegador.');
+            setEngineStatus('Salvando texto no arquivo local…');
+            const result = await client.replaceText({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType, search: originalText, replacement: editedText });
+            documentRecord.file = result.blob;
+            documentRecord.engine = { status: 'visual-text-edited', at: now(), path: result.path, count: result.count };
+            state.officeEditor.originalText = editedText;
+          }
+        }
+      }
+      documentRecord.updatedAt = now();
+      await storage.save(documentRecord);
+      state.documents = await storage.list();
+      setStatus('Alterações salvas localmente.');
+      render();
+    } catch (error) {
+      setStatus(`Não foi possível salvar: ${error.message}`, true);
+      setEngineStatus(error.message, true);
+    }
   }
 
   async function inspectWithEngine() {
@@ -264,8 +304,11 @@
       const result = await client.inspect({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType });
       els.enginePreviewText.textContent = result.plainText || 'O engine não encontrou texto extraível neste arquivo.';
       els.enginePreview.hidden = false;
+      state.officeEditor = { id: documentRecord.id, originalText: result.plainText || '' };
+      els.officeContent.textContent = result.plainText || '';
+      els.officeVisual.hidden = false;
       setStatus(`Conteúdo ${result.format.toUpperCase()} lido localmente; o original foi preservado.`);
-      setEngineStatus(`${result.format.toUpperCase()} processado localmente`);
+      setEngineStatus(`${result.format.toUpperCase()} aberto para edição local`);
     } catch (error) {
       setEngineStatus(error.message, true);
       setStatus('O engine não conseguiu ler este documento.', true);
@@ -288,6 +331,7 @@
       const result = await client.replaceText({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType, search, replacement });
       documentRecord.file = result.blob;
       documentRecord.engine = { status: 'text-replaced', at: now(), path: result.path, count: result.count };
+      state.officeEditor = { id: '', originalText: '' };
       documentRecord.updatedAt = now();
       await storage.save(documentRecord);
       state.documents = await storage.list();
@@ -319,7 +363,7 @@
     const documentRecord = state.documents.find((item) => item.id === state.selectedId);
     if (!documentRecord || !confirm(`Excluir localmente “${documentRecord.name}”?`)) return;
     await storage.remove(documentRecord.id);
-    state.documents = await storage.list(); state.selectedId = '';
+    state.documents = await storage.list(); state.selectedId = ''; state.officeEditor = { id: '', originalText: '' };
     setStatus('Documento removido deste navegador.'); render();
   }
 
@@ -334,10 +378,9 @@
   els.csvContent.addEventListener('input', renderCsvPreview);
   $('#save-document').addEventListener('click', () => void saveCurrent());
   $('#download-document').addEventListener('click', () => void downloadCurrent());
+  $('#delete-document').addEventListener('click', () => void removeCurrent());
   els.engineInspect.addEventListener('click', () => void inspectWithEngine());
   els.engineReplace.addEventListener('click', () => void replaceTextWithEngine());
-  $('#editor-view').addEventListener('contextmenu', (event) => { if (event.target.closest('#editor-title')) event.preventDefault(); });
-  $('#editor-view').addEventListener('dblclick', (event) => { if (event.target.closest('#editor-title')) void removeCurrent(); });
   els.file.addEventListener('change', () => { const file = els.file.files?.[0]; if (file) { els.type.value = extension(file.name); if (!els.name.value) els.name.value = baseName(file.name); } });
 
   if (!storage || !financeStorage || !financeDataStore) {

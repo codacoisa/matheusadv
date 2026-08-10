@@ -36,6 +36,7 @@ h2 { font-size: 25px; }
 .button.primary { border-color: transparent; color: #17122a; background: var(--violet); }
 .button.secondary { color: var(--violet); background: rgba(189,162,255,.1); }
 .button.ghost { background: transparent; }
+.button.danger { border-color: rgba(255,180,171,.3); color: var(--danger); background: rgba(255,180,171,.08); }
 .button:disabled { cursor: not-allowed; opacity: .45; }
 .status-line { min-height: 24px; padding: 15px 0 3px; color: var(--gold); }
 .status-line.error { color: var(--danger); }
@@ -71,6 +72,11 @@ select option { color: #14152a; background: #f4f1ff; }
 .engine-preview { margin-top: 18px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.14); }
 .engine-preview .preview-head { margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .engine-preview pre { max-height: 260px; overflow: auto; margin: 0; padding: 13px; color: var(--ink); font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.office-visual { margin-top: 22px; border: 1px solid rgba(189,162,255,.35); border-radius: 10px; background: rgba(0,0,0,.14); }
+.office-visual .preview-head { margin: 0; padding: 11px 13px; border-bottom: 1px solid var(--line); }
+.office-content { min-height: 300px; max-height: 520px; overflow: auto; padding: 22px; color: #201a32; background: #fbf9ff; font: 16px/1.7 Georgia, "Times New Roman", serif; white-space: pre-wrap; outline: none; }
+.office-content:focus { box-shadow: inset 0 0 0 3px rgba(189,162,255,.35); }
+.visual-editor-note { margin: 0; padding: 10px 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .engine-edit { display: grid; gap: 14px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
 .engine-edit-copy { margin: 0; color: var(--muted); font-size: 12px; }
 .csv-editor, .office-editor { margin-top: 22px; }
