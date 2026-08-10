@@ -2242,14 +2242,6 @@ textarea {
     width: 38px;
     min-height: 38px;
   }
-  .top-actions #sync-now {
-    display: inline-flex;
-    width: 38px;
-    min-width: 38px;
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-  }
   .mobile-menu-btn {
     display: inline-block;
   }

@@ -617,7 +617,6 @@
       container: document.querySelector(".shell"),
       settingsHref: "../configuracoes/",
       statusElement: document.querySelector("#sync-label"),
-      syncButton: document.querySelector("#sync-now"),
       footer: document.querySelector("office-site-footer"),
       mobileMenuButton: document.querySelector("#mobile-menu-btn"),
     });
@@ -3920,7 +3919,6 @@
         toast(error.message);
       }
   });
-  $("#sync-now").onclick = () => pushGist().catch((e) => toast(e.message));
   $("#download-raw-storage").onclick = () =>
     downloadRawStorage().catch((error) => showStorageFailure(error));
   document.addEventListener("click", (e) => {

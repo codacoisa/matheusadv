@@ -65,6 +65,14 @@ for (const appPath of pages) {
   });
 }
 
+test('headers com sincronização automática não exibem ação manual', async ({ page }) => {
+  for (const route of ['financeiro/', 'lab/controle-pagamentos/']) {
+    await page.goto(route, { waitUntil: 'networkidle' });
+    await expect(page.locator('.topbar #sync-now')).toHaveCount(0);
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Sincronizar', exact: true })).toHaveCount(0);
+  }
+});
+
 test('lease expirado bloqueia Cálculos antes de expor os dados e preserva a cópia para revalidação', async ({ page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {

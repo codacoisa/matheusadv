@@ -65,7 +65,6 @@
     pieLegend: $('#pie-legend'),
     pieCaption: $('#pie-caption'),
     barChart: $('#bar-chart'),
-    syncNow: $('#sync-now'),
     paymentsModal: $('#payments-modal'),
     paymentsTitle: $('#payments-title'),
     paymentsSubtitle: $('#payments-subtitle'),
@@ -1032,7 +1031,6 @@
     els.personDeleteModal.addEventListener('click', (event) => {
       if (event.target === els.personDeleteModal) closeDeletePersonDialog();
     });
-    els.syncNow.addEventListener('click', () => runGistAction(pushToGist, 'Sincronizando...'));
   }
 
   async function bootstrapAccess() {
@@ -1057,7 +1055,6 @@
       container: document.querySelector('main'),
       settingsHref: '../../configuracoes/',
       statusElement: els.storageStatus,
-      syncButton: els.syncNow,
       footer: document.querySelector('office-site-footer'),
     });
   }
