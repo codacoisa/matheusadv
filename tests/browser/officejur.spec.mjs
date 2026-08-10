@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { minimalDocx } from './office-fixtures.cjs';
+import { minimalDocx, minimalPptx, minimalXlsx } from './office-fixtures.cjs';
 
 async function prepareCalculationPage(page, path = 'calculos/') {
   await page.goto('financeiro/', { waitUntil: 'networkidle' });
@@ -379,6 +379,27 @@ test('Documentos preserva o binário Office e carrega o engine WASM local', asyn
   await page.locator('#engine-inspect').click();
   await expect(page.locator('#engine-preview-text')).toContainText('OfficeJur WASM');
   await expect(page.getByText('Conteúdo DOCX lido localmente; o original foi preservado.')).toBeVisible();
+});
+
+test('Documentos inspeciona XLSX e PPTX com o mesmo engine local', async ({ page }) => {
+  const fixtures = [
+    { extension: 'xlsx', name: 'planilha.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', text: 'OfficeJur XLSX', buffer: minimalXlsx('OfficeJur XLSX') },
+    { extension: 'pptx', name: 'apresentacao.pptx', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', text: 'OfficeJur PPTX', buffer: minimalPptx('OfficeJur PPTX') },
+  ];
+
+  await prepareCalculationPage(page, 'lab/documentos/');
+  for (const fixture of fixtures) {
+    await page.getByRole('button', { name: 'Novo documento' }).click();
+    await page.locator('#client-select').selectOption('client-test');
+    await page.locator('#document-name').fill(fixture.name);
+    await page.locator('#document-file').setInputFiles({ name: fixture.name, mimeType: fixture.mimeType, buffer: fixture.buffer });
+    await page.getByRole('button', { name: 'Salvar documento' }).click();
+    await expect(page.getByRole('button', { name: new RegExp(fixture.name.replace('.', '\\.')) })).toBeVisible();
+    await expect(page.locator('#engine-status')).toContainText('Engine disponível: office-oxide-wasm 0.1.8');
+    await page.locator('#engine-inspect').click();
+    await expect(page.locator('#engine-preview-text')).toContainText(fixture.text);
+    await expect(page.getByText(`Conteúdo ${fixture.extension.toUpperCase()} lido localmente; o original foi preservado.`)).toBeVisible();
+  }
 });
 
 test('páginas com tema institucional habilitam a barra de status no Safari', async ({ page }) => {
