@@ -44,18 +44,22 @@ function replaceFirstText(files, extension, search, replacement) {
 
     const fullText = nodes.map((node) => node.value).join('');
     if (!search && fullText) continue;
-    const matchStart = search ? fullText.indexOf(search) : 0;
+    const exactMatchStart = search ? fullText.indexOf(search) : 0;
+    const fullDocumentMatch = search && exactMatchStart < 0 && fullText.replace(/\s/g, '') === search.replace(/\s/g, '');
+    const matchStart = fullDocumentMatch ? 0 : exactMatchStart;
     if (matchStart < 0) continue;
     const matchEnd = matchStart + search.length;
-    const affected = search
-      ? nodes.filter((node) => node.end > matchStart && node.start < matchEnd)
-      : nodes.filter((node) => node.value.length === 0).slice(0, 1);
+    const affected = !search
+      ? nodes.filter((node) => node.value.length === 0).slice(0, 1)
+      : fullDocumentMatch
+        ? nodes.filter((node) => node.value.length > 0)
+        : nodes.filter((node) => node.end > matchStart && node.start < matchEnd);
     if (!affected.length) continue;
     let edited = source;
     for (let index = affected.length - 1; index >= 0; index -= 1) {
       const node = affected[index];
-      const localStart = Math.max(0, matchStart - node.start);
-      const localEnd = Math.min(node.value.length, matchEnd - node.start);
+      const localStart = fullDocumentMatch ? 0 : Math.max(0, matchStart - node.start);
+      const localEnd = fullDocumentMatch ? node.value.length : Math.min(node.value.length, matchEnd - node.start);
       let value = node.value.slice(0, localStart);
       if (index === 0) value += replacement;
       if (index === affected.length - 1) value += node.value.slice(localEnd);

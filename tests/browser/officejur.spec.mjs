@@ -397,6 +397,25 @@ test('Documentos permite limpar a biblioteca local com confirmação', async ({ 
   await expect(page.locator('#clear-library')).toBeDisabled();
 });
 
+test('Documentos salva texto visual com múltiplos parágrafos', async ({ page }) => {
+  await prepareCalculationPage(page, 'lab/documentos/');
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await page.locator('#client-select').selectOption('client-test');
+  await page.locator('#document-name').fill('Petição com parágrafos');
+  await page.locator('#document-file').setInputFiles({
+    name: 'peticao.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    buffer: minimalDocx({ paragraphs: ['OfficeJur WASM', 'Segundo parágrafo'] }),
+  });
+  await page.getByRole('button', { name: 'Salvar documento' }).click();
+  await expect(page.locator('#office-content')).toContainText('OfficeJur WASM');
+  await page.locator('#office-content').fill('OfficeJur editado\nSegundo parágrafo revisado');
+  await page.locator('#save-document').click();
+  await expect(page.getByText('Alterações salvas localmente.')).toBeVisible();
+  await page.locator('#engine-inspect').click();
+  await expect(page.locator('#office-content')).toContainText('Segundo parágrafo revisado');
+});
+
 test('Documentos preserva o binário Office e carrega o engine WASM local', async ({ page }) => {
   await prepareCalculationPage(page, 'lab/documentos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();

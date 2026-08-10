@@ -7,7 +7,7 @@
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const $ = (selector) => document.querySelector(selector);
-  const state = { clients: [], documents: [], selectedId: '', query: '', busy: false, officeEditor: { id: '', originalText: '' } };
+  const state = { clients: [], documents: [], selectedId: '', query: '', busy: false, openingOfficeId: '', officeEditor: { id: '', originalText: '' } };
   let engineClient = null;
   const els = {
     status: $('#status'),
@@ -179,6 +179,12 @@
       els.editorNotice.textContent = documentRecord.fileName ? `Arquivo local: ${documentRecord.fileName}. O original importado permanece preservado.` : 'Documento Office local criado em branco. Abra-o para começar a editar o texto.';
       setEngineStatus(documentRecord.file ? 'Verificando engine WASM…' : 'Sem arquivo binário para testar');
       void refreshEngineStatus(documentRecord);
+      if (documentRecord.file && state.officeEditor.id !== documentRecord.id && state.openingOfficeId !== documentRecord.id) {
+        state.openingOfficeId = documentRecord.id;
+        void inspectWithEngine(documentRecord.id).finally(() => {
+          if (state.openingOfficeId === documentRecord.id) state.openingOfficeId = '';
+        });
+      }
     }
   }
 
@@ -292,8 +298,8 @@
     }
   }
 
-  async function inspectWithEngine() {
-    const documentRecord = state.documents.find((item) => item.id === state.selectedId);
+  async function inspectWithEngine(documentId = state.selectedId) {
+    const documentRecord = state.documents.find((item) => item.id === documentId);
     if (!documentRecord?.file || documentRecord.extension === 'csv') return;
     const client = getEngineClient();
     if (!client) {
@@ -304,13 +310,15 @@
     setEngineStatus('Lendo conteúdo localmente…');
     try {
       const result = await client.inspect({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType });
+      if (state.selectedId !== documentRecord.id) return;
       els.enginePreviewText.textContent = result.plainText || 'O engine não encontrou texto extraível neste arquivo.';
       els.enginePreview.hidden = false;
       state.officeEditor = { id: documentRecord.id, originalText: result.plainText || '' };
       els.officeContent.textContent = result.plainText || '';
       els.officeVisual.hidden = false;
       setStatus(`Conteúdo ${result.format.toUpperCase()} lido localmente; o original foi preservado.`);
-      setEngineStatus(`${result.format.toUpperCase()} aberto para edição local`);
+      const availability = await client.probe();
+      setEngineStatus(availability.available ? `Engine disponível: ${availability.manifest.engine} ${availability.manifest.packageVersion}` : availability.reason, !availability.available);
     } catch (error) {
       setEngineStatus(error.message, true);
       setStatus('O engine não conseguiu ler este documento.', true);
@@ -333,7 +341,8 @@
       const result = await client.replaceText({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType, search, replacement });
       documentRecord.file = result.blob;
       documentRecord.engine = { status: 'text-replaced', at: now(), path: result.path, count: result.count };
-      state.officeEditor = { id: '', originalText: '' };
+      state.officeEditor = { id: documentRecord.id, originalText: '' };
+      els.officeVisual.hidden = true;
       documentRecord.updatedAt = now();
       await storage.save(documentRecord);
       state.documents = await storage.list();
