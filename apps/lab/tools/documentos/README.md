@@ -20,6 +20,9 @@ upload automático ou integração com servidor.
 
 O editor é incorporado por um iframe same-origin construído a partir do
 submódulo `third_party/ranuts-document`, baseado na camada web do OnlyOffice.
+O build fixa o submódulo no commit público `fcaa66e` e aplica o patch
+`third_party/ranuts-document.patch` para o caminho do GitHub Pages e o idioma
+português, sem depender de commits privados ou locais.
 O aplicativo principal envia o arquivo por `postMessage` e recebe os eventos
 `document:ready`, `document:opened`, `document:saved` e `document:error`.
 

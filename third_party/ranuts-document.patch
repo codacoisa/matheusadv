@@ -1,0 +1,259 @@
+diff --git a/packages/shared/src/document-utils.ts b/packages/shared/src/document-utils.ts
+index 477a4ae..f0e21ae 100644
+--- a/packages/shared/src/document-utils.ts
++++ b/packages/shared/src/document-utils.ts
+@@ -2,22 +2,15 @@ import { getMime } from 'ranuts/utils';
+ import type { DocumentType } from './document-types';
+ 
+ /**
+- * Get base path based on deployment environment
+- * - GitHub Pages: uses /document/ path
+- * - Docker/Other: uses root path /
++ * Get the asset base path from the current document URL. This keeps the
++ * editor embeddable below an arbitrary static-site subdirectory, including
++ * GitHub Pages project sites and same-origin iframes.
+  */
+ export const getBasePath = (): string => {
+   if (typeof window === 'undefined') {
+     return '/';
+   }
+-
+-  const pathname = window.location.pathname;
+-  // Check if we're in GitHub Pages (path starts with /document/ or contains /document/)
+-  if (pathname.startsWith('/document/') || pathname === '/document') {
+-    return '/document/';
+-  }
+-  // Docker or other deployments use root path
+-  return '/';
++  return new URL('./', window.document.baseURI).pathname;
+ };
+ 
+ export const BASE_PATH = getBasePath();
+diff --git a/packages/shared/src/i18n.ts b/packages/shared/src/i18n.ts
+index 3987884..5d12200 100644
+--- a/packages/shared/src/i18n.ts
++++ b/packages/shared/src/i18n.ts
+@@ -24,6 +24,8 @@ export enum OnlyOfficeLanguageCode {
+   ZH_CN = 'zh-CN',
+   /** English */
+   EN = 'en',
++  /** Brazilian Portuguese */
++  PT_BR = 'pt-BR',
+ }
+ 
+ export type Language = LanguageCode.ZH | LanguageCode.EN;
+@@ -299,6 +301,8 @@ class I18n {
+    * - Simplified Chinese (Mainland China): 'zh-CN'
+    */
+   getOnlyOfficeLang(): string {
++    const requestedLocale = this.getUrlParameter('locale');
++    if (requestedLocale?.toLowerCase().startsWith('pt')) return OnlyOfficeLanguageCode.PT_BR;
+     // Mapping from internal language code to OnlyOffice BCP 47 standard code
+     const langMap: Record<Language, OnlyOfficeLanguageCode> = {
+       [LanguageCode.ZH]: OnlyOfficeLanguageCode.ZH_CN,
+diff --git a/public/web-apps/apps/documenteditor/main/app.js b/public/web-apps/apps/documenteditor/main/app.js
+index 9ea61a4..3ac2e32 100644
+--- a/public/web-apps/apps/documenteditor/main/app.js
++++ b/public/web-apps/apps/documenteditor/main/app.js
+@@ -3532,6 +3532,31 @@ define('documenteditor/main/locale/zh.json', {
+   'DE.Views.WatermarkSettingsDialog.tipFontSize': '字号',
+ });
+ 
++define('documenteditor/main/locale/pt-br.json', {
++  'Common.Translation.textMoreButton': 'Mais',
++  'Common.Views.Header.textPrint': 'Imprimir',
++  'Common.Views.Header.textSaveBegin': 'Salvando...',
++  'Common.Views.Header.textSaveChanged': 'Alterado',
++  'Common.Views.Header.textSaveEnd': 'Todas as alterações foram salvas',
++  'Common.Views.Header.textZoom': 'Zoom',
++  'DE.Controllers.Main.textRedo': 'Refazer',
++  'DE.Controllers.Main.textUndo': 'Desfazer',
++  'DE.Views.FileMenu.btnPrintCaption': 'Imprimir',
++  'DE.Views.FileMenu.btnSaveCaption': 'Salvar',
++  'DE.Views.Toolbar.textTabCollaboration': 'Colaboração',
++  'DE.Views.Toolbar.textTabDraw': 'Desenhar',
++  'DE.Views.Toolbar.textTabFile': 'Arquivo',
++  'DE.Views.Toolbar.textTabHome': 'Início',
++  'DE.Views.Toolbar.textTabInsert': 'Inserir',
++  'DE.Views.Toolbar.textTabLayout': 'Layout',
++  'DE.Views.Toolbar.textTabLinks': 'Referências',
++  'DE.Views.Toolbar.textTabProtect': 'Proteção',
++  'DE.Views.Toolbar.textTabReview': 'Revisão',
++  'DE.Views.Toolbar.textTabView': 'Exibir',
++  'DE.Views.Toolbar.textUndo': 'Desfazer',
++  'DE.Views.Toolbar.textRedo': 'Refazer',
++});
++
+ define('documenteditor/main/locale/en.json', {
+   'Common.Controllers.Chat.notcriticalErrorTitle': 'Warning',
+   'Common.Controllers.Desktop.hintBtnHome': 'Show main window',
+@@ -8054,7 +8079,8 @@ define('documenteditor/main/locale/en.json', {
+   'DE.Views.WatermarkSettingsDialog.tipFontSize': 'Font size',
+ });
+ var params = getUrlParams(),
+-  lang = (params.lang || 'en').split(/[\-\_]/)[0],
++  lang = (params.lang || 'en').toLowerCase().replace('_', '-'),
++  lang = lang === 'pt-br' ? lang : lang.split('-')[0],
+   logo = params.headerlogo ? encodeUrlParam(params.headerlogo) : null,
+   logoDark = params.headerlogodark ? encodeUrlParam(params.headerlogodark) : null,
+   checkLocalStorage =
+@@ -17681,7 +17707,7 @@ function _extend_object(t, e) {
+       apply = !1,
+       defLang = 'zh',
+       currentLang = defLang,
+-      _4letterLangs = ['pt-pt', 'zh-tw'],
++      _4letterLangs = ['pt-br', 'pt-pt', 'zh-tw'],
+       _applyLocalization = function (t, e) {
+         try {
+           if ((t && (loadcallback = t), e)) {
+@@ -110937,7 +110963,8 @@ var FONT_TYPE_RECENT = 4,
+     'locale',
+     'device_scale',
+     'documenteditor/main/locale/en.json',
+-  ], function (t, e, i, n, o, s, analytics, gateway, locale, deviceScale, en) {
++    'documenteditor/main/locale/pt-br.json',
++  ], function (t, e, i, n, o, s, analytics, gateway, locale, deviceScale, en, ptbr) {
+     var a;
+     (n.History && n.History.started) ||
+       (n.history.start(),
+@@ -111020,7 +111047,7 @@ var FONT_TYPE_RECENT = 4,
+             a.start();
+           });
+         },
+-        lang === 'zh' ? t : en,
++        lang === 'pt-br' ? Object.assign({}, en, ptbr) : lang === 'zh' ? t : en,
+       ));
+   }, function (t) {
+     'timeout' == t.requireType &&
+diff --git a/public/web-apps/apps/presentationeditor/main/app.js b/public/web-apps/apps/presentationeditor/main/app.js
+index 5ca1efb..78b5cb5 100644
+--- a/public/web-apps/apps/presentationeditor/main/app.js
++++ b/public/web-apps/apps/presentationeditor/main/app.js
+@@ -2777,6 +2777,26 @@ define('presentationeditor/main/locale/zh.json', {
+   'PE.Views.ViewTab.tipGuides': '显示参考线',
+   'PE.Views.ViewTab.tipInterfaceTheme': '界面主题',
+ });
++define('presentationeditor/main/locale/pt-br.json', {
++  'Common.Translation.textMoreButton': 'Mais',
++  'Common.Views.Header.textPrint': 'Imprimir',
++  'Common.Views.Header.textSaveBegin': 'Salvando...',
++  'Common.Views.Header.textSaveChanged': 'Alterado',
++  'Common.Views.Header.textSaveEnd': 'Todas as alterações foram salvas',
++  'Common.Views.Header.textZoom': 'Zoom',
++  'PE.Controllers.Main.textRedo': 'Refazer',
++  'PE.Controllers.Main.textUndo': 'Desfazer',
++  'PE.Views.Toolbar.textTabAnimation': 'Animação',
++  'PE.Views.Toolbar.textTabCollaboration': 'Revisão',
++  'PE.Views.Toolbar.textTabDraw': 'Desenhar',
++  'PE.Views.Toolbar.textTabFile': 'Arquivo',
++  'PE.Views.Toolbar.textTabHome': 'Início',
++  'PE.Views.Toolbar.textTabInsert': 'Inserir',
++  'PE.Views.Toolbar.textTabProtect': 'Proteger',
++  'PE.Views.Toolbar.textTabTransitions': 'Transições',
++  'PE.Views.Toolbar.textTabView': 'Exibir',
++});
++
+ define('presentationeditor/main/locale/en.json', {
+   'Common.Controllers.Chat.notcriticalErrorTitle': 'Warning',
+   'Common.Controllers.Chat.textEnterMessage': 'Enter your message here',
+@@ -14465,7 +14485,7 @@ function _extend_object(t, e) {
+       apply = !1,
+       defLang = 'zh',
+       currentLang = defLang,
+-      _4letterLangs = ['pt-pt', 'zh-tw'],
++      _4letterLangs = ['pt-br', 'pt-pt', 'zh-tw'],
+       _applyLocalization = function (t, e) {
+         try {
+           if ((t && (loadcallback = t), e)) {
+@@ -81192,11 +81212,13 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
+     'locale',
+     'device_scale',
+     'presentationeditor/main/locale/en.json',
+-  ], function (t, e, i, n, o, s, analytics, gateway, locale, deviceScale, en) {
++    'presentationeditor/main/locale/pt-br.json',
++  ], function (t, e, i, n, o, s, analytics, gateway, locale, deviceScale, en, ptbr) {
+     var a;
+     var currentLang = (function () {
+       var params = getUrlParams();
+-      return (params.lang || 'en').split(/[\-\_]/)[0];
++      const language = (params.lang || 'en').toLowerCase().replace('_', '-');
++      return language === 'pt-br' ? language : language.split('-')[0];
+     })();
+     (n.History && n.History.started) ||
+       (n.history.start(),
+@@ -81271,7 +81293,7 @@ var c_oHyperlinkType = { InternalLink: 0, WebLink: 1 },
+             a.start();
+           });
+         },
+-        currentLang === 'zh' ? t : en,
++        currentLang === 'pt-br' ? Object.assign({}, en, ptbr) : currentLang === 'zh' ? t : en,
+       ));
+   }, function (t) {
+     'timeout' == t.requireType &&
+diff --git a/public/web-apps/apps/spreadsheeteditor/main/app.js b/public/web-apps/apps/spreadsheeteditor/main/app.js
+index 7ffc13b..d70ca77 100644
+--- a/public/web-apps/apps/spreadsheeteditor/main/app.js
++++ b/public/web-apps/apps/spreadsheeteditor/main/app.js
+@@ -4292,6 +4292,27 @@ define('spreadsheeteditor/main/locale/zh.json', {
+   'SSE.Views.WBProtection.txtWBUnlockDescription': '输入密码解除保护',
+   'SSE.Views.WBProtection.txtWBUnlockTitle': '取消工作簿保护',
+ });
++define('spreadsheeteditor/main/locale/pt-br.json', {
++  'Common.Translation.textMoreButton': 'Mais',
++  'Common.Views.Header.textPrint': 'Imprimir',
++  'Common.Views.Header.textSaveBegin': 'Salvando...',
++  'Common.Views.Header.textSaveChanged': 'Alterado',
++  'Common.Views.Header.textSaveEnd': 'Todas as alterações foram salvas',
++  'Common.Views.Header.textZoom': 'Zoom',
++  'SSE.Controllers.Main.textRedo': 'Refazer',
++  'SSE.Controllers.Main.textUndo': 'Desfazer',
++  'SSE.Views.Toolbar.textTabCollaboration': 'Revisão',
++  'SSE.Views.Toolbar.textTabData': 'Dados',
++  'SSE.Views.Toolbar.textTabDraw': 'Desenhar',
++  'SSE.Views.Toolbar.textTabFile': 'Arquivo',
++  'SSE.Views.Toolbar.textTabFormula': 'Fórmulas',
++  'SSE.Views.Toolbar.textTabHome': 'Início',
++  'SSE.Views.Toolbar.textTabInsert': 'Inserir',
++  'SSE.Views.Toolbar.textTabLayout': 'Layout da página',
++  'SSE.Views.Toolbar.textTabProtect': 'Proteger',
++  'SSE.Views.Toolbar.textTabView': 'Exibir',
++});
++
+ define('spreadsheeteditor/main/locale/en.json', {
+   'Common.Controllers.Chat.notcriticalErrorTitle': 'Warning',
+   'Common.Controllers.Chat.textEnterMessage': 'Enter your message here',
+@@ -17615,7 +17636,7 @@ function _extend_object(t, e) {
+       apply = !1,
+       defLang = 'zh',
+       currentLang = defLang,
+-      _4letterLangs = ['pt-pt', 'zh-tw'],
++      _4letterLangs = ['pt-br', 'pt-pt', 'zh-tw'],
+       _applyLocalization = function (t, e) {
+         try {
+           if ((t && (loadcallback = t), e)) {
+@@ -113435,11 +113456,13 @@ var c_paragraphLinerule = { LINERULE_AUTO: 1, LINERULE_EXACT: 2 },
+     'locale',
+     'device_scale',
+     'spreadsheeteditor/main/locale/en.json',
+-  ], function (t, e, i, s, o, n, analytics, gateway, locale, deviceScale, en) {
++    'spreadsheeteditor/main/locale/pt-br.json',
++  ], function (t, e, i, s, o, n, analytics, gateway, locale, deviceScale, en, ptbr) {
+     var a;
+     var currentLang = (function () {
+       var params = getUrlParams();
+-      return (params.lang || 'en').split(/[\-\_]/)[0];
++      const language = (params.lang || 'en').toLowerCase().replace('_', '-');
++      return language === 'pt-br' ? language : language.split('-')[0];
+     })();
+     (s.History && s.History.started) ||
+       (s.history.start(),
+@@ -113519,7 +113542,7 @@ var c_paragraphLinerule = { LINERULE_AUTO: 1, LINERULE_EXACT: 2 },
+             a.start();
+           });
+         },
+-        currentLang === 'zh' ? t : en,
++        currentLang === 'pt-br' ? Object.assign({}, en, ptbr) : currentLang === 'zh' ? t : en,
+       ));
+   }, function (t) {
+     'timeout' == t.requireType &&
+

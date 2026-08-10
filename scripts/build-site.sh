@@ -62,10 +62,34 @@ for source in "$ROOT_DIR/apps/lab/tools/"*; do
 done
 
 RANUTS_EDITOR_SOURCE="$ROOT_DIR/third_party/ranuts-document"
+RANUTS_EDITOR_BASE="fcaa66eb92d1759c1ec695f668e7adf2e4c8150b"
+RANUTS_EDITOR_PATCH="$ROOT_DIR/third_party/ranuts-document.patch"
+RANUTS_PATCH_APPLIED=0
 if [[ ! -d "$RANUTS_EDITOR_SOURCE" ]]; then
   echo "Submódulo ranuts/document ausente; inicialize os submódulos antes de montar o site." >&2
   exit 1
 fi
+if [[ "$(git -C "$RANUTS_EDITOR_SOURCE" rev-parse HEAD)" != "$RANUTS_EDITOR_BASE" ]]; then
+  echo "O submódulo ranuts/document precisa estar em $RANUTS_EDITOR_BASE." >&2
+  exit 1
+fi
+if [[ ! -f "$RANUTS_EDITOR_PATCH" ]]; then
+  echo "Patch local do editor Office ausente: $RANUTS_EDITOR_PATCH" >&2
+  exit 1
+fi
+if git -C "$RANUTS_EDITOR_SOURCE" apply --check "$RANUTS_EDITOR_PATCH" >/dev/null 2>&1; then
+  git -C "$RANUTS_EDITOR_SOURCE" apply "$RANUTS_EDITOR_PATCH"
+  RANUTS_PATCH_APPLIED=1
+elif ! git -C "$RANUTS_EDITOR_SOURCE" apply --reverse --check "$RANUTS_EDITOR_PATCH" >/dev/null 2>&1; then
+  echo "Não foi possível aplicar o patch local do editor Office." >&2
+  exit 1
+fi
+cleanup_ranuts_editor() {
+  if [[ "$RANUTS_PATCH_APPLIED" == "1" ]]; then
+    git -C "$RANUTS_EDITOR_SOURCE" apply --reverse "$RANUTS_EDITOR_PATCH" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_ranuts_editor EXIT
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "pnpm é necessário para construir o editor Office local." >&2
   exit 1

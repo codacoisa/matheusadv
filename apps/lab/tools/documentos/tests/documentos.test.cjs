@@ -21,8 +21,12 @@ test('Documentos integra o editor OnlyOffice local', () => {
 
 test('o build publica o submódulo e a licença AGPL do editor', () => {
   const build = read('scripts/build-site.sh');
+  const patch = read('third_party/ranuts-document.patch');
 
-  assert.match(build, /third_party\/ranuts-document/);
+  assert.match(build, /RANUTS_EDITOR_BASE="fcaa66e/);
+  assert.match(build, /third_party\/ranuts-document\.patch/);
   assert.match(build, /pnpm --dir "\$RANUTS_EDITOR_SOURCE" run build/);
   assert.match(build, /AGPL-3\.0\.LICENSE/);
+  assert.match(patch, /packages\/shared\/src\/document-utils\.ts/);
+  assert.match(patch, /pt-br\.json/);
 });
