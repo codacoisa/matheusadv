@@ -11,20 +11,21 @@ Este módulo é experimental e, por enquanto, mantém os arquivos somente no nav
 - preservação do binário importado dos formatos Office e campo local de anotações;
 - exclusão apenas da cópia mantida neste navegador.
 
-DOCX, XLSX e PPTX ainda não são regravados por um motor Office nesta etapa. O módulo deixa a integração isolada para uma futura camada WASM; não baixa nem incorpora um editor remoto silenciosamente e não salva um arquivo inválido com extensão Office.
+DOCX, XLSX e PPTX ainda não são regravados por um motor Office nesta etapa. A primeira camada WASM faz leitura e prévia textual local, sem alterar o binário original. O módulo não baixa nem incorpora um editor remoto silenciosamente e não salva um arquivo inválido com extensão Office.
 
 ## Camada de integração WASM
 
-O protótipo agora possui um contrato local, mas o engine ainda não está instalado:
+O protótipo agora possui um contrato local e um primeiro engine WASM instalado:
 
-- `assets/engine/manifest.json` declara explicitamente se existe um engine auditado neste build;
+- `assets/engine/manifest.json` registra engine, versão, origem, licença, hashes e tamanho dos assets;
 - `assets/office-engine.worker.js` isola o processamento do thread da interface;
-- `assets/engine.js` carrega o worker sob demanda e expõe `probe()` e `roundTrip()`;
+- `assets/engine.js` carrega o worker sob demanda e expõe `probe()` e `inspect()`;
+- `assets/engine/office-oxide-adapter.js` adapta `office-oxide-wasm` para leitura de texto, Markdown e HTML;
 - o original importado é preservado em `originalFile`, enquanto `file` representa a versão corrente.
 
-Enquanto o manifest estiver com `status: "not-installed"`, nenhum código ou binário de terceiro é baixado. Para instalar um engine, o adaptador deverá expor `OfficeJurDocumentEngineAdapter.create()` e implementar `roundTrip({ bytes, extension, mimeType })`. A origem, o commit, a licença, o hash e o tamanho do bundle devem ser registrados no manifest e em `THIRD-PARTY-NOTICES.md` antes de ativar `status: "ready"`.
+O pacote `office-oxide-wasm@0.1.8` é copiado durante o build para os assets do Lab. O runtime web tem aproximadamente 14 KB e o WASM 1,05 MB; o manifest fixa SHA-256 dos dois arquivos. A API pública desta versão lê e converte o conteúdo, mas não fornece ainda um editor visual nem uma operação de regravação binária.
 
-O primeiro aceite técnico é um round-trip local de um DOCX, seguido de XLSX e PPTX. Isso valida o transporte de `Blob`, o worker, o carregamento no GitHub Pages e a preservação do original; não significa ainda que exista edição Office completa.
+O aceite desta etapa é a leitura local de um DOCX, seguida de XLSX e PPTX. Isso valida o transporte de `Blob`, o worker, o carregamento no GitHub Pages e a preservação do original. A próxima decisão será entre implementar edições estruturais sobre uma IR ou adicionar uma camada de editor visual.
 
 ## Referências avaliadas
 

@@ -97,10 +97,14 @@
               <textarea id="office-notes" placeholder="Registre aqui observações ou conteúdo de trabalho deste arquivo..."></textarea>
             </label>
             <div class="engine-actions">
-              <button id="engine-round-trip" class="button secondary" type="button">Testar round-trip</button>
+              <button id="engine-inspect" class="button secondary" type="button">Inspecionar localmente</button>
               <span id="engine-status" class="engine-status" role="status" aria-live="polite">Engine WASM não carregado</span>
             </div>
-            <p class="engine-note"><strong>Motor Office em avaliação.</strong> O arquivo original permanece preservado localmente. O round-trip abaixo só será habilitado quando um engine WASM auditado estiver instalado neste build.</p>
+            <div id="engine-preview" class="engine-preview" hidden>
+              <div class="preview-head"><strong>Texto extraído localmente</strong><span>O binário original não foi alterado</span></div>
+              <pre id="engine-preview-text"></pre>
+            </div>
+            <p class="engine-note"><strong>Processamento Office local em avaliação.</strong> Esta etapa lê DOCX, XLSX e PPTX no navegador e oferece uma prévia textual. A edição visual e a regravação do binário exigem uma camada adicional.</p>
           </div>
         </section>
       </section>

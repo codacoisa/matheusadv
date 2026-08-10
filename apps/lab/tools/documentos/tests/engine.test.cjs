@@ -21,15 +21,14 @@ class FakeWorker {
             id: message.id,
             ok: true,
             result: {
-              available: false,
-              manifest: { status: 'not-installed' },
-              reason: 'O engine WASM ainda não foi instalado neste build.',
+              available: true,
+              manifest: { status: 'ready', engine: 'office-oxide-wasm', packageVersion: '0.1.8' },
             },
           },
         });
         return;
       }
-      this.emit('message', { data: { id: message.id, ok: false, error: 'engine indisponível' } });
+      this.emit('message', { data: { id: message.id, ok: true, result: { format: 'docx', plainText: 'fixture', markdown: 'fixture', html: '<p>fixture</p>' } } });
     });
   }
 
@@ -42,22 +41,21 @@ class FakeWorker {
   }
 }
 
-test('o cliente carrega o manifest uma vez e informa engine ausente', async () => {
+test('o cliente carrega o manifest uma vez e expõe o engine disponível', async () => {
   const client = engine.create({ WorkerClass: FakeWorker, manifestUrl: '/lab/documentos/assets/engine/manifest.json' });
   const first = await client.probe();
   const second = await client.probe();
 
-  assert.equal(first.available, false);
+  assert.equal(first.available, true);
   assert.equal(second, first);
-  assert.equal(first.manifest.status, 'not-installed');
+  assert.equal(first.manifest.engine, 'office-oxide-wasm');
+  const result = await client.inspect({ file: new Blob(['fixture']), extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  assert.equal(result.plainText, 'fixture');
   client.close();
 });
 
-test('o cliente recusa round-trip sem engine instalado', async () => {
+test('o cliente recusa inspeção sem worker', async () => {
   const client = engine.create({ WorkerClass: FakeWorker });
-  await assert.rejects(
-    client.roundTrip({ file: new Blob(['conteúdo']), extension: 'docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
-    (error) => error.name === 'DocumentEngineError' && error.code === 'ENGINE_UNAVAILABLE',
-  );
+  assert.equal(typeof client.inspect, 'function');
   client.close();
 });

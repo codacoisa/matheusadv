@@ -24,8 +24,10 @@
     csvPreview: $('#csv-preview'),
     officeEditor: $('#office-editor'),
     officeNotes: $('#office-notes'),
-    engineRoundTrip: $('#engine-round-trip'),
+    engineInspect: $('#engine-inspect'),
     engineStatus: $('#engine-status'),
+    enginePreview: $('#engine-preview'),
+    enginePreviewText: $('#engine-preview-text'),
     dialog: $('#document-dialog'),
     form: $('#document-form'),
     clientSelect: $('#client-select'),
@@ -150,7 +152,9 @@
     const isCsv = documentRecord.extension === 'csv';
     els.csvEditor.hidden = !isCsv;
     els.officeEditor.hidden = isCsv;
-    els.engineRoundTrip.disabled = isCsv || !documentRecord.file;
+    els.engineInspect.disabled = isCsv || !documentRecord.file;
+    els.enginePreview.hidden = true;
+    els.enginePreviewText.textContent = '';
     if (isCsv) {
       els.csvContent.value = documentRecord.content || '';
       renderCsvPreview();
@@ -173,7 +177,7 @@
     try {
       const result = await client.probe();
       if (state.selectedId !== documentRecord.id) return;
-      setEngineStatus(result.available ? `Engine disponível: ${result.manifest.engine}` : result.reason, !result.available);
+      setEngineStatus(result.available ? `Engine disponível: ${result.manifest.engine} ${result.manifest.packageVersion}` : result.reason, !result.available);
     } catch (error) {
       if (state.selectedId === documentRecord.id) setEngineStatus(error.message, true);
     }
@@ -242,7 +246,7 @@
     render();
   }
 
-  async function runEngineRoundTrip() {
+  async function inspectWithEngine() {
     const documentRecord = state.documents.find((item) => item.id === state.selectedId);
     if (!documentRecord?.file || documentRecord.extension === 'csv') return;
     const client = getEngineClient();
@@ -250,23 +254,19 @@
       setEngineStatus('Web Worker indisponível neste navegador', true);
       return;
     }
-    els.engineRoundTrip.disabled = true;
-    setEngineStatus('Executando round-trip local…');
+    els.engineInspect.disabled = true;
+    setEngineStatus('Lendo conteúdo localmente…');
     try {
-      const editedFile = await client.roundTrip({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType });
-      documentRecord.file = editedFile;
-      documentRecord.engine = { status: 'round-tripped', at: now() };
-      documentRecord.updatedAt = now();
-      await storage.save(documentRecord);
-      state.documents = await storage.list();
-      setStatus('Round-trip concluído localmente; o original foi preservado.');
-      setEngineStatus('Round-trip concluído');
-      render();
+      const result = await client.inspect({ file: documentRecord.file, extension: documentRecord.extension, mimeType: documentRecord.mimeType });
+      els.enginePreviewText.textContent = result.plainText || 'O engine não encontrou texto extraível neste arquivo.';
+      els.enginePreview.hidden = false;
+      setStatus(`Conteúdo ${result.format.toUpperCase()} lido localmente; o original foi preservado.`);
+      setEngineStatus(`${result.format.toUpperCase()} processado localmente`);
     } catch (error) {
       setEngineStatus(error.message, true);
-      setStatus('O engine ainda não conseguiu processar este documento.', true);
+      setStatus('O engine não conseguiu ler este documento.', true);
     } finally {
-      els.engineRoundTrip.disabled = !documentRecord.file;
+      els.engineInspect.disabled = !documentRecord.file;
     }
   }
 
@@ -302,7 +302,7 @@
   els.csvContent.addEventListener('input', renderCsvPreview);
   $('#save-document').addEventListener('click', () => void saveCurrent());
   $('#download-document').addEventListener('click', () => void downloadCurrent());
-  els.engineRoundTrip.addEventListener('click', () => void runEngineRoundTrip());
+  els.engineInspect.addEventListener('click', () => void inspectWithEngine());
   $('#editor-view').addEventListener('contextmenu', (event) => { if (event.target.closest('#editor-title')) event.preventDefault(); });
   $('#editor-view').addEventListener('dblclick', (event) => { if (event.target.closest('#editor-title')) void removeCurrent(); });
   els.file.addEventListener('change', () => { const file = els.file.files?.[0]; if (file) { els.type.value = extension(file.name); if (!els.name.value) els.name.value = baseName(file.name); } });

@@ -1,12 +1,17 @@
 {
   "schema": "officejur/document-engine-manifest",
   "version": 1,
-  "status": "not-installed",
-  "engine": "",
-  "adapter": "",
-  "wasm": "",
-  "source": "",
-  "commit": "",
-  "license": "",
-  "formats": []
+  "status": "ready",
+  "engine": "office-oxide-wasm",
+  "packageVersion": "0.1.8",
+  "adapter": "./office-oxide-adapter.js",
+  "wasm": "./office-oxide/office_oxide_bg.wasm",
+  "source": "https://github.com/yfedoseev/office_oxide",
+  "commit": "npm:office-oxide-wasm@0.1.8",
+  "license": "MIT OR Apache-2.0",
+  "formats": ["docx", "xlsx", "pptx"],
+  "assets": {
+    "runtime": { "path": "./office-oxide/office_oxide.js", "bytes": 14492, "sha256": "3c5c08c993ecf22e92c9fc4091a6c8fef5f2d59883218210d783ef903635136d" },
+    "wasm": { "path": "./office-oxide/office_oxide_bg.wasm", "bytes": 1047437, "sha256": "d5f6dc626f1fdff85f9b3a53dfbca1773d27678540030c227985716bd3939030" }
+  }
 }

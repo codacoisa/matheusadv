@@ -21,7 +21,7 @@
     if (typeof WorkerClass !== 'function') {
       return { probe: async () => ({ available: false, reason: 'Web Worker não está disponível neste navegador.' }) };
     }
-    const worker = new WorkerClass(resolveUrl(workerUrl));
+    const worker = new WorkerClass(resolveUrl(workerUrl), { type: 'module' });
     const pending = new Map();
     let closed = false;
 
@@ -63,16 +63,15 @@
       return initialization;
     }
 
-    async function roundTrip({ file, extension, mimeType }) {
-      if (!(file instanceof Blob)) throw new DocumentEngineError('O round-trip exige um arquivo local.', 'INVALID_FILE');
+    async function inspect({ file, extension, mimeType }) {
+      if (!(file instanceof Blob)) throw new DocumentEngineError('A inspeção exige um arquivo local.', 'INVALID_FILE');
       const state = await probe();
       if (!state.available) throw new DocumentEngineError(state.reason || 'Engine WASM indisponível.', 'ENGINE_UNAVAILABLE');
       const bytes = await file.arrayBuffer();
-      const result = await request('round-trip', { bytes, extension, mimeType }, [bytes]);
-      return new Blob([result.bytes], { type: mimeType || file.type || 'application/octet-stream' });
+      return request('inspect', { bytes, extension, mimeType }, [bytes]);
     }
 
-    return { close, probe, roundTrip };
+    return { close, inspect, probe };
   }
 
   root.OfficeJurDocumentEngine = { DocumentEngineError, create, DEFAULT_MANIFEST_URL };

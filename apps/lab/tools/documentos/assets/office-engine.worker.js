@@ -8,12 +8,6 @@
     self.postMessage({ id, ...payload }, transfer);
   }
 
-  function normalizeBytes(value) {
-    if (value instanceof ArrayBuffer) return new Uint8Array(value);
-    if (ArrayBuffer.isView(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    throw new Error('O adaptador do engine não retornou bytes válidos.');
-  }
-
   async function loadManifest(url) {
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Manifest do engine indisponível (${response.status}).`);
@@ -27,11 +21,9 @@
   async function loadAdapter(baseUrl, value) {
     if (value.status !== 'ready' || !value.adapter) return null;
     const adapterUrl = new URL(value.adapter, baseUrl).href;
-    importScripts(adapterUrl);
-    if (typeof self.OfficeJurDocumentEngineAdapter?.create !== 'function') {
-      throw new Error('O adaptador WASM não expôs OfficeJurDocumentEngineAdapter.create().');
-    }
-    return self.OfficeJurDocumentEngineAdapter.create({ manifest: value, baseUrl });
+    const adapterModule = await import(adapterUrl);
+    if (typeof adapterModule.create !== 'function') throw new Error('O adaptador WASM não expôs create().');
+    return adapterModule.create({ manifest: value, baseUrl });
   }
 
   async function initialize(data) {
@@ -44,16 +36,14 @@
     };
   }
 
-  async function roundTrip(data) {
+  async function inspect(data) {
     if (!adapter) throw new Error('O engine WASM ainda não foi instalado neste build.');
-    if (typeof adapter.roundTrip !== 'function') throw new Error('O adaptador não implementa roundTrip().');
-    const output = await adapter.roundTrip({
+    if (typeof adapter.inspect !== 'function') throw new Error('O adaptador não implementa inspect().');
+    return adapter.inspect({
       bytes: new Uint8Array(data.bytes),
       extension: data.extension,
       mimeType: data.mimeType,
     });
-    const bytes = normalizeBytes(output);
-    return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
   }
 
   self.onmessage = (event) => {
@@ -62,7 +52,7 @@
     Promise.resolve()
       .then(() => {
         if (type === 'initialize') return initialize(data);
-        if (type === 'round-trip') return roundTrip(data);
+        if (type === 'inspect') return inspect(data);
         throw new Error(`Operação do engine desconhecida: ${type}.`);
       })
       .then((result) => {

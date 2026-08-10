@@ -61,6 +61,17 @@ for source in "$ROOT_DIR/apps/lab/tools/"*; do
   fi
 done
 
+DOCUMENT_ENGINE_SOURCE="$ROOT_DIR/node_modules/office-oxide-wasm/web"
+if [[ ! -f "$DOCUMENT_ENGINE_SOURCE/office_oxide.js" || ! -f "$DOCUMENT_ENGINE_SOURCE/office_oxide_bg.wasm" ]]; then
+  echo "Dependência office-oxide-wasm ausente; execute npm ci antes de montar o site." >&2
+  exit 1
+fi
+mkdir -p "$SITE_DIR/lab/documentos/assets/engine/office-oxide"
+cp "$DOCUMENT_ENGINE_SOURCE/office_oxide.js" "$SITE_DIR/lab/documentos/assets/engine/office-oxide/office_oxide.js"
+cp "$DOCUMENT_ENGINE_SOURCE/office_oxide_bg.wasm" "$SITE_DIR/lab/documentos/assets/engine/office-oxide/office_oxide_bg.wasm"
+cp "$ROOT_DIR/node_modules/office-oxide-wasm/LICENSE-MIT" "$SITE_DIR/lab/documentos/assets/engine/office-oxide/LICENSE-MIT"
+cp "$ROOT_DIR/node_modules/office-oxide-wasm/LICENSE-APACHE" "$SITE_DIR/lab/documentos/assets/engine/office-oxide/LICENSE-APACHE"
+
 cp -R "$ROOT_DIR/apps/documentos/assets/." "$SITE_DIR/documentos/assets/"
 
 for source in "$ROOT_DIR/apps/documentos/"*; do
