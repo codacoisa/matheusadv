@@ -24,38 +24,60 @@ const redirectPages = [];
 const pagesWithoutModalScrollLock = [];
 const pagesWithoutStandardMetadata = [];
 const attributePattern = /(?<![\w-])(?:href|src)=["']([^"']+)["']/g;
+// O bundle do editor preserva páginas e rotas próprias do projeto de origem.
+// Seu contrato publicado é validado pelos arquivos essenciais listados abaixo.
+const thirdPartyHtmlPrefixes = ["lab/documentos/editor/"];
+const requiredEditorFiles = [
+  "lab/documentos/editor/index.html",
+  "lab/documentos/editor/AGPL-3.0.LICENSE",
+  "lab/documentos/editor/wasm/x2t/x2t.js",
+  "lab/documentos/editor/wasm/x2t/x2t.wasm.gz",
+  "lab/documentos/editor/web-apps/apps/api/documents/api.js",
+  "lab/documentos/editor/web-apps/apps/documenteditor/main/index.html",
+  "lab/documentos/editor/web-apps/apps/presentationeditor/main/index.html",
+  "lab/documentos/editor/web-apps/apps/spreadsheeteditor/main/index.html",
+];
 
 for (const htmlFile of htmlFiles) {
   const html = readFileSync(htmlFile, "utf8");
-  if (/http-equiv=["']refresh["']|window\.location\.replace\s*\(/i.test(html)) {
-    redirectPages.push(htmlFile.replace(`${root}/`, ""));
-  }
-  if (!html.includes("modal-scroll-lock.js")) {
-    pagesWithoutModalScrollLock.push(htmlFile.replace(`${root}/`, ""));
-  }
-  const standardMetaValues = [
-    ["theme-color", "#17213a"],
-    ["msapplication-TileColor", "#17213a"],
-    ["application-name", "OfficeJur"],
-    ["apple-mobile-web-app-title", "OfficeJur"],
-    ["apple-mobile-web-app-status-bar-style", "black-translucent"],
-  ];
-  const hasStandardMetadata =
-    standardMetaValues.every(([name, content]) =>
-      new RegExp(
-        `<meta\\s+[^>]*name=["']${name}["'][^>]*content=["']${content}["'][^>]*>`,
-        "i",
-      ).test(html),
-    ) &&
-    /<link\s+[^>]*rel=["']icon["'][^>]*href=["'](?:\.\.?\/)*assets\/app-icon\.png["'][^>]*type=["']image\/png["'][^>]*>/i.test(html) &&
-    /<link\s+[^>]*rel=["']apple-touch-icon["'][^>]*href=["'](?:\.\.?\/)*assets\/app-icon\.png["'][^>]*>/i.test(html) &&
-    html.includes("office-config.js") &&
-    html.includes("office-context.js") &&
-    html.indexOf("office-config.js") < html.indexOf("office-context.js");
+  const publishedPath = htmlFile.replace(`${root}/`, "");
+  const isThirdPartyHtml = thirdPartyHtmlPrefixes.some((prefix) =>
+    publishedPath.startsWith(prefix),
+  );
 
-  if (!hasStandardMetadata) {
-    pagesWithoutStandardMetadata.push(htmlFile.replace(`${root}/`, ""));
+  if (!isThirdPartyHtml) {
+    if (/http-equiv=["']refresh["']|window\.location\.replace\s*\(/i.test(html)) {
+      redirectPages.push(publishedPath);
+    }
+    if (!html.includes("modal-scroll-lock.js")) {
+      pagesWithoutModalScrollLock.push(publishedPath);
+    }
+    const standardMetaValues = [
+      ["theme-color", "#17213a"],
+      ["msapplication-TileColor", "#17213a"],
+      ["application-name", "OfficeJur"],
+      ["apple-mobile-web-app-title", "OfficeJur"],
+      ["apple-mobile-web-app-status-bar-style", "black-translucent"],
+    ];
+    const hasStandardMetadata =
+      standardMetaValues.every(([name, content]) =>
+        new RegExp(
+          `<meta\\s+[^>]*name=["']${name}["'][^>]*content=["']${content}["'][^>]*>`,
+          "i",
+        ).test(html),
+      ) &&
+      /<link\s+[^>]*rel=["']icon["'][^>]*href=["'](?:\.\.?\/)*assets\/app-icon\.png["'][^>]*type=["']image\/png["'][^>]*>/i.test(html) &&
+      /<link\s+[^>]*rel=["']apple-touch-icon["'][^>]*href=["'](?:\.\.?\/)*assets\/app-icon\.png["'][^>]*>/i.test(html) &&
+      html.includes("office-config.js") &&
+      html.includes("office-context.js") &&
+      html.indexOf("office-config.js") < html.indexOf("office-context.js");
+
+    if (!hasStandardMetadata) {
+      pagesWithoutStandardMetadata.push(publishedPath);
+    }
   }
+  if (isThirdPartyHtml) continue;
+
   for (const match of html.matchAll(attributePattern)) {
     const reference = match[1].split("#")[0].split("?")[0];
     if (
@@ -75,6 +97,20 @@ for (const htmlFile of htmlFiles) {
       missing.push(`${htmlFile.replace(`${root}/`, "")}: ${match[1]}`);
     }
   }
+}
+
+for (const requiredEditorFile of requiredEditorFiles) {
+  if (!existsSync(join(root, requiredEditorFile))) {
+    missing.push(`Bundle do editor ausente: ${requiredEditorFile}`);
+  }
+}
+
+const editorAssetsDirectory = join(root, "lab/documentos/editor/assets");
+if (
+  !existsSync(editorAssetsDirectory) ||
+  !readdirSync(editorAssetsDirectory).some((entry) => /^index-.*\.js$/.test(entry))
+) {
+  missing.push("Bundle do editor ausente: lab/documentos/editor/assets/index-*.js");
 }
 
 if (pagesWithoutModalScrollLock.length) {
