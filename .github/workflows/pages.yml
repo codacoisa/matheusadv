@@ -44,11 +44,17 @@ jobs:
         working-directory: apps/validador-projudi
         run: npm ci && npm run check
 
+      - name: Testar cálculos
+        run: npm run test:calculos
+
+      - name: Testar Central de Guias
+        run: npm run test:central-guias
+
       - name: Testar regras financeiras
         working-directory: apps/financeiro
         run: npm test
 
-      - name: Testar contrato do engine de documentos
+      - name: Testar contrato do app Arquivos
         run: npm run test:arquivos
 
       - name: Testar integração com Mercado Pago

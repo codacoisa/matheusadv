@@ -648,6 +648,7 @@ test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ pag
   const appNames = await switcher.locator('.name').allTextContents();
   expect(appNames).toEqual([
     'Início',
+    'Arquivos',
     'Cálculos',
     'Ciência',
     'Financeiro',
@@ -661,6 +662,7 @@ test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ pag
 
   const sections = page.locator('main > section');
   await expect(sections.nth(0).locator('.label strong')).toHaveText([
+    'Biblioteca de Arquivos',
     'Ciência de Audiência',
     'Contrato de Honorários',
     'Hipossuficiência',
