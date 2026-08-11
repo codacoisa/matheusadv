@@ -82,6 +82,25 @@ test("remonta os domínios sem perder relacionamentos", () => {
   assert.deepEqual(storage.validateReferences(domains), []);
 });
 
+test("resolve clientes PF e PJ para os módulos consumidores", () => {
+  const data = sampleData();
+  data.clients.push({
+    id: "empresa-1",
+    type: "pj",
+    legalName: "Empresa Exemplo Ltda.",
+    cnpj: "04.252.011/0001-10",
+  });
+  const domains = storage.split(data), resolved = storage.resolvedClients(domains);
+
+  assert.deepEqual(
+    resolved.map((client) => ({ id: client.id, name: client.name, document: client.document })),
+    [
+      { id: "cliente-1", name: "Cliente", document: "529.982.247-25" },
+      { id: "empresa-1", name: "Empresa Exemplo Ltda.", document: "04.252.011/0001-10" },
+    ],
+  );
+});
+
 test("detecta referências quebradas entre bancos", () => {
   const domains = storage.split(sampleData());
   domains.clients.records = [];

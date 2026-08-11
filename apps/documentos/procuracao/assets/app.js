@@ -211,6 +211,8 @@ const {
   formatLongDate,
   formatZip,
   joinParts,
+  representationClause,
+  representativesOf,
   todayISO,
 } = window.OfficeJurDocumentUtils;
 const normalizeFilename = value => window.OfficeJurDocumentUtils.normalizeFilename(value, 'procuracao');
@@ -253,6 +255,13 @@ function mergeDraftFromForm(baseDraft = state.draft) {
       draft.people[i] = draft.people[i] || {};
       if (field === 'type' && state.mode !== 'normal') continue;
       draft.people[i][field] = element.value;
+      const representativeFields = { representativeName: 'name', representativeRole: 'role', representativeCpf: 'cpf' };
+      if (representativeFields[field] && Array.isArray(draft.people[i].representatives) && draft.people[i].representatives.length) {
+        draft.people[i].representatives[0] = {
+          ...draft.people[i].representatives[0],
+          [representativeFields[field]]: element.value,
+        };
+      }
     } else {
       const [group, field] = parts;
       if (draft[group]) draft[group][field] = element.value;
@@ -328,6 +337,14 @@ function renderPeopleUI(savedPeople) {
     });
     typeLabel.appendChild(typeSelect);
     card.appendChild(typeLabel);
+
+    const linkedRepresentatives = representativesOf(person);
+    if (personType === 'pj' && linkedRepresentatives.length > 1) {
+      const summary = document.createElement('p');
+      summary.className = 'representatives-summary';
+      summary.textContent = `Representantes vinculados: ${linkedRepresentatives.map(item => item.name).join('; ')}.`;
+      card.appendChild(summary);
+    }
 
     PERSON_FIELD_GROUPS.forEach(group => {
       if (group.sublegend) {
@@ -416,7 +433,7 @@ function consumeDocumentHandoff() {
     const payload = JSON.parse(raw);
     const validAge = Number(payload.createdAt) > 0
       && Date.now() - Number(payload.createdAt) <= DOCUMENT_HANDOFF_TTL;
-    if (payload.version !== 1 || payload.source !== 'financeiro'
+    if (payload.version !== 2 || payload.source !== 'financeiro'
       || payload.target !== 'procuracao' || !validAge
       || !payload.person || typeof payload.person !== 'object') return null;
     return payload.person;
@@ -499,11 +516,8 @@ function buildQualification(person, options = {}) {
     if (person.email) segments.push(`e-mail: ${clean(person.email)}`);
     const address = buildAddress(person);
     if (address) segments.push(`com sede em ${address}`);
-    if (person.representativeName) {
-      const role = clean(person.representativeRole);
-      const cpf = person.representativeCpf ? `, inscrito(a) no CPF sob o nº ${formatCPF(person.representativeCpf)}` : '';
-      segments.push(`neste ato representada por ${clean(person.representativeName).toUpperCase()}${role ? `, ${role}` : ''}${cpf}`);
-    }
+    const representation = representationClause(person);
+    if (representation) segments.push(representation);
     return segments.length > 1 ? `${segments.join(', ')}.` : '';
   }
   const identity = joinParts([
@@ -751,7 +765,13 @@ function signatureLabels(draft, peopleList) {
   if (draft.mode === 'over16') return ['OUTORGANTE', 'ASSISTENTE'];
   const signaturePeople = peopleList.filter(person => buildQualification(person));
   if (!signaturePeople.length) return ['OUTORGANTE'];
-  return signaturePeople.map(person => (person.type === 'pj' ? 'OUTORGANTE/REPRESENTANTE LEGAL' : 'OUTORGANTE'));
+  return signaturePeople.flatMap(person => {
+    if (person.type !== 'pj') return ['OUTORGANTE'];
+    const representatives = representativesOf(person);
+    return representatives.length
+      ? representatives.map(item => `REPRESENTANTE LEGAL — ${item.name.toUpperCase()}`)
+      : ['OUTORGANTE/REPRESENTANTE LEGAL'];
+  });
 }
 
 function drawSignatures(doc, labels, y) {

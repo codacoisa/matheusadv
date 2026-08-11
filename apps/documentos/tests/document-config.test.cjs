@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const read = (path) => fs.readFileSync(path, 'utf8');
 const config = read('config/document-config.js');
@@ -73,4 +74,35 @@ test('tema da instalação alimenta a interface e as cores dos PDFs', () => {
   assert.match(officeContext, /--navy/);
   assert.match(officeContext, /meta\[name="theme-color"\]/);
   assert.match(config, /themeColors\.pdfAccent/);
+});
+
+test('geradores preservam múltiplos representantes recebidos do Financeiro', () => {
+  const context = { window: {} };
+  vm.runInNewContext(read('apps/documentos/assets/document-utils.js'), context);
+  const utils = context.window.OfficeJurDocumentUtils;
+  const person = {
+    type: 'pj',
+    representatives: [
+      { name: 'Maria da Silva', role: 'Administradora', cpf: '52998224725' },
+      { name: 'João de Souza', role: 'Diretor', cpf: '11144477735', signatureRule: 'joint' },
+    ],
+  };
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(utils.representativesOf(person))),
+    [
+      { name: 'Maria da Silva', role: 'Administradora', cpf: '529.982.247-25', authority: '', signatureRule: 'individual' },
+      { name: 'João de Souza', role: 'Diretor', cpf: '111.444.777-35', authority: '', signatureRule: 'joint' },
+    ],
+  );
+  assert.equal(
+    utils.representationClause(person),
+    'neste ato representada por MARIA DA SILVA, Administradora, inscrito(a) no CPF sob o nº 529.982.247-25; e JOÃO DE SOUZA, Diretor, inscrito(a) no CPF sob o nº 111.444.777-35',
+  );
+  for (const moduleName of ['procuracao', 'honorarios']) {
+    const app = read(`apps/documentos/${moduleName}/assets/app.js`);
+    assert.match(app, /payload\.version !== 2/);
+    assert.match(app, /representationClause\(person\)/);
+    assert.match(app, /representativesOf\(person\)/);
+  }
 });

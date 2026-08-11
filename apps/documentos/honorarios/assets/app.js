@@ -155,6 +155,8 @@ const {
   formatPhone,
   formatZip,
   joinParts,
+  representationClause,
+  representativesOf,
   todayISO,
 } = window.OfficeJurDocumentUtils;
 const normalizeFilename = value => window.OfficeJurDocumentUtils.normalizeFilename(value, 'contrato-de-honorarios');
@@ -178,6 +180,18 @@ function getDraft() {
       if (draft[group]) draft[group][field] = element.value;
     }
   }
+  peopleContainer.querySelectorAll('.person-card').forEach((card, index) => {
+    let representatives = [];
+    try { representatives = JSON.parse(card.dataset.representatives || '[]'); } catch { representatives = []; }
+    if (!representatives.length || !draft.people[index]) return;
+    representatives[0] = {
+      ...representatives[0],
+      name: draft.people[index].representativeName || '',
+      role: draft.people[index].representativeRole || '',
+      cpf: draft.people[index].representativeCpf || '',
+    };
+    draft.people[index].representatives = representatives;
+  });
   if (!draft.people.length) draft.people = [{}];
   return draft;
 }
@@ -208,6 +222,7 @@ function renderPeopleUI(savedPeople) {
     const personType = person.type === 'pj' ? 'pj' : 'pf';
     const card = document.createElement('div');
     card.className = 'person-card';
+    card.dataset.representatives = JSON.stringify(Array.isArray(person.representatives) ? person.representatives : []);
 
     const head = document.createElement('div');
     head.className = 'person-card-head';
@@ -242,6 +257,14 @@ function renderPeopleUI(savedPeople) {
     });
     typeLabel.appendChild(typeSelect);
     card.appendChild(typeLabel);
+
+    const linkedRepresentatives = representativesOf(person);
+    if (personType === 'pj' && linkedRepresentatives.length > 1) {
+      const summary = document.createElement('p');
+      summary.className = 'representatives-summary';
+      summary.textContent = `Representantes vinculados: ${linkedRepresentatives.map(item => item.name).join('; ')}.`;
+      card.appendChild(summary);
+    }
 
     PERSON_FIELD_GROUPS.forEach(group => {
       if (group.sublegend) {
@@ -328,7 +351,7 @@ function consumeDocumentHandoff() {
     const payload = JSON.parse(raw);
     const validAge = Number(payload.createdAt) > 0
       && Date.now() - Number(payload.createdAt) <= DOCUMENT_HANDOFF_TTL;
-    if (payload.version !== 1 || payload.source !== 'financeiro'
+    if (payload.version !== 2 || payload.source !== 'financeiro'
       || payload.target !== 'honorarios' || !validAge
       || !payload.person || typeof payload.person !== 'object') return null;
     return payload.person;
@@ -560,11 +583,8 @@ function buildContratanteText(person) {
     if (person.phone) segments.push(`telefone/WhatsApp: ${formatPhone(person.phone)}`);
     const address = buildAddress(person);
     if (address) segments.push(`com sede em ${address}`);
-    if (person.representativeName) {
-      const role = clean(person.representativeRole);
-      const cpf = person.representativeCpf ? `, inscrito(a) no CPF sob o nº ${formatCPF(person.representativeCpf)}` : '';
-      segments.push(`neste ato representada por ${clean(person.representativeName).toUpperCase()}${role ? `, ${role}` : ''}${cpf}`);
-    }
+    const representation = representationClause(person);
+    if (representation) segments.push(representation);
     return segments.length > 1 ? `${segments.join(', ')}.` : '';
   }
   const identity = joinParts([
@@ -927,12 +947,19 @@ function generateDocument(draft = getDraft()) {
   y = drawDeclaration(doc, draft, y + 4);
 
   if (y > 242) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
-  const signaturePeople = peopleList.filter(person => buildContratanteText(person));
-  const signatureCount = Math.max(1, signaturePeople.length);
+  const signatureLabels = peopleList
+    .filter(person => buildContratanteText(person))
+    .flatMap(person => {
+      if (person.type !== 'pj') return ['CONTRATANTE'];
+      const representatives = representativesOf(person);
+      return representatives.length
+        ? representatives.map(item => `REPRESENTANTE LEGAL — ${item.name.toUpperCase()}`)
+        : ['CONTRATANTE/REPRESENTANTE LEGAL'];
+    });
+  const labels = signatureLabels.length ? signatureLabels : ['CONTRATANTE'];
   let sigY = y + 16;
-  for (let i = 0; i < signatureCount; i += 1) {
+  for (const label of labels) {
     if (sigY > 258) sigY = addContentPage(doc, TEMPLATE_CONFIG.headerTitle) + 16;
-    const label = signaturePeople[i]?.type === 'pj' ? 'CONTRATANTE/REPRESENTANTE LEGAL' : 'CONTRATANTE';
     drawSignature(doc, label, 66, sigY, 78);
     sigY += 18;
   }

@@ -36,6 +36,7 @@ test('Arquivos integra o editor OnlyOffice sem se misturar aos geradores', () =>
   assert.match(app, /AUTO_SAVE_INTERVAL = 10000/);
   assert.match(app, /dataBase64/);
   assert.match(app, /originalDataBase64/);
+  assert.match(app, /financeStorage\.resolvedClients\(domains\)/);
   assert.doesNotMatch(app, /engineApi|office-oxide/);
 });
 

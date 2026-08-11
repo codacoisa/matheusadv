@@ -593,20 +593,12 @@
   }
   function clientProfile(client) {
     if (!client) return null;
-    if (client.type === "pj")
-      return {
-        ...client,
-        name: client.legalName,
-        document: client.cnpj,
-        birthDate: "",
-      };
-    const person = personById(client.personId) || {};
+    const resolved = financeStorage.resolveClient(data, client);
+    if (client.type === "pj") return { ...resolved, birthDate: "" };
     return {
-      ...person,
-      ...client,
-      name: person.name || "Pessoa não encontrada",
-      document: person.cpf || "",
-      notes: client.notes || person.notes || "",
+      ...resolved,
+      name: resolved.name || "Pessoa não encontrada",
+      notes: client.notes || resolved.notes || "",
     };
   }
   function clientDisplayName(client) {
@@ -809,13 +801,9 @@
         cnpj: profile.cnpj || "",
         legalNature: profile.legalNature || "",
         representatives,
-        representativeName: representatives.map((representative) => {
-          const role = representative.role ? `, ${representative.role}` : "";
-          const cpf = representative.cpf ? `, inscrito(a) no CPF sob o nº ${maskCpf(representative.cpf)}` : "";
-          return `${representative.name}${role}${cpf}`;
-        }).join("; e "),
-        representativeCpf: "",
-        representativeRole: "",
+        representativeName: representatives[0]?.name || "",
+        representativeCpf: representatives[0]?.cpf || "",
+        representativeRole: representatives[0]?.role || "",
         phone: displayPhone(profile),
         email: profile.email || "",
         street: profile.street || "",
@@ -877,7 +865,7 @@
     const token = uid(),
       key = `${DOCUMENT_HANDOFF_PREFIX}${token}`,
       payload = {
-        version: 1,
+        version: 2,
         source: "financeiro",
         target: type,
         createdAt: Date.now(),

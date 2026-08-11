@@ -472,15 +472,26 @@ test('Financeiro cadastra pessoa jurídica com representante reutilizável', asy
   await personForm.locator('[name="profession"]').fill('administradora');
   await personForm.getByRole('button', { name: 'Salvar pessoa' }).click();
 
-  const representative = page.locator('.representative-row');
-  await expect(representative).toHaveCount(1);
-  await representative.locator('[data-representative="role"]').fill('Administradora');
-  await expect(representative.locator('[data-representative="isPrimary"]')).toBeChecked();
-  await expect(representative.locator('[data-representative="isSigner"]')).toBeChecked();
+  await page.locator('#new-representative-person').click();
+  await personForm.locator('[name="name"]').fill('João de Souza');
+  await personForm.locator('[name="cpf"]').fill('111.444.777-35');
+  await personForm.locator('[name="birthDate"]').fill('1988-05-20');
+  await personForm.locator('[name="maritalStatus"]').fill('casado');
+  await personForm.locator('[name="profession"]').fill('diretor');
+  await personForm.getByRole('button', { name: 'Salvar pessoa' }).click();
+
+  const representatives = page.locator('.representative-row');
+  await expect(representatives).toHaveCount(2);
+  await representatives.nth(0).locator('[data-representative="role"]').fill('Administradora');
+  await representatives.nth(1).locator('[data-representative="role"]').fill('Diretor');
+  await expect(representatives.nth(0).locator('[data-representative="isPrimary"]')).toBeChecked();
+  await expect(representatives.nth(0).locator('[data-representative="isSigner"]')).toBeChecked();
+  await expect(representatives.nth(1).locator('[data-representative="isSigner"]')).toBeChecked();
   await clientForm.getByRole('button', { name: 'Salvar cliente' }).click();
 
   await page.locator('[data-view="clients"]').click();
-  await expect(page.locator('.client-card').filter({ hasText: 'Empresa Exemplo Ltda' })).toBeVisible();
+  const clientCard = page.locator('.client-card').filter({ hasText: 'Empresa Exemplo Ltda' });
+  await expect(clientCard).toBeVisible();
   const saved = await page.evaluate(() => new Promise((resolve, reject) => {
     const request = indexedDB.open('officejur-financeiro', 2);
     request.onerror = () => reject(request.error);
@@ -496,10 +507,51 @@ test('Financeiro cadastra pessoa jurídica com representante reutilizável', asy
       transaction.onerror = () => reject(transaction.error);
     };
   }));
-  expect(saved.people).toHaveLength(1);
+  expect(saved.people).toHaveLength(2);
   expect(saved.clients).toHaveLength(1);
   expect(saved.clients[0]).toMatchObject({ type: 'pj', legalName: 'Empresa Exemplo LTDA', cnpj: '04.252.011/0001-10' });
   expect(saved.clients[0].representatives[0]).toMatchObject({ personId: saved.people[0].id, role: 'Administradora', isPrimary: true, isSigner: true });
+  expect(saved.clients[0].representatives[1]).toMatchObject({ personId: saved.people[1].id, role: 'Diretor', isPrimary: false, isSigner: true });
+
+  await clientCard.locator('.document-menu > summary').click();
+  const popupPromise = page.waitForEvent('popup');
+  await clientCard.locator('[data-document-type="procuracao"]').click();
+  const generator = await popupPromise;
+  await generator.waitForLoadState('networkidle');
+  await expect(generator.locator('[name="people.0.companyName"]')).toHaveValue('Empresa Exemplo LTDA');
+  await expect(generator.locator('.representatives-summary')).toContainText('Maria da Silva; João de Souza');
+  const transferredRepresentatives = await generator.evaluate(() => {
+    const draft = JSON.parse(localStorage.getItem('officejur::documentos::procuracao::draft') || '{}');
+    return draft.people?.[0]?.representatives || [];
+  });
+  expect(transferredRepresentatives).toHaveLength(2);
+  await generator.close();
+
+  await clientCard.locator('.document-menu > summary').click();
+  const contractPopupPromise = page.waitForEvent('popup');
+  await clientCard.locator('[data-document-type="honorarios"]').click();
+  const contract = await contractPopupPromise;
+  await contract.waitForLoadState('networkidle');
+  await expect(contract.locator('[name="people.0.companyName"]')).toHaveValue('Empresa Exemplo LTDA');
+  await expect(contract.locator('.representatives-summary')).toContainText('Maria da Silva; João de Souza');
+  const contractRepresentatives = await contract.evaluate(() => {
+    const draft = JSON.parse(localStorage.getItem('officejur::documentos::honorarios::draft') || '{}');
+    return draft.people?.[0]?.representatives || [];
+  });
+  expect(contractRepresentatives).toHaveLength(2);
+  await contract.close();
+
+  await page.goto('arquivos/', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Novo documento' }).click();
+  await expect(page.locator('#client-select option', { hasText: 'Empresa Exemplo LTDA' })).toHaveCount(1);
+  await page.keyboard.press('Escape');
+
+  await page.goto('calculos/facil/', { waitUntil: 'networkidle' });
+  const linkedClients = await page.evaluate(async () => {
+    const finance = await window.OfficeJurCalculationFinance.load();
+    return finance.clients.map(client => ({ id: client.id, name: client.name, document: client.document }));
+  });
+  expect(linkedClients).toEqual([{ id: saved.clients[0].id, name: 'Empresa Exemplo LTDA', document: '04.252.011/0001-10' }]);
 });
 
 test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }) => {

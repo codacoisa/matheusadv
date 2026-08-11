@@ -189,6 +189,40 @@
     return value;
   }
 
+  function recordsFrom(source, name) {
+    const value = source?.[name];
+    return Array.isArray(value)
+      ? value
+      : Array.isArray(value?.records)
+        ? value.records
+        : [];
+  }
+
+  function resolveClient(source, client) {
+    if (!client) return null;
+    if (client.type === "pj")
+      return {
+        ...client,
+        name: String(client.legalName || ""),
+        document: String(client.cnpj || ""),
+      };
+    const person = recordsFrom(source, "people").find(
+      (item) => String(item.id) === String(client.personId),
+    );
+    return {
+      ...person,
+      ...client,
+      name: String(person?.name || ""),
+      document: String(person?.cpf || ""),
+    };
+  }
+
+  function resolvedClients(source) {
+    return recordsFrom(source, "clients")
+      .map((client) => resolveClient(source, client))
+      .filter((client) => client?.id);
+  }
+
   function signature(name, raw) {
     const domain = normalizeDomain(name, raw);
     return JSON.stringify(
@@ -296,6 +330,8 @@
     split,
     assemble,
     mergeDomain,
+    resolveClient,
+    resolvedClients,
     signature,
     validateReferences,
   };

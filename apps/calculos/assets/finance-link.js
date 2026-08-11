@@ -25,13 +25,7 @@
     if (!storage || !dataStore) return empty();
     const domains = await dataStore.load({ financeStorage: storage });
     const people = (domains.people?.records || []).slice();
-    const personById = new Map(people.map((person) => [String(person.id), person]));
-    const clients = (domains.clients?.records || []).map((client) => {
-      if (client.type === "pj")
-        return { ...client, name: client.legalName, document: client.cnpj };
-      const person = personById.get(String(client.personId)) || {};
-      return { ...client, name: person.name, document: person.cpf };
-    });
+    const clients = storage.resolvedClients(domains);
     return {
       people,
       clients: clients.sort((a, b) =>

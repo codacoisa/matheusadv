@@ -48,6 +48,45 @@
     return digits.replace(/^(\d{2})(\d)(\d)/, '($1) $2 $3').replace(/(\d{4})(\d)/, '$1-$2');
   }
 
+  function representativesOf(person) {
+    const linked = Array.isArray(person?.representatives)
+      ? person.representatives
+          .map(item => ({
+            name: clean(item?.name),
+            role: clean(item?.role),
+            cpf: formatCPF(item?.cpf),
+            authority: clean(item?.authority),
+            signatureRule: item?.signatureRule === 'joint' ? 'joint' : 'individual',
+          }))
+          .filter(item => item.name)
+      : [];
+    if (linked.length) return linked;
+    const name = clean(person?.representativeName);
+    return name ? [{
+      name,
+      role: clean(person?.representativeRole),
+      cpf: formatCPF(person?.representativeCpf),
+      authority: '',
+      signatureRule: 'individual',
+    }] : [];
+  }
+
+  function representationClause(person) {
+    const representatives = representativesOf(person);
+    if (!representatives.length) return '';
+    const descriptions = representatives.map(representative => {
+      const role = representative.role ? `, ${representative.role}` : '';
+      const cpf = representative.cpf
+        ? `, inscrito(a) no CPF sob o nº ${representative.cpf}`
+        : '';
+      return `${representative.name.toUpperCase()}${role}${cpf}`;
+    });
+    const joined = descriptions.length === 1
+      ? descriptions[0]
+      : `${descriptions.slice(0, -1).join('; ')}; e ${descriptions.at(-1)}`;
+    return `neste ato representada por ${joined}`;
+  }
+
   function normalizeFilename(value, fallback = 'documento') {
     return (clean(value) || fallback)
       .normalize('NFD')
@@ -138,6 +177,8 @@
     formatZip,
     joinParts,
     normalizeFilename,
+    representationClause,
+    representativesOf,
     todayISO,
   });
 })(window);
