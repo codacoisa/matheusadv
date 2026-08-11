@@ -561,12 +561,16 @@
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
-        <input type="hidden" name="id" /><input
-          type="hidden"
-          name="type"
-          value="pf"
-        />
+        <input type="hidden" name="id" />
         <div class="form-grid">
+          <label class="span-2">Tipo de cliente *
+            <select name="type" id="client-type" required>
+              <option value="pf">Pessoa física</option>
+              <option value="pj">Pessoa jurídica</option>
+            </select>
+          </label>
+          <div class="form-grid span-2 client-kind-fields" data-client-kind="pf">
+          <input type="hidden" name="personId" />
           <label class="span-2"
             >Nome completo *<input
               name="name"
@@ -582,6 +586,20 @@
           ><label
             >Data de nascimento *<input name="birthDate" type="date" required
           /></label>
+          <label>Nacionalidade<input name="nationality" placeholder="Ex.: brasileira" /></label>
+          <label>Estado civil *<input name="maritalStatus" required /></label>
+          <label class="span-2">Profissão *<input name="profession" required /></label>
+          <label>RG<input name="rg" /></label>
+          <label>Órgão expedidor<input name="rgIssuer" /></label>
+          </div>
+          <div class="form-grid span-2 client-kind-fields" data-client-kind="pj" hidden>
+            <label class="span-2">Razão social *<input name="legalName" placeholder="Empresa Exemplo Ltda." /></label>
+            <label class="span-2">Nome fantasia<input name="tradeName" /></label>
+            <label>CNPJ *<input name="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00" /></label>
+            <label>Natureza jurídica<input name="legalNature" /></label>
+            <label>Inscrição estadual<input name="stateRegistration" /></label>
+            <label>Inscrição municipal<input name="municipalRegistration" /></label>
+          </div>
           <div class="phone-fields span-2">
             <label
               >País do telefone *<select
@@ -615,14 +633,6 @@
               name="email"
               type="email"
               autocomplete="email" /></label
-          ><label
-            >Nacionalidade<input
-              name="nationality"
-              placeholder="Ex.: brasileira" /></label
-          ><label>Estado civil *<input name="maritalStatus" required /></label
-          ><label class="span-2">Profissão *<input name="profession" required /></label
-          ><label>RG<input name="rg" /></label
-          ><label>Órgão expedidor<input name="rgIssuer" /></label
           ><label class="span-2"
             >Logradouro *<input
               name="street"
@@ -644,6 +654,14 @@
           ><label class="span-2"
             >Observações<textarea name="notes" rows="3"></textarea>
           </label>
+          <section class="representatives-editor span-2" id="representatives-editor" hidden>
+            <header>
+              <div><strong>Representantes da pessoa jurídica</strong><small>Vincule pessoas físicas e informe como cada uma representa a empresa.</small></div>
+              <button class="btn ghost compact" type="button" id="add-representative"><i class="fa-solid fa-user-plus"></i> Adicionar</button>
+            </header>
+            <div id="representatives-list"></div>
+            <button class="btn ghost compact" type="button" id="new-representative-person"><i class="fa-solid fa-plus"></i> Cadastrar nova pessoa</button>
+          </section>
         </div>
         <div class="modal-actions split">
           <button class="btn danger" type="button" id="delete-client" hidden>
@@ -656,6 +674,27 @@
             </button></span
           >
         </div>
+      </form>
+    </dialog>
+    <dialog id="person-dialog">
+      <form method="dialog" id="person-form">
+        <div class="modal-head">
+          <div><p class="eyebrow">PESSOA</p><h2 id="person-modal-title">Nova pessoa</h2><p>Cadastro reutilizável para clientes PF e representantes de empresas.</p></div>
+          <button class="icon-btn dark" value="cancel" formnovalidate><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <input type="hidden" name="id" />
+        <div class="form-grid">
+          <label class="span-2">Nome completo *<input name="name" required autocomplete="name" /></label>
+          <label>CPF *<input name="cpf" required inputmode="numeric" placeholder="000.000.000-00" /></label>
+          <label>Data de nascimento *<input name="birthDate" type="date" required /></label>
+          <label>Nacionalidade<input name="nationality" placeholder="Ex.: brasileira" /></label>
+          <label>Estado civil *<input name="maritalStatus" required /></label>
+          <label class="span-2">Profissão *<input name="profession" required /></label>
+          <label>RG<input name="rg" /></label><label>Órgão expedidor<input name="rgIssuer" /></label>
+          <label class="span-2">E-mail<input name="email" type="email" /></label>
+          <label class="span-2">Observações<textarea name="notes" rows="3"></textarea></label>
+        </div>
+        <div class="modal-actions"><button class="btn ghost" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="default">Salvar pessoa</button></div>
       </form>
     </dialog>
     <dialog id="client-files-dialog" class="wide-dialog">

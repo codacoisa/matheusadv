@@ -372,6 +372,20 @@
     };
     return digit(9) === Number(d[9]) && digit(10) === Number(d[10]);
   }
+  function validCnpj(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false;
+    const calculate = (length) => {
+      let sum = 0, weight = length - 7;
+      for (let index = 0; index < length; index += 1) {
+        sum += Number(digits[index]) * weight--;
+        if (weight < 2) weight = 9;
+      }
+      const remainder = sum % 11;
+      return remainder < 2 ? 0 : 11 - remainder;
+    };
+    return calculate(12) === Number(digits[12]) && calculate(13) === Number(digits[13]);
+  }
   const date = (v) =>
     v ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR") : "—";
   const monthLabel = (v) =>
@@ -380,6 +394,7 @@
       year: "numeric",
     });
   const deletedKeys = [
+    "deletedPeople",
     "deletedClients",
     "deletedCases",
     "deletedPackages",
@@ -405,6 +420,7 @@
   function emptyData() {
     return {
       updatedAt: now(),
+      people: [],
       clients: [],
       cases: [],
       packages: [],
@@ -417,6 +433,7 @@
         { id: "pix", name: "PIX", initialBalance: 0 },
         { id: "court", name: "Conta judicial", initialBalance: 0 },
       ],
+      deletedPeople: [],
       deletedClients: [],
       deletedCases: [],
       deletedPackages: [],
@@ -426,22 +443,31 @@
       deletedAccounts: [],
     };
   }
+  function normalizePerson(item = {}) {
+    const fields = [
+      "id", "name", "cpf", "birthDate", "phone", "phoneCountry",
+      "whatsapp", "email", "nationality", "maritalStatus", "profession",
+      "rg", "rgIssuer", "street", "addressNumber", "addressBlock",
+      "addressLot", "complement", "neighborhood", "city", "state", "zip",
+      "notes", "createdAt", "updatedAt",
+    ];
+    return Object.fromEntries(fields.map((field) => [field, item[field] ?? ""]));
+  }
   function normalizeClient(item = {}) {
     const fields = [
       "id",
       "type",
-      "name",
-      "document",
-      "birthDate",
+      "personId",
+      "legalName",
+      "tradeName",
+      "cnpj",
+      "legalNature",
+      "stateRegistration",
+      "municipalRegistration",
       "phone",
       "phoneCountry",
       "whatsapp",
       "email",
-      "nationality",
-      "maritalStatus",
-      "profession",
-      "rg",
-      "rgIssuer",
       "street",
       "addressNumber",
       "addressBlock",
@@ -452,14 +478,32 @@
       "state",
       "zip",
       "notes",
+      "representatives",
       "createdAt",
       "updatedAt",
     ];
-    return Object.fromEntries(
+    const normalized = Object.fromEntries(
       fields
         .filter((field) => item[field] !== undefined)
         .map((field) => [field, item[field]]),
     );
+    normalized.type = item.type === "pj" ? "pj" : "pf";
+    normalized.representatives = normalized.type === "pj" && Array.isArray(item.representatives)
+      ? item.representatives.map((link) => ({
+          id: String(link.id || ""),
+          personId: String(link.personId || ""),
+          role: String(link.role || ""),
+          authority: String(link.authority || ""),
+          signatureRule: link.signatureRule === "joint" ? "joint" : "individual",
+          isPrimary: Boolean(link.isPrimary),
+          isSigner: Boolean(link.isSigner),
+          startDate: String(link.startDate || ""),
+          endDate: String(link.endDate || ""),
+          basis: String(link.basis || ""),
+          notes: String(link.notes || ""),
+        }))
+      : [];
+    return normalized;
   }
   function normalizeCase(item = {}) {
     const fields = [
@@ -504,6 +548,7 @@
   }
   function normalize(raw) {
     const d = { ...emptyData(), ...(raw || {}) };
+    d.people = (Array.isArray(d.people) ? d.people : []).map(normalizePerson);
     d.clients = (Array.isArray(d.clients) ? d.clients : []).map(
       normalizeClient,
     );
@@ -542,6 +587,44 @@
     d.accounts = Array.isArray(d.accounts) ? d.accounts : emptyData().accounts;
     deletedKeys.forEach((key) => (d[key] = normalizeDeleted(d[key])));
     return d;
+  }
+  function personById(id) {
+    return data.people.find((person) => person.id === id) || null;
+  }
+  function clientProfile(client) {
+    if (!client) return null;
+    if (client.type === "pj")
+      return {
+        ...client,
+        name: client.legalName,
+        document: client.cnpj,
+        birthDate: "",
+      };
+    const person = personById(client.personId) || {};
+    return {
+      ...person,
+      ...client,
+      name: person.name || "Pessoa não encontrada",
+      document: person.cpf || "",
+      notes: client.notes || person.notes || "",
+    };
+  }
+  function clientDisplayName(client) {
+    return clientProfile(client)?.name || "Cliente não encontrado";
+  }
+  function clientDisplayDocument(client) {
+    return clientProfile(client)?.document || "";
+  }
+  function activeClientRepresentatives(client, referenceDate = iso()) {
+    if (client?.type !== "pj") return [];
+    return (client.representatives || [])
+      .filter((link) =>
+        (!link.startDate || link.startDate <= referenceDate) &&
+        (!link.endDate || link.endDate >= referenceDate),
+      )
+      .map((link) => ({ ...link, person: personById(link.personId) }))
+      .filter((link) => link.person)
+      .sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
   }
   function openFilesDatabase() {
     return new Promise((resolve, reject) => {
@@ -708,28 +791,68 @@
     }
   }
   function clientDocumentPerson(client) {
+    const profile = clientProfile(client);
+    if (client.type === "pj") {
+      const representatives = activeClientRepresentatives(client)
+        .filter((link) => link.isSigner || link.isPrimary)
+        .map((link) => ({
+          name: link.person.name || "",
+          cpf: link.person.cpf || "",
+          role: link.role || "",
+          authority: link.authority || "",
+          signatureRule: link.signatureRule,
+        }));
+      return {
+        type: "pj",
+        companyName: profile.legalName || "",
+        tradeName: profile.tradeName || "",
+        cnpj: profile.cnpj || "",
+        legalNature: profile.legalNature || "",
+        representatives,
+        representativeName: representatives.map((representative) => {
+          const role = representative.role ? `, ${representative.role}` : "";
+          const cpf = representative.cpf ? `, inscrito(a) no CPF sob o nº ${maskCpf(representative.cpf)}` : "";
+          return `${representative.name}${role}${cpf}`;
+        }).join("; e "),
+        representativeCpf: "",
+        representativeRole: "",
+        phone: displayPhone(profile),
+        email: profile.email || "",
+        street: profile.street || "",
+        number: profile.addressNumber || "",
+        complement: [
+          profile.complement,
+          profile.addressBlock ? `Quadra ${profile.addressBlock}` : "",
+          profile.addressLot ? `Lote ${profile.addressLot}` : "",
+        ].filter(Boolean).join(", "),
+        neighborhood: profile.neighborhood || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        zip: profile.zip || "",
+      };
+    }
     return {
       type: "pf",
-      name: client.name || "",
-      nationality: normalizeDocumentPhrase(client.nationality),
-      maritalStatus: normalizeDocumentPhrase(client.maritalStatus),
-      profession: normalizeDocumentPhrase(client.profession),
-      rg: client.rg || "",
-      rgIssuer: client.rgIssuer || "",
-      cpf: client.document || "",
-      phone: displayPhone(client),
-      email: client.email || "",
-      street: client.street || "",
-      number: client.addressNumber || "",
+      name: profile.name || "",
+      nationality: normalizeDocumentPhrase(profile.nationality),
+      maritalStatus: normalizeDocumentPhrase(profile.maritalStatus),
+      profession: normalizeDocumentPhrase(profile.profession),
+      rg: profile.rg || "",
+      rgIssuer: profile.rgIssuer || "",
+      cpf: profile.document || "",
+      phone: displayPhone(profile),
+      email: profile.email || "",
+      street: profile.street || "",
+      number: profile.addressNumber || "",
       complement: [
-        client.complement,
-        client.addressBlock ? `Quadra ${client.addressBlock}` : "",
-        client.addressLot ? `Lote ${client.addressLot}` : "",
+        profile.complement,
+        profile.addressBlock ? `Quadra ${profile.addressBlock}` : "",
+        profile.addressLot ? `Lote ${profile.addressLot}` : "",
       ].filter(Boolean).join(", "),
-      neighborhood: client.neighborhood || "",
-      city: client.city || "",
-      state: client.state || "",
-      zip: client.zip || "",
+      neighborhood: profile.neighborhood || "",
+      city: profile.city || "",
+      state: profile.state || "",
+      zip: profile.zip || "",
     };
   }
   function pruneDocumentHandoffs() {
@@ -822,7 +945,8 @@
     syncPending = false,
     caseTeamFilterId = "",
     currentFilesClientId = "",
-    filePreviewUrl = "";
+    filePreviewUrl = "",
+    representativePersonTarget = null;
   const filesReady = bootAccess.then((allowed) => allowed ? loadFilesState() : financeFiles.emptyData())
     .then((loaded) => {
       if (!localAccessAllowed) return financeFiles.emptyData();
@@ -843,6 +967,7 @@
   function captureMissingDeletions() {
     const previous = lastPersistedData;
     const collections = {
+        people: "deletedPeople",
         clients: "deletedClients",
         cases: "deletedCases",
         packages: "deletedPackages",
@@ -1098,7 +1223,7 @@
     $("#case-summary").innerHTML = cs
       .map(
         (x) =>
-          `<div class="row-item"><div><strong>${escapeHtml(x.c.name)}</strong><small>${x.cases.length} ${x.cases.length === 1 ? "caso" : "casos"}</small></div><div class="amount">${money(x.balance)}<small>a receber</small></div></div>`,
+          `<div class="row-item"><div><strong>${escapeHtml(clientDisplayName(x.c))}</strong><small>${x.cases.length} ${x.cases.length === 1 ? "caso" : "casos"}</small></div><div class="amount">${money(x.balance)}<small>a receber</small></div></div>`,
       )
       .join("");
   }
@@ -1116,7 +1241,8 @@
       .join("");
   }
   function clientName(id) {
-    return data.clients.find((c) => c.id === id)?.name || "Sem vínculo";
+    const client = data.clients.find((item) => item.id === id);
+    return client ? clientDisplayName(client) : "Sem vínculo";
   }
   function findCase(clientId, caseId) {
     return data.cases.find(
@@ -1276,7 +1402,7 @@
   }
   function renderClients() {
     const q = $("#client-search")?.value.toLowerCase() || "";
-    const clients = data.clients.filter((c) =>
+    const clients = data.clients.map(clientProfile).filter((c) =>
       `${c.name} ${c.document} ${displayPhone(c)} ${c.email}`
         .toLowerCase()
         .includes(q),
@@ -1297,7 +1423,7 @@
               .slice(0, 2)
               .map((x) => x[0])
               .join("")
-              .toUpperCase())}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${c.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.document || "CPF não informado")}${c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(c))}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(c.email)}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(c.city)}${c.state ? `/${escapeHtml(c.state)}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
+              .toUpperCase())}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${c.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.document || "Documento não informado")}${c.type === "pj" ? ` · ${escapeHtml(c.tradeName || "Pessoa jurídica")}` : c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(c))}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(c.email)}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(c.city)}${c.state ? `/${escapeHtml(c.state)}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum cliente encontrado.</div>';
@@ -1352,7 +1478,7 @@
         .sort((a, b) => timestamp(b).localeCompare(timestamp(a))),
       cases = clientFileCases(client.id),
       totalSize = records.reduce((sum, item) => sum + item.size, 0);
-    $("#client-files-title").textContent = `Pasta de ${client.name}`;
+    $("#client-files-title").textContent = `Pasta de ${clientDisplayName(client)}`;
     $("#client-files-subtitle").textContent =
       `${records.length} ${records.length === 1 ? "PDF armazenado" : "PDFs armazenados"} com índice em financeiro-documentos.json`;
     $("#client-file-case").innerHTML =
@@ -2103,7 +2229,7 @@
       data.clients
         .map(
           (c) =>
-            `<option value="${c.id}" ${c.id === selected ? "selected" : ""}>${escapeHtml(c.name)}</option>`,
+            `<option value="${c.id}" ${c.id === selected ? "selected" : ""}>${escapeHtml(clientDisplayName(c))}</option>`,
         )
         .join("");
     $("#entry-form [name=clientId]").innerHTML = opts;
@@ -2179,6 +2305,90 @@
     renderAllocationPreview();
     $("#entry-dialog").showModal();
   }
+  function personOptions(selected = "") {
+    return '<option value="">Selecione uma pessoa</option>' + data.people
+      .slice()
+      .sort((left, right) => left.name.localeCompare(right.name, "pt-BR"))
+      .map((person) => `<option value="${person.id}" ${person.id === selected ? "selected" : ""}>${escapeHtml(person.name)} — ${escapeHtml(person.cpf)}</option>`)
+      .join("");
+  }
+  function addRepresentativeRow(link = {}) {
+    const row = document.createElement("article");
+    row.className = "representative-row";
+    row.dataset.id = link.id || uid();
+    row.innerHTML = `<header><strong>Representante</strong><button class="link-btn" type="button" data-remove-representative title="Remover representante"><i class="fa-solid fa-trash"></i></button></header>
+      <label class="span-2">Pessoa física *<span class="representative-person-field"><select data-representative="personId">${personOptions(link.personId)}</select><button class="link-btn" type="button" data-edit-representative-person title="Editar pessoa selecionada" aria-label="Editar pessoa selecionada"><i class="fa-solid fa-pen"></i></button></span></label>
+      <label>Cargo ou qualidade *<input data-representative="role" value="${escapeHtml(link.role || "")}" placeholder="Ex.: administradora"></label>
+      <label>Forma de assinatura<select data-representative="signatureRule"><option value="individual" ${link.signatureRule !== "joint" ? "selected" : ""}>Isoladamente</option><option value="joint" ${link.signatureRule === "joint" ? "selected" : ""}>Em conjunto</option></select></label>
+      <label class="span-2">Poderes ou limites<textarea data-representative="authority" rows="2">${escapeHtml(link.authority || "")}</textarea></label>
+      <label>Início da representação<input data-representative="startDate" type="date" value="${escapeHtml(link.startDate || "")}"></label>
+      <label>Fim da representação<input data-representative="endDate" type="date" value="${escapeHtml(link.endDate || "")}"></label>
+      <label class="span-2">Fundamento dos poderes<input data-representative="basis" value="${escapeHtml(link.basis || "")}" placeholder="Ex.: contrato social ou procuração"></label>
+      <div class="representative-flags span-2"><label><input data-representative="isPrimary" type="checkbox" ${link.isPrimary ? "checked" : ""}> Representante principal</label><label><input data-representative="isSigner" type="checkbox" ${link.isSigner ? "checked" : ""}> Incluir como signatário nos documentos</label></div>
+      <label class="span-2">Observações<textarea data-representative="notes" rows="2">${escapeHtml(link.notes || "")}</textarea></label>`;
+    $("#representatives-list").append(row);
+    return row;
+  }
+  function readRepresentatives() {
+    return [...$("#representatives-list").querySelectorAll(".representative-row")].map((row) => {
+      const value = (field) => row.querySelector(`[data-representative="${field}"]`);
+      return {
+        id: row.dataset.id,
+        personId: value("personId").value,
+        role: value("role").value.trim(),
+        authority: value("authority").value.trim(),
+        signatureRule: value("signatureRule").value,
+        isPrimary: value("isPrimary").checked,
+        isSigner: value("isSigner").checked,
+        startDate: value("startDate").value,
+        endDate: value("endDate").value,
+        basis: value("basis").value.trim(),
+        notes: value("notes").value.trim(),
+      };
+    });
+  }
+  function renderRepresentatives(links = []) {
+    $("#representatives-list").replaceChildren();
+    links.forEach(addRepresentativeRow);
+  }
+  function refreshRepresentativePersonOptions() {
+    $("#representatives-list").querySelectorAll(".representative-row").forEach((row) => {
+      const select = row.querySelector('[data-representative="personId"]'),
+        selected = select.value;
+      select.innerHTML = personOptions(selected);
+    });
+  }
+  function openPersonDialog(personId = "", targetRow = null) {
+    const form = $("#person-form"), person = personById(personId);
+    form.reset();
+    form.elements.id.value = person?.id || "";
+    fillClientFormProfile(form, person);
+    form.elements.cpf.value = maskCpf(person?.cpf || "");
+    representativePersonTarget = targetRow;
+    $("#person-modal-title").textContent = person ? "Editar pessoa" : "Nova pessoa";
+    $("#person-dialog").showModal();
+  }
+  function syncClientKind() {
+    const form = $("#client-form"), type = form.elements.type.value;
+    form.querySelectorAll("[data-client-kind]").forEach((section) => {
+      section.hidden = section.dataset.clientKind !== type;
+    });
+    $("#representatives-editor").hidden = type !== "pj";
+    ["name", "document", "birthDate", "maritalStatus", "profession"].forEach((name) => {
+      form.elements[name].required = type === "pf";
+    });
+    ["legalName", "cnpj"].forEach((name) => {
+      form.elements[name].required = type === "pj";
+    });
+  }
+  function fillClientFormProfile(form, profile) {
+    Object.entries(profile || {}).forEach(([key, value]) => {
+      const field = form.elements[key];
+      if (!field) return;
+      if (field.type === "checkbox") field.checked = Boolean(value);
+      else field.value = value ?? "";
+    });
+  }
   function openClient(id = "") {
     const f = $("#client-form");
     f.reset();
@@ -2186,19 +2396,23 @@
     f.elements.phoneCountry.value = PHONE_DEFAULT_COUNTRY;
     const c = data.clients.find((x) => x.id === id);
     if (c) {
-      Object.entries(c).forEach(([k, v]) => {
-        if (!f.elements[k]) return;
-        if (f.elements[k].type === "checkbox")
-          f.elements[k].checked = Boolean(v);
-        else f.elements[k].value = v;
-      });
-      const phone = phoneDetails(c.phone, c.phoneCountry);
+      const profile = clientProfile(c);
+      fillClientFormProfile(f, profile);
+      f.elements.type.value = c.type;
+      f.elements.personId.value = c.personId || "";
+      const phone = phoneDetails(profile.phone, profile.phoneCountry);
       f.elements.phoneCountry.value = phone.country;
       f.elements.phoneNational.value = phone.national;
-      f.elements.document.value = maskCpf(c.document);
-      f.elements.zip.value = maskZip(c.zip);
-      f.elements.state.value = String(c.state || "").toUpperCase();
+      f.elements.document.value = maskCpf(profile.document);
+      f.elements.cnpj.value = maskCnpj(profile.cnpj);
+      f.elements.zip.value = maskZip(profile.zip);
+      f.elements.state.value = String(profile.state || "").toUpperCase();
+      renderRepresentatives(c.representatives);
+    } else {
+      f.elements.type.value = "pf";
+      renderRepresentatives();
     }
+    syncClientKind();
     syncPhoneField();
     clearStreetWarning();
     $("#client-modal-title").textContent = c
@@ -2230,7 +2444,7 @@
       data.clients
         .map(
           (c) =>
-            `<option value="${c.id}">${escapeHtml(c.name)} — ${escapeHtml(c.document || "sem CPF")}</option>`,
+            `<option value="${c.id}">${escapeHtml(clientDisplayName(c))} — ${escapeHtml(clientDisplayDocument(c) || "sem documento")}</option>`,
         )
         .join("");
     const item = data.cases.find((x) => x.id === caseId);
@@ -2281,7 +2495,7 @@
       data.clients
         .map(
           (client) =>
-            `<option value="${client.id}">${escapeHtml(client.name)} — ${escapeHtml(client.document || "sem CPF")}</option>`,
+            `<option value="${client.id}">${escapeHtml(clientDisplayName(client))} — ${escapeHtml(clientDisplayDocument(client) || "sem documento")}</option>`,
         )
         .join("");
     if (item) {
@@ -2331,7 +2545,7 @@
     const f = $("#assignments-form");
     f.elements.clientId.value = clientId;
     f.elements.caseId.value = caseId;
-    $("#assignments-subtitle").textContent = `${client.name} · ${item.number}`;
+    $("#assignments-subtitle").textContent = `${clientDisplayName(client)} · ${item.number}`;
     $("#assignment-rows").innerHTML = "";
     (item.assignments || []).forEach(addAssignmentRow);
     if (!item.assignments?.length) addAssignmentRow();
@@ -2415,8 +2629,9 @@
     if (!dialog.open) dialog.showModal();
   }
   function viewClient(id) {
-    const c = data.clients.find((x) => x.id === id);
-    if (!c) return;
+    const client = data.clients.find((item) => item.id === id);
+    if (!client) return;
+    const c = clientProfile(client);
     const cases = data.cases.filter((x) => x.clientId === id),
       entries = data.entries.filter((e) => e.clientId === id),
       t = totals(entries),
@@ -2432,12 +2647,16 @@
         c.zip,
       ]
         .filter(Boolean)
-        .join(", ");
+        .join(", "),
+      representatives = activeClientRepresentatives(client),
+      representativeSection = client.type === "pj"
+        ? `<div class="detail-section"><header><strong>Representantes ativos</strong><span>${representatives.length}</span></header>${representatives.map((link) => `<div class="detail-list-row"><span><strong>${escapeHtml(link.person.name)}</strong><small>${escapeHtml(link.role)} · ${link.signatureRule === "joint" ? "assinatura conjunta" : "assinatura isolada"}${link.isPrimary ? " · principal" : ""}</small></span></div>`).join("") || '<p class="detail-empty">Nenhum representante ativo.</p>'}</div>`
+        : "";
     showDetail({
       eyebrow: "CLIENTE",
       title: c.name,
-      subtitle: `CPF ${c.document} · Nascimento ${date(c.birthDate)}`,
-      body: `<div class="detail-grid">${detailField("Telefone", displayPhone(c), "fa-phone")}${detailField("E-mail", c.email, "fa-envelope")}${detailField("Profissão", c.profession, "fa-briefcase")}${detailField("Estado civil", c.maritalStatus, "fa-heart")}${detailField("RG", c.rg ? `${c.rg}${c.rgIssuer ? ` · ${c.rgIssuer}` : ""}` : "", "fa-id-card")}${detailField("Endereço", address, "fa-location-dot")}</div>${c.notes ? `<div class="detail-note"><strong>Observações</strong><p>${c.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Casos vinculados</strong><span>${cases.length}</span></header>${cases.map((x) => `<button class="detail-list-row" data-view-case="${x.id}"><span><strong>${x.title}</strong><small>${x.number} · ${x.area}</small></span><i class="fa-solid fa-chevron-right"></i></button>`).join("") || '<p class="detail-empty">Nenhum caso vinculado.</p>'}</div><div class="detail-totals"><span><small>Receitas</small><strong>${money(t.income)}</strong></span><span><small>Recebido</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
+      subtitle: client.type === "pj" ? `CNPJ ${c.document}${c.tradeName ? ` · ${c.tradeName}` : ""}` : `CPF ${c.document} · Nascimento ${date(c.birthDate)}`,
+      body: `<div class="detail-grid">${detailField("Telefone", displayPhone(c), "fa-phone")}${detailField("E-mail", c.email, "fa-envelope")}${client.type === "pf" ? `${detailField("Profissão", c.profession, "fa-briefcase")}${detailField("Estado civil", c.maritalStatus, "fa-heart")}${detailField("RG", c.rg ? `${c.rg}${c.rgIssuer ? ` · ${c.rgIssuer}` : ""}` : "", "fa-id-card")}` : `${detailField("Natureza jurídica", c.legalNature, "fa-building")}${detailField("Inscrição estadual", c.stateRegistration, "fa-receipt")}${detailField("Inscrição municipal", c.municipalRegistration, "fa-receipt")}`}${detailField("Endereço", address, "fa-location-dot")}</div>${c.notes ? `<div class="detail-note"><strong>Observações</strong><p>${c.notes}</p></div>` : ""}${representativeSection}<div class="detail-section"><header><strong>Casos vinculados</strong><span>${cases.length}</span></header>${cases.map((x) => `<button class="detail-list-row" data-view-case="${x.id}"><span><strong>${x.title}</strong><small>${x.number} · ${x.area}</small></span><i class="fa-solid fa-chevron-right"></i></button>`).join("") || '<p class="detail-empty">Nenhum caso vinculado.</p>'}</div><div class="detail-totals"><span><small>Receitas</small><strong>${money(t.income)}</strong></span><span><small>Recebido</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
       links: `${c.whatsapp && c.phone ? `<a class="btn whatsapp-btn" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>` : ""}${c.email ? `<a class="btn ghost" href="mailto:${c.email}"><i class="fa-solid fa-envelope"></i> E-mail</a>` : ""}<button class="btn ghost" type="button" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Novo caso</button>`,
       onEdit: () => openClient(id),
     });
@@ -3150,6 +3369,69 @@
     "input",
     (e) => (e.target.value = maskCpf(e.target.value)),
   );
+  $("#client-form [name=cnpj]").addEventListener(
+    "input",
+    (e) => (e.target.value = maskCnpj(e.target.value)),
+  );
+  $("#client-form [name=type]").addEventListener("change", syncClientKind);
+  $("#add-representative").addEventListener("click", () => addRepresentativeRow());
+  $("#representatives-list").addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-remove-representative]");
+    if (removeButton) return removeButton.closest(".representative-row").remove();
+    const editButton = event.target.closest("[data-edit-representative-person]");
+    if (!editButton) return;
+    const row = editButton.closest(".representative-row"),
+      personId = row.querySelector('[data-representative="personId"]').value;
+    if (!personId) return toast("Selecione uma pessoa para editar.");
+    openPersonDialog(personId, row);
+  });
+  $("#new-representative-person").addEventListener("click", () => openPersonDialog());
+  $("#person-form [name=cpf]").addEventListener(
+    "input",
+    (event) => (event.target.value = maskCpf(event.target.value)),
+  );
+  $("#person-form").addEventListener("submit", (event) => {
+    if (event.submitter?.value === "cancel") return;
+    event.preventDefault();
+    const form = event.currentTarget,
+      values = Object.fromEntries(new FormData(form)),
+      name = titleCaseName(values.name),
+      cpfDigits = String(values.cpf || "").replace(/\D/g, "");
+    if (name.split(/\s+/).length < 2) return toast("Informe o nome completo da pessoa.");
+    if (!validCpf(values.cpf)) return toast("Informe um CPF válido para a pessoa.");
+    if (!values.birthDate || values.birthDate >= iso()) return toast("Informe uma data de nascimento válida para a pessoa.");
+    if (data.people.some((person) => person.id !== values.id && String(person.cpf || "").replace(/\D/g, "") === cpfDigits))
+      return toast("Já existe uma pessoa cadastrada com este CPF.");
+    const old = data.people.find((person) => person.id === values.id),
+      person = normalizePerson({
+        ...old,
+        ...values,
+        id: values.id || uid(),
+        name,
+        cpf: maskCpf(values.cpf),
+        nationality: normalizeDocumentPhrase(values.nationality),
+        maritalStatus: normalizeDocumentPhrase(values.maritalStatus),
+        profession: normalizeDocumentPhrase(values.profession),
+        createdAt: old?.createdAt || now(),
+        updatedAt: now(),
+      });
+    if (old) data.people = data.people.map((item) => item.id === person.id ? person : item);
+    else data.people.push(person);
+    const targetRow = representativePersonTarget;
+    $("#person-dialog").close();
+    refreshRepresentativePersonOptions();
+    if (targetRow) {
+      targetRow.querySelector('[data-representative="personId"]').value = person.id;
+    } else if (!old) {
+      addRepresentativeRow({ personId: person.id, isPrimary: !readRepresentatives().some((link) => link.isPrimary), isSigner: true });
+    }
+    representativePersonTarget = null;
+    persist();
+    toast("Pessoa salva e disponível para vínculos.");
+  });
+  $("#person-dialog").addEventListener("close", () => {
+    representativePersonTarget = null;
+  });
   $("#client-form [name=phoneNational]").addEventListener("input", (e) =>
     syncPhoneField(e.target.value),
   );
@@ -3186,20 +3468,12 @@
     e.preventDefault();
     const f = e.currentTarget,
       fd = Object.fromEntries(new FormData(f)),
-      name = titleCaseName(fd.name),
       phone = parsePhone(fd.phoneNational, fd.phoneCountry);
-    if (name.split(/\s+/).length < 2)
-      return toast("Informe o nome completo do cliente.");
-    if (!validCpf(fd.document)) return toast("Informe um CPF válido.");
-    if (!fd.birthDate || fd.birthDate >= iso())
-      return toast("Informe uma data de nascimento válida.");
     if (!phone?.isValid())
       return toast(
         `Informe um telefone válido para ${phoneCountryName(fd.phoneCountry)} (+${phoneCallingCode(fd.phoneCountry)}).`,
       );
     const requiredFields = {
-      maritalStatus: "estado civil",
-      profession: "profissão",
       street: "endereço",
       neighborhood: "bairro",
       city: "cidade",
@@ -3215,27 +3489,90 @@
       f.elements.street.focus();
       return;
     }
-    if (hasDuplicateDocument(data.clients, fd.document, fd.id))
-      return toast("Já existe um cliente cadastrado com este CPF.");
-    const old = data.clients.find((x) => x.id === fd.id),
-      { phoneNational, ...clientFields } = fd,
-      obj = {
-        ...old,
-        ...clientFields,
-        name,
-        nationality: normalizeDocumentPhrase(fd.nationality),
-        maritalStatus: normalizeDocumentPhrase(fd.maritalStatus),
-        profession: normalizeDocumentPhrase(fd.profession),
-        document: maskCpf(fd.document),
+    const old = data.clients.find((item) => item.id === fd.id),
+      clientId = fd.id || uid(),
+      shared = {
         phone: phone.number,
         phoneCountry: phone.country || fd.phoneCountry,
-        zip: maskZip(fd.zip),
-        state: String(fd.state || "").toUpperCase(),
         whatsapp: f.elements.whatsapp.checked,
-        id: fd.id || uid(),
+        email: fd.email.trim(),
+        street: fd.street.trim(),
+        addressNumber: fd.addressNumber.trim(),
+        addressBlock: fd.addressBlock.trim(),
+        addressLot: fd.addressLot.trim(),
+        complement: fd.complement.trim(),
+        neighborhood: fd.neighborhood.trim(),
+        city: fd.city.trim(),
+        state: String(fd.state || "").toUpperCase(),
+        zip: maskZip(fd.zip),
+      };
+    let obj;
+    if (fd.type === "pf") {
+      const name = titleCaseName(fd.name),
+        cpfDigits = String(fd.document || "").replace(/\D/g, ""),
+        personId = fd.personId || uid();
+      if (name.split(/\s+/).length < 2) return toast("Informe o nome completo do cliente.");
+      if (!validCpf(fd.document)) return toast("Informe um CPF válido.");
+      if (!fd.birthDate || fd.birthDate >= iso()) return toast("Informe uma data de nascimento válida.");
+      if (!fd.maritalStatus.trim()) return toast("Informe o estado civil do cliente.");
+      if (!fd.profession.trim()) return toast("Informe a profissão do cliente.");
+      if (data.people.some((person) => person.id !== personId && String(person.cpf || "").replace(/\D/g, "") === cpfDigits))
+        return toast("Já existe uma pessoa cadastrada com este CPF.");
+      const oldPerson = personById(personId),
+        person = normalizePerson({
+          ...oldPerson,
+          ...shared,
+          id: personId,
+          name,
+          cpf: maskCpf(fd.document),
+          birthDate: fd.birthDate,
+          nationality: normalizeDocumentPhrase(fd.nationality),
+          maritalStatus: normalizeDocumentPhrase(fd.maritalStatus),
+          profession: normalizeDocumentPhrase(fd.profession),
+          rg: fd.rg.trim(),
+          rgIssuer: fd.rgIssuer.trim(),
+          createdAt: oldPerson?.createdAt || now(),
+          updatedAt: now(),
+        });
+      if (oldPerson) data.people = data.people.map((item) => item.id === person.id ? person : item);
+      else data.people.push(person);
+      obj = normalizeClient({
+        id: clientId,
+        type: "pf",
+        personId,
+        notes: fd.notes.trim(),
         createdAt: old?.createdAt || now(),
         updatedAt: now(),
-      };
+      });
+    } else {
+      const legalName = titleCaseName(fd.legalName, { company: true }),
+        cnpjDigits = String(fd.cnpj || "").replace(/\D/g, ""),
+        representatives = readRepresentatives();
+      if (!legalName) return toast("Informe a razão social do cliente.");
+      if (!validCnpj(fd.cnpj)) return toast("Informe um CNPJ válido.");
+      if (data.clients.some((client) => client.id !== clientId && client.type === "pj" && String(client.cnpj || "").replace(/\D/g, "") === cnpjDigits))
+        return toast("Já existe um cliente cadastrado com este CNPJ.");
+      if (!representatives.length) return toast("Adicione ao menos um representante da pessoa jurídica.");
+      if (representatives.some((link) => !link.personId || !link.role)) return toast("Selecione a pessoa e informe o cargo de cada representante.");
+      if (representatives.filter((link) => link.isPrimary).length !== 1) return toast("Marque exatamente um representante principal.");
+      if (!representatives.some((link) => link.isSigner)) return toast("Marque ao menos um representante para os documentos.");
+      if (representatives.some((link) => link.startDate && link.endDate && link.endDate < link.startDate)) return toast("O fim da representação não pode anteceder o início.");
+      obj = normalizeClient({
+        ...shared,
+        id: clientId,
+        type: "pj",
+        legalName,
+        tradeName: titleCaseName(fd.tradeName, { company: true }),
+        cnpj: maskCnpj(fd.cnpj),
+        legalNature: fd.legalNature.trim(),
+        stateRegistration: fd.stateRegistration.trim(),
+        municipalRegistration: fd.municipalRegistration.trim(),
+        representatives,
+        notes: fd.notes.trim(),
+        createdAt: old?.createdAt || now(),
+        updatedAt: now(),
+      });
+    }
     if (old)
       data.clients = data.clients.map((x) => (x.id === obj.id ? obj : x));
     else data.clients.push(obj);
@@ -3484,7 +3821,7 @@
     if (
       !(await askConfirmation({
         title: "Excluir cliente?",
-        message: `Você está prestes a excluir o cadastro de ${item.name}.`,
+        message: `Você está prestes a excluir o cadastro de ${clientDisplayName(item)}.`,
         impact: `${clientFiles.length ? `${clientFiles.length} PDF(s) da pasta também serão excluídos. ` : ""}Os lançamentos gerais serão preservados sem cliente vinculado. Esta ação não pode ser desfeita.`,
       }))
     )

@@ -5,14 +5,15 @@ import { minimalDocx, minimalPptx, minimalXlsx } from './office-fixtures.cjs';
 async function prepareCalculationPage(page, path = 'calculos/') {
   await page.goto('financeiro/', { waitUntil: 'networkidle' });
   await page.evaluate(() => new Promise((resolve, reject) => {
-    const request = indexedDB.open('officejur-financeiro', 1);
+    const request = indexedDB.open('officejur-financeiro', 2);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const database = request.result;
-      const transaction = database.transaction('domains', 'readwrite');
-      const store = transaction.objectStore('domains');
+      const transaction = database.transaction('domains-v2', 'readwrite');
+      const store = transaction.objectStore('domains-v2');
       const now = new Date().toISOString();
-      store.put({ name: 'clients', value: { schema: 'officejur/financeiro-clientes-data', version: 1, updatedAt: now, records: [{ id: 'client-test', type: 'pf', name: 'Cliente de teste', updatedAt: now }], deleted: [] } });
+      store.put({ name: 'people', value: { schema: 'officejur/financeiro-pessoas-data', version: 1, updatedAt: now, records: [{ id: 'person-test', name: 'Cliente de teste', cpf: '529.982.247-25', updatedAt: now }], deleted: [] } });
+      store.put({ name: 'clients', value: { schema: 'officejur/financeiro-clientes-data', version: 2, updatedAt: now, records: [{ id: 'client-test', type: 'pf', personId: 'person-test', updatedAt: now }], deleted: [] } });
       store.put({ name: 'cases', value: { schema: 'officejur/financeiro-casos-data', version: 1, updatedAt: now, records: [{ id: 'case-test', clientId: 'client-test', title: 'Ação de teste', number: '0000000-00.2026.8.00.0000', type: 'Judicial', status: 'active', updatedAt: now }], deleted: [] } });
       transaction.oncomplete = () => { database.close(); resolve(); };
       transaction.onerror = () => reject(transaction.error);
@@ -447,6 +448,58 @@ test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) 
   await street.fill('Avenida Central qD. B');
   await expect(street).toHaveValue('Avenida Central B');
   await expect(page.locator('#street-warning')).toContainText('Preencha no campo Quadra');
+});
+
+test('Financeiro cadastra pessoa jurídica com representante reutilizável', async ({ page }) => {
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.locator('#quick-client').click();
+  const clientForm = page.locator('#client-form');
+  await clientForm.locator('[name="type"]').selectOption('pj');
+  await clientForm.locator('[name="legalName"]').fill('Empresa Exemplo Ltda');
+  await clientForm.locator('[name="tradeName"]').fill('Empresa Exemplo');
+  await clientForm.locator('[name="cnpj"]').fill('04.252.011/0001-10');
+  await clientForm.locator('[name="phoneNational"]').fill('62999999999');
+  await clientForm.locator('[name="street"]').fill('Avenida Central');
+  await clientForm.locator('[name="neighborhood"]').fill('Centro');
+  await clientForm.locator('[name="city"]').fill('Goiânia');
+
+  await page.locator('#new-representative-person').click();
+  const personForm = page.locator('#person-form');
+  await personForm.locator('[name="name"]').fill('Maria da Silva');
+  await personForm.locator('[name="cpf"]').fill('529.982.247-25');
+  await personForm.locator('[name="birthDate"]').fill('1990-01-10');
+  await personForm.locator('[name="maritalStatus"]').fill('casada');
+  await personForm.locator('[name="profession"]').fill('administradora');
+  await personForm.getByRole('button', { name: 'Salvar pessoa' }).click();
+
+  const representative = page.locator('.representative-row');
+  await expect(representative).toHaveCount(1);
+  await representative.locator('[data-representative="role"]').fill('Administradora');
+  await expect(representative.locator('[data-representative="isPrimary"]')).toBeChecked();
+  await expect(representative.locator('[data-representative="isSigner"]')).toBeChecked();
+  await clientForm.getByRole('button', { name: 'Salvar cliente' }).click();
+
+  await page.locator('[data-view="clients"]').click();
+  await expect(page.locator('.client-card').filter({ hasText: 'Empresa Exemplo Ltda' })).toBeVisible();
+  const saved = await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('officejur-financeiro', 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction('domains-v2', 'readonly');
+      const store = transaction.objectStore('domains-v2');
+      const peopleRequest = store.get('people'), clientsRequest = store.get('clients');
+      transaction.oncomplete = () => {
+        database.close();
+        resolve({ people: peopleRequest.result?.value?.records || [], clients: clientsRequest.result?.value?.records || [] });
+      };
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }));
+  expect(saved.people).toHaveLength(1);
+  expect(saved.clients).toHaveLength(1);
+  expect(saved.clients[0]).toMatchObject({ type: 'pj', legalName: 'Empresa Exemplo LTDA', cnpj: '04.252.011/0001-10' });
+  expect(saved.clients[0].representatives[0]).toMatchObject({ personId: saved.people[0].id, role: 'Administradora', isPrimary: true, isSigner: true });
 });
 
 test('Documentos vincula cliente, organiza a pasta e salva CSV', async ({ page }) => {

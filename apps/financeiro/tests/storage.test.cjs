@@ -6,10 +6,19 @@ const storage = require("../assets/storage.js");
 function sampleData() {
   return {
     updatedAt: "2026-07-29T12:00:00.000Z",
+    people: [
+      {
+        id: "pessoa-cliente-1",
+        name: "Cliente",
+        cpf: "529.982.247-25",
+        updatedAt: "2026-07-29T12:00:00.000Z",
+      },
+    ],
     clients: [
       {
         id: "cliente-1",
-        name: "Cliente",
+        type: "pf",
+        personId: "pessoa-cliente-1",
         updatedAt: "2026-07-29T12:00:00.000Z",
       },
     ],
@@ -39,6 +48,7 @@ function sampleData() {
     ],
     charges: [],
     accounts: [{ id: "pix", name: "PIX" }],
+    deletedPeople: [],
     deletedClients: [],
     deletedCases: [],
     deletedPackages: [],
@@ -59,6 +69,7 @@ test("separa cada domínio em arquivo e chave local próprios", () => {
     assert.ok(storage.DOMAINS[name].file.endsWith(".json"));
   });
   assert.equal(domains.clients.records[0].id, "cliente-1");
+  assert.equal(domains.people.records[0].id, "pessoa-cliente-1");
   assert.equal(domains.cases.records[0].clientId, "cliente-1");
 });
 
@@ -81,6 +92,34 @@ test("detecta referências quebradas entre bancos", () => {
   ]);
 });
 
+test("valida representantes reutilizáveis de cliente pessoa jurídica", () => {
+  const data = sampleData();
+  data.clients.push({
+    id: "empresa-1",
+    type: "pj",
+    legalName: "Empresa Exemplo Ltda.",
+    cnpj: "04.252.011/0001-10",
+    representatives: [
+      {
+        id: "representacao-1",
+        personId: "pessoa-cliente-1",
+        role: "Administradora",
+        isPrimary: true,
+        isSigner: true,
+      },
+    ],
+    updatedAt: "2026-07-29T12:00:00.000Z",
+  });
+  const domains = storage.split(data);
+
+  assert.deepEqual(storage.validateReferences(domains), []);
+  domains.people.records = [];
+  assert.deepEqual(storage.validateReferences(domains), [
+    "Cliente cliente-1 referencia pessoa inexistente pessoa-cliente-1.",
+    "Cliente empresa-1 referencia representante inexistente pessoa-cliente-1.",
+  ]);
+});
+
 test("mescla um domínio registro por registro e respeita exclusões", () => {
   const base = storage.split(sampleData()).clients,
     changed = {
@@ -89,12 +128,14 @@ test("mescla um domínio registro por registro e respeita exclusões", () => {
       records: [
         {
           ...base.records[0],
-          name: "Nome atualizado",
+          personId: "pessoa-cliente-1",
+          notes: "Cadastro atualizado",
           updatedAt: "2026-07-30T10:00:00.000Z",
         },
         {
           id: "cliente-2",
-          name: "Excluído",
+          type: "pf",
+          personId: "pessoa-cliente-1",
           updatedAt: "2026-07-29T10:00:00.000Z",
         },
       ],
@@ -108,7 +149,7 @@ test("mescla um domínio registro por registro e respeita exclusões", () => {
     merged = storage.mergeDomain("clients", base, changed);
 
   assert.equal(merged.records.length, 1);
-  assert.equal(merged.records[0].name, "Nome atualizado");
+  assert.equal(merged.records[0].notes, "Cadastro atualizado");
   assert.equal(
     storage.signature("clients", merged),
     storage.signature("clients", storage.mergeDomain("clients", changed, base)),

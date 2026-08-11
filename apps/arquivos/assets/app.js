@@ -581,8 +581,12 @@
     }
     try {
       const domains = await financeDataStore.load({ financeStorage });
+      const people = new Map((domains.people?.records || []).map((person) => [String(person.id), person]));
       state.clients = (domains.clients?.records || []).filter((client) => client?.id)
-        .map((client) => ({ id: String(client.id), name: String(client.name || client.companyName || 'Cliente sem nome') }))
+        .map((client) => ({
+          id: String(client.id),
+          name: String(client.type === 'pj' ? client.legalName : people.get(String(client.personId))?.name || 'Cliente sem nome'),
+        }))
         .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
       renderClients();
     } catch (error) {

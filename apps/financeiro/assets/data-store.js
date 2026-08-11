@@ -6,14 +6,17 @@
   "use strict";
 
   const DATABASE = "officejur-financeiro";
-  const VERSION = 1;
-  const DOMAIN_STORE = "domains";
+  const VERSION = 2;
+  const DOMAIN_STORE = "domains-v2";
 
   function openDatabase(indexedDb = indexedDB) {
     return new Promise((resolve, reject) => {
       const request = indexedDb.open(DATABASE, VERSION);
       request.onupgradeneeded = () => {
         const database = request.result;
+        Array.from(database.objectStoreNames).forEach((storeName) => {
+          if (storeName !== DOMAIN_STORE) database.deleteObjectStore(storeName);
+        });
         if (!database.objectStoreNames.contains(DOMAIN_STORE))
           database.createObjectStore(DOMAIN_STORE, { keyPath: "name" });
       };

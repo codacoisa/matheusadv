@@ -45,8 +45,8 @@ test("exigir os campos complementares do cliente", () => {
         new RegExp(`<input[^>]*name="${name}"[^>]*required`, "s"),
       ),
   );
-  assert.match(app, /maritalStatus:\s*"estado civil"/);
-  assert.match(app, /profession:\s*"profissão"/);
+  assert.match(app, /Informe o estado civil do cliente/);
+  assert.match(app, /Informe a profissão do cliente/);
   assert.match(app, /street:\s*"endereço"/);
   assert.match(app, /neighborhood:\s*"bairro"/);
   assert.match(app, /city:\s*"cidade"/);
@@ -60,8 +60,21 @@ test("separar número, quadra e lote do logradouro do cliente", () => {
   assert.match(app, /FORBIDDEN_STREET_PART/);
   assert.match(app, /n\[uú\]mero\|nº\|n\\\.º\|quadra\|qd\\\.\?\|lote\|lt\\\.\?/);
   assert.match(app, /Preencha no campo \$\{restriction\.field\}/);
-  assert.match(app, /client\.addressBlock \? `Quadra/);
-  assert.match(app, /client\.addressLot \? `Lote/);
+  assert.match(app, /profile\.addressBlock \? `Quadra/);
+  assert.match(app, /profile\.addressLot \? `Lote/);
+});
+
+test("cadastrar pessoa jurídica com representantes reutilizáveis", () => {
+  assert.match(html, /value="pj">Pessoa jurídica/);
+  assert.match(html, /name="legalName"/);
+  assert.match(html, /name="cnpj"/);
+  assert.match(html, /id="representatives-editor"/);
+  assert.match(html, /id="person-dialog"/);
+  assert.match(app, /function validCnpj/);
+  assert.match(app, /signatureRule/);
+  assert.match(app, /isPrimary/);
+  assert.match(app, /isSigner/);
+  assert.match(app, /activeClientRepresentatives/);
 });
 
 test("remover do Gist o payload de PDFs excluídos", () => {

@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, (root) => {
   "use strict";
 
-  const empty = () => ({ clients: [], cases: [], loaded: false });
+  const empty = () => ({ people: [], clients: [], cases: [], loaded: false });
 
   function clientLabel(client) {
     return String(client?.name || client?.document || "Cliente sem nome").trim();
@@ -24,8 +24,17 @@
     const dataStore = root.FinanceDataStore;
     if (!storage || !dataStore) return empty();
     const domains = await dataStore.load({ financeStorage: storage });
+    const people = (domains.people?.records || []).slice();
+    const personById = new Map(people.map((person) => [String(person.id), person]));
+    const clients = (domains.clients?.records || []).map((client) => {
+      if (client.type === "pj")
+        return { ...client, name: client.legalName, document: client.cnpj };
+      const person = personById.get(String(client.personId)) || {};
+      return { ...client, name: person.name, document: person.cpf };
+    });
     return {
-      clients: (domains.clients?.records || []).slice().sort((a, b) =>
+      people,
+      clients: clients.sort((a, b) =>
         clientLabel(a).localeCompare(clientLabel(b), "pt-BR"),
       ),
       cases: (domains.cases?.records || []).slice(),

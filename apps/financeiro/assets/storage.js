@@ -6,10 +6,16 @@
   "use strict";
 
   const DOMAINS = Object.freeze({
+    people: {
+      file: "financeiro-pessoas.json",
+      schema: "officejur/financeiro-pessoas-data",
+      version: 1,
+      deletedKey: "deletedPeople",
+    },
     clients: {
       file: "financeiro-clientes.json",
       schema: "officejur/financeiro-clientes-data",
-      version: 1,
+      version: 2,
       deletedKey: "deletedClients",
     },
     cases: {
@@ -200,6 +206,7 @@
   function validateReferences(domains) {
     const data = assemble(domains),
       ids = (name) => new Set(data[name].map((item) => item.id)),
+      people = ids("people"),
       clients = ids("clients"),
       cases = ids("cases"),
       packages = ids("packages"),
@@ -209,6 +216,21 @@
       requireId = (condition, message) => {
         if (!condition) issues.push(message);
       };
+
+    data.clients.forEach((item) => {
+      if (item.type === "pf")
+        requireId(
+          people.has(item.personId),
+          `Cliente ${item.id} referencia pessoa inexistente ${item.personId}.`,
+        );
+      if (item.type === "pj")
+        (Array.isArray(item.representatives) ? item.representatives : []).forEach(
+          (representative) => requireId(
+            people.has(representative.personId),
+            `Cliente ${item.id} referencia representante inexistente ${representative.personId}.`,
+          ),
+        );
+    });
 
     data.cases.forEach((item) => {
       requireId(
