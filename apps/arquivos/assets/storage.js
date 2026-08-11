@@ -5,8 +5,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : window, () => {
   'use strict';
 
-  const DATABASE = 'officejur-documentos-lab';
-  const VERSION = 3;
+  const DATABASE = 'officejur-arquivos';
+  const VERSION = 1;
   const STORE = 'documents';
 
   function openDatabase(indexedDb = globalThis.indexedDB) {
@@ -82,31 +82,27 @@
 
   function normalize(document) {
     if (!document) return document;
-    const normalized = { ...document };
-    delete normalized.file;
-    delete normalized.originalFile;
-    normalized.dataBase64 = String(normalized.dataBase64 ?? normalized.fileBase64 ?? '');
-    normalized.originalDataBase64 = String(normalized.originalDataBase64 ?? normalized.originalFileBase64 ?? normalized.dataBase64);
-    delete normalized.fileBase64;
-    delete normalized.originalFileBase64;
-    return normalized;
-  }
-
-  async function serialize(document) {
-    if (!document) return document;
-    const serialized = { ...document };
-    if (serialized.file) serialized.dataBase64 = await blobToBase64(serialized.file);
-    if (serialized.originalFile) serialized.originalDataBase64 = await blobToBase64(serialized.originalFile);
-    if (serialized.dataBase64 == null) serialized.dataBase64 = '';
-    if (serialized.originalDataBase64 == null) serialized.originalDataBase64 = serialized.dataBase64;
-    return normalize(serialized);
-  }
-
-  async function migrate(records, database) {
-    const migrated = await Promise.all(records.map(serialize));
-    const changed = records.some((record) => record?.file || record?.originalFile || record?.fileBase64 || record?.originalFileBase64);
-    if (changed) await transaction(database, 'readwrite', (store) => migrated.forEach((record) => store.put(record)));
-    return migrated;
+    return {
+      id: String(document.id || ''),
+      clientId: String(document.clientId || ''),
+      clientName: String(document.clientName || ''),
+      name: String(document.name || 'Documento sem título'),
+      extension: String(document.extension || 'docx'),
+      mimeType: String(document.mimeType || 'application/octet-stream'),
+      fileName: String(document.fileName || ''),
+      source: String(document.source || 'created'),
+      content: String(document.content || ''),
+      size: Math.max(0, Number(document.size || 0)),
+      originalSize: Math.max(0, Number(document.originalSize || 0)),
+      sha256: String(document.sha256 || ''),
+      originalSha256: String(document.originalSha256 || ''),
+      payloadFile: String(document.payloadFile || ''),
+      originalPayloadFile: String(document.originalPayloadFile || ''),
+      createdAt: String(document.createdAt || ''),
+      updatedAt: String(document.updatedAt || ''),
+      dataBase64: String(document.dataBase64 ?? ''),
+      originalDataBase64: String(document.originalDataBase64 ?? ''),
+    };
   }
 
   async function list({ indexedDb } = {}) {
@@ -117,7 +113,7 @@
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
-      return (await migrate(records, database)).sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
+      return records.map(normalize).sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
     } finally { database.close(); }
   }
 
@@ -130,14 +126,13 @@
         request.onerror = () => reject(request.error);
       });
       if (!record) return null;
-      const [migrated] = await migrate([record], database);
-      return migrated;
+      return normalize(record);
     } finally { database.close(); }
   }
 
   async function save(document, { indexedDb } = {}) {
     const database = await openDatabase(indexedDb);
-    const serialized = await serialize(document);
+    const serialized = normalize(document);
     try { await transaction(database, 'readwrite', (store) => store.put(serialized)); return serialized; }
     finally { database.close(); }
   }

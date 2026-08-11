@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
-  --navy: #17213a;
-  --navy-2: #23304f;
-  --gold: #8b651f;
-  --gold-light: #d9bd7a;
-  --paper: #fff;
-  --bg: #eef1f5;
-  --line: #d9dee7;
-  --text: #182033;
-  --muted: #667085;
+  --navy: var(--officejur-primary, #17213a);
+  --navy-2: var(--officejur-primary-soft, #23304f);
+  --gold: var(--officejur-accent, #8b651f);
+  --gold-light: var(--officejur-accent-light, #d9bd7a);
+  --paper: var(--officejur-surface, #fff);
+  --bg: var(--officejur-canvas, #eef1f5);
+  --line: var(--officejur-line, #d9dee7);
+  --text: var(--officejur-text, #182033);
+  --muted: var(--officejur-muted, #667085);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 

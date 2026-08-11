@@ -38,9 +38,9 @@
       source: String(item.source || 'created'),
       content: String(item.content || ''),
       size: Math.max(0, Number(item.size || 0)),
-      originalSize: Math.max(0, Number(item.originalSize || item.size || 0)),
+      originalSize: Math.max(0, Number(item.originalSize || 0)),
       sha256: String(item.sha256 || ''),
-      originalSha256: String(item.originalSha256 || item.sha256 || ''),
+      originalSha256: String(item.originalSha256 || ''),
       payloadFile: String(item.payloadFile || payloadFileName(id)),
       originalPayloadFile: String(item.originalPayloadFile || originalPayloadFileName(id)),
       createdAt: String(item.createdAt || ''),
@@ -50,14 +50,14 @@
 
   function normalizeData(raw) {
     const source = raw && typeof raw === 'object' ? raw : {};
-    if (source.schema && source.schema !== SCHEMA) throw new Error('Os documentos não usam o formato atual do OfficeJur.');
-    if (source.version !== undefined && Number(source.version) !== VERSION) throw new Error('Os documentos usam uma versão incompatível.');
+    if (source.schema !== SCHEMA) throw new Error('Os documentos não usam o formato atual do OfficeJur.');
+    if (Number(source.version) !== VERSION) throw new Error('Os documentos usam uma versão incompatível.');
     return {
       ...emptyData(String(source.updatedAt || new Date().toISOString())),
-      documents: (Array.isArray(source.documents) ? source.documents : Array.isArray(source.files) ? source.files : [])
+      documents: (Array.isArray(source.documents) ? source.documents : [])
         .map(normalizeDocument)
         .filter((item) => item.id && item.clientId),
-      deletedDocuments: normalizeDeleted(source.deletedDocuments || source.deletedFiles)
+      deletedDocuments: normalizeDeleted(source.deletedDocuments)
     };
   }
 

@@ -8,6 +8,7 @@
   "scripts": {
     "test:calculos": "node --test apps/calculos/tests/*.test.cjs apps/calculos/trabalhista/tests/*.test.cjs",
     "test:central-guias": "node --test apps/lab/tools/central-guias/tests/*.test.cjs",
+    "test:documentos": "node --test apps/documentos/tests/*.test.cjs",
     "test:arquivos": "node --test apps/arquivos/tests/*.test.cjs",
     "test:browser": "playwright test",
     "test:browser:headed": "playwright test --headed"

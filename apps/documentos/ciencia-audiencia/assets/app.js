@@ -6,25 +6,23 @@ const pageCount = document.getElementById('page-count');
 const importBtn = document.getElementById('import');
 const importFile = document.getElementById('import-file');
 
-const GOLD = [179, 135, 49];
-const GRAY = [88, 88, 92];
-const FOOTER_GRAY = [125, 125, 128];
+const DOCUMENT_CONFIG = window.OFFICEJUR_DOCUMENT_CONFIG;
+const TEMPLATE_CONFIG = DOCUMENT_CONFIG.templates['ciencia-audiencia'];
+const PDF_COLORS = DOCUMENT_CONFIG.pdf.colors;
+const GOLD = PDF_COLORS.gold;
+const GRAY = PDF_COLORS.gray;
+const FOOTER_GRAY = PDF_COLORS.footerGray;
 const TABLE_INK = [55, 55, 55];
 const TABLE_HEADER_BG = [189, 192, 191];
 const TABLE_LABEL_BG = [220, 220, 220];
 const TABLE_VALUE_BG = [245, 245, 245];
 const TABLE_BORDER = [150, 150, 150];
-const MAPS_URL = 'https://maps.app.goo.gl/r8CVrczAXdqNZc6u9';
-const WHATSAPP_URL = 'https://wa.me/5562993161514';
+const MAPS_URL = DOCUMENT_CONFIG.pdf.footer.mapsUrl;
+const WHATSAPP_URL = DOCUMENT_CONFIG.pdf.footer.whatsappUrl;
 const LEFT = 19;
 const WIDTH = 172;
-const PDF_DRAFT_MARKER = 'GM_CIENCIA_AUDIENCIA_DRAFT:';
-
-const ATTORNEYS = [
-  { name: 'Adauto Aparecido de Morais', oab: '33.799' },
-  { name: 'Jales Gregório de Oliveira Sousa', oab: '62.131' },
-  { name: 'Matheus Ricardo de Sousa Ferreira', oab: '60.162' },
-];
+const PDF_DRAFT_MARKER = TEMPLATE_CONFIG.draftMarker;
+const ATTORNEYS = TEMPLATE_CONFIG.attorneys;
 
 function strokeIcon(doc, color, weight, fn) {
   doc.setDrawColor(...color);
@@ -117,7 +115,17 @@ function setDraft(draft) {
     const value = draft?.[group]?.[field];
     if (value != null) element.value = value;
   }
+  if (!form.elements['document.location'].value) form.elements['document.location'].value = TEMPLATE_CONFIG.defaultLocation;
   if (!form.elements['document.date'].value) form.elements['document.date'].value = todayISO();
+}
+
+function populateAttorneyOptions() {
+  const select = form.elements['document.attorney'];
+  if (!select) return;
+  select.replaceChildren(new Option('Não informar', ''));
+  ATTORNEYS.forEach((attorney, index) => {
+    select.add(new Option(`${attorney.name} — OAB-GO ${attorney.oab}`, String(index)));
+  });
 }
 
 function saveDraft() {
@@ -169,22 +177,14 @@ function loadCroppedImage(src, crop) {
 }
 
 async function loadAssets() {
-  const [logo, wordmark, watermark] = await Promise.all([
-    loadCroppedImage('../../assets/logo.png', { x: 200, y: 234, w: 623, h: 962 }),
-    loadCroppedImage('../assets/wordmark.png', { x: 238, y: 384, w: 1068, h: 190 }),
-    loadCroppedImage('../assets/watermark.png', { x: 0, y: 0, w: 1414, h: 2000 }),
-  ]);
-  state.assets = { logo, wordmark, watermark };
+  state.assets = await window.OfficeJurPdfTemplate.loadAssets();
 }
 
 function drawWatermark(doc) {
-  if (!state.assets.watermark) return;
-  if (doc.GState && doc.setGState) doc.setGState(new doc.GState({ opacity: 0.18 }));
-  doc.addImage(state.assets.watermark, 'PNG', 134.4, 42.3, 150, 212.3);
-  if (doc.GState && doc.setGState) doc.setGState(new doc.GState({ opacity: 1 }));
+  window.OfficeJurPdfTemplate.drawWatermark(doc, state.assets);
 }
 
-function drawHeader(doc, title = 'TERMO DE CIÊNCIA E COMPROMISSO\nDE COMPARECIMENTO EM AUDIÊNCIA') {
+function drawHeader(doc, title = TEMPLATE_CONFIG.headerTitle) {
   if (state.assets.logo) doc.addImage(state.assets.logo, 'PNG', 95.3, 5, 19.4, 30);
   if (state.assets.wordmark) doc.addImage(state.assets.wordmark, 'PNG', 74.1, 38, 61.8, 11);
   doc.setDrawColor(...GOLD);
@@ -198,32 +198,7 @@ function drawHeader(doc, title = 'TERMO DE CIÊNCIA E COMPROMISSO\nDE COMPARECIM
 }
 
 function drawFooter(doc, pageInfo) {
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.25);
-  doc.line(0, 274, 210, 274);
-  doc.setLineWidth(0.8);
-  doc.line(0, 294, 210, 294);
-  doc.setLineWidth(0.3);
-  doc.line(0, 296, 210, 296);
-  doc.setFont('times', 'normal');
-  doc.setTextColor(...FOOTER_GRAY);
-  doc.setFontSize(9);
-
-  const rows = [
-    { icon: 'phone', text: '(62) 9 9316-1514', y: 282, link: WHATSAPP_URL },
-    { icon: 'pin', text: 'GO-010, Km 67, Zona Rural, Silvânia-GO', y: 287, link: MAPS_URL },
-    { icon: 'envelope', text: 'gregorioemorais.adv@gmail.com', y: 292 },
-  ];
-  const iconSize = 3;
-  const gap = 1.6;
-  rows.forEach(({ icon, text, y, link }) => {
-    const textWidth = doc.getTextWidth(text);
-    const startX = 105 - (iconSize + gap + textWidth) / 2;
-    drawIcon(doc, icon, startX, y - iconSize * 0.78, iconSize, FOOTER_GRAY);
-    if (link) doc.textWithLink(text, startX + iconSize + gap, y, { url: link });
-    else doc.text(text, startX + iconSize + gap, y);
-  });
-
+  window.OfficeJurPdfTemplate.drawFooter(doc, drawIcon);
 }
 
 function drawPageChrome(doc, title) {
@@ -323,12 +298,7 @@ function drawSignatureLine(doc, lines, x, y, width, opts = {}) {
 function generateDocument(draft = getDraft()) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-  doc.setProperties({
-    title: 'Termo de Ciência de Audiência',
-    author: 'Gregório & Morais Advogados',
-    subject: 'Ciência de audiência gerada pelo sistema Gregório & Morais',
-    keywords: encodePdfDraft(draft),
-  });
+  window.OfficeJurPdfTemplate.setProperties(doc, TEMPLATE_CONFIG, draft, encodePdfDraft);
   drawPageChrome(doc);
 
   let y = 76;
@@ -478,7 +448,7 @@ document.getElementById('clear').addEventListener('click', () => {
   if (!confirm('Limpar todos os campos deste termo?')) return;
   localStorage.removeItem(STORAGE_KEY);
   form.reset();
-  form.elements['document.location'].value = 'Silvânia-GO';
+  form.elements['document.location'].value = TEMPLATE_CONFIG.defaultLocation;
   form.elements['document.date'].value = todayISO();
   form.elements['document.filename'].value = 'ciencia-audiencia';
   updatePreview();
@@ -489,6 +459,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 async function init() {
+  populateAttorneyOptions();
   setDraft(loadDraft());
   try {
     await loadAssets();

@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --navy: #17213a;
-  --navy-2: #23304f;
-  --gold: #8b651f;
-  --gold-soft: #f3ead8;
-  --bg: #eef1f5;
-  --paper: #fff;
-  --text: #182033;
-  --muted: #596273;
-  --line: #d9dee7;
-  --danger: #b42318;
-  --ok: #087443;
+  --navy: var(--officejur-primary, #17213a);
+  --navy-2: var(--officejur-primary-soft, #23304f);
+  --gold: var(--officejur-accent, #8b651f);
+  --gold-soft: var(--officejur-accent-soft, #f3ead8);
+  --bg: var(--officejur-canvas, #eef1f5);
+  --paper: var(--officejur-surface, #fff);
+  --text: var(--officejur-text, #182033);
+  --muted: var(--officejur-muted, #596273);
+  --line: var(--officejur-line, #d9dee7);
+  --danger: var(--officejur-danger, #b42318);
+  --ok: var(--officejur-success, #087443);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 

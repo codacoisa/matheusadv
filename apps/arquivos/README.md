@@ -1,6 +1,6 @@
 # Arquivos
 
-Este app mantém os arquivos em um IndexedDB próprio (`officejur-documentos-lab`, nome preservado para compatibilidade com dados criados no protótipo)
+Este app mantém os arquivos em um IndexedDB próprio (`officejur-arquivos`)
 e pode sincronizá-los pelo Gist global configurado no OfficeJur. O índice dos
 documentos fica separado dos conteúdos: cada arquivo corrente e sua versão
 original são enviados como payloads Base64 próprios, no mesmo padrão usado
@@ -59,9 +59,8 @@ junto dos assets publicados. O build é estático e adequado ao GitHub Pages;
 nenhum arquivo é enviado a um servidor para ser editado.
 
 O armazenamento usa `dataBase64` para a versão corrente e
-`originalDataBase64` para a versão originalmente importada. Registros antigos
-com `Blob` ou `File` são migrados para Base64 na primeira leitura após a
-atualização. Nenhum binário estruturado permanece gravado no IndexedDB.
+`originalDataBase64` para a versão originalmente importada. O esquema atual
+aceita somente Base64; nenhum binário estruturado é gravado no IndexedDB.
 
 ## Modelo institucional
 

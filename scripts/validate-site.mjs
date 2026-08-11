@@ -194,10 +194,9 @@ const documentModulesRoot = "apps/documentos";
 const sharedDocumentAssets = [
   "document-header.js",
   "document-utils.js",
+  "pdf-template.js",
   "jspdf.umd.min.js",
   "styles.css",
-  "watermark.png",
-  "wordmark.png",
 ];
 
 const sharedHeaderPages = [
@@ -299,16 +298,47 @@ const requiredOfficeConfigFields = [
   "shortName",
   "tagline",
   "statementDescriptor",
+  "logoUrl",
   "logoWhiteUrl",
   "appIconUrl",
   "baseUrl",
   "origin",
   "repositoryUrl",
 ];
+const requiredThemeFields = [
+  "primary",
+  "primaryDark",
+  "primarySoft",
+  "accent",
+  "accentStrong",
+  "accentLight",
+  "accentSoft",
+  "canvas",
+  "surface",
+  "text",
+  "muted",
+  "line",
+  "success",
+  "danger",
+  "warning",
+  "info",
+  "headerText",
+  "headerMuted",
+  "pdfAccent",
+  "pdfText",
+  "pdfMuted",
+];
 
 for (const field of requiredOfficeConfigFields) {
   if (!new RegExp(`\\b${field}\\s*:`).test(officeConfigSource)) {
     console.error(`Campo obrigatório ausente em config/office.js: ${field}.`);
+    process.exit(1);
+  }
+}
+
+for (const field of requiredThemeFields) {
+  if (!new RegExp(`\\b${field}\\s*:\\s*["']#[0-9a-f]{6}["']`, "i").test(officeConfigSource)) {
+    console.error(`Cor obrigatória ausente ou inválida em config/office.js: ${field}.`);
     process.exit(1);
   }
 }
@@ -324,6 +354,13 @@ const documentTemplatePath = "config/document-templates/modelo-institucional.doc
 const publishedDocumentTemplatePath = join(root, "assets/document-templates/modelo-institucional.docx.base64");
 if (!existsSync(documentTemplatePath) || !existsSync(publishedDocumentTemplatePath)) {
   console.error("Modelo institucional DOCX ausente na configuração ou no site publicado.");
+  process.exit(1);
+}
+
+const documentConfigPath = "config/document-config.js";
+const publishedDocumentConfigPath = join(root, "documentos/assets/document-config.js");
+if (!existsSync(documentConfigPath) || !existsSync(publishedDocumentConfigPath)) {
+  console.error("Configuração documental ausente na origem ou no site publicado.");
   process.exit(1);
 }
 const configuredTemplateHash = officeConfigSource.match(/institutionalDocxTemplate[\s\S]*?sha256:\s*["']([a-f0-9]{64})["']/i)?.[1];
@@ -386,6 +423,8 @@ for (const entry of readdirSync(documentModulesRoot)) {
     !html.includes("<office-document-header") ||
     !html.includes("../assets/styles.css") ||
     !html.includes("../assets/document-utils.js") ||
+    !html.includes("../assets/document-config.js") ||
+    !html.includes("../assets/pdf-template.js") ||
     !html.includes("../assets/jspdf.umd.min.js")
   ) {
     console.error(

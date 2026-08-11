@@ -29,7 +29,7 @@
   const PROTECTED_DATABASES = Object.freeze([
     "officejur-financeiro",
     "officejur-financeiro-documentos",
-    "officejur-documentos-lab",
+    "officejur-arquivos",
   ]);
   const HANDOFF_PREFIX = "officejur::documentos::handoff:";
   const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || min));

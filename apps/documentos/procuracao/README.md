@@ -1,6 +1,6 @@
 # Gerador de Procuração
 
-App estático para GitHub Pages que gera procurações em PDF no modelo Gregório & Morais.
+App estático para GitHub Pages que gera procurações em PDF conforme a configuração documental da instalação.
 
 ## Modos
 

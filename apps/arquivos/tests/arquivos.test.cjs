@@ -52,6 +52,8 @@ test('Documentos codifica arquivos em Base64 sem manter binários estruturados',
 test('Documentos separa índice e payloads Base64 para o Gist', () => {
   const encoded = documentFiles.toBase64(new Uint8Array([1, 2, 3]));
   const data = documentFiles.normalizeData({
+    schema: documentFiles.SCHEMA,
+    version: documentFiles.VERSION,
     documents: [{ id: 'doc-1', clientId: 'client-1', name: 'Petição', extension: 'docx', sha256: 'hash' }],
     deletedDocuments: [{ id: 'doc-old', deletedAt: '2026-01-01T00:00:00.000Z' }]
   });
@@ -62,6 +64,7 @@ test('Documentos separa índice e payloads Base64 para o Gist', () => {
   assert.equal(data.documents[0].clientId, 'client-1');
   assert.equal(data.deletedDocuments[0].id, 'doc-old');
   assert.match(documentFiles.signature(data), /doc-1/);
+  assert.equal(storage.DATABASE, 'officejur-arquivos');
 });
 
 test('Arquivos oferece o modelo institucional definido pela implantação', () => {

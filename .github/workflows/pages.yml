@@ -50,6 +50,9 @@ jobs:
       - name: Testar Central de Guias
         run: npm run test:central-guias
 
+      - name: Testar geradores de documentos
+        run: npm run test:documentos
+
       - name: Testar regras financeiras
         working-directory: apps/financeiro
         run: npm test

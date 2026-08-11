@@ -1,15 +1,15 @@
   :root {
     color-scheme: dark;
-    --navy: #121b32;
-    --navy-2: #192642;
-  --gold: #8b651f;
-    --gold-light: #d7bb79;
-    --paper: #ffffff;
+    --navy: var(--officejur-primary, #121b32);
+    --navy-2: var(--officejur-primary-soft, #192642);
+  --gold: var(--officejur-accent, #8b651f);
+    --gold-light: var(--officejur-accent-light, #d7bb79);
+    --paper: var(--officejur-surface, #ffffff);
     --line: rgba(255,255,255,.14);
-    --text: #f8fafc;
-    --muted: #c7cfdd;
-    --ink: #17213a;
-    --ink-muted: #667085;
+    --text: var(--officejur-header-text, #f8fafc);
+    --muted: var(--officejur-header-muted, #c7cfdd);
+    --ink: var(--officejur-text, #17213a);
+    --ink-muted: var(--officejur-muted, #667085);
   }
 
   * { box-sizing: border-box; }
@@ -25,7 +25,7 @@
     background:
       linear-gradient(180deg, rgba(18,27,50,.78), rgba(18,27,50,.97)),
       radial-gradient(circle at 16% 0%, rgba(215,187,121,.26), transparent 28%),
-      linear-gradient(135deg, #121b32 0%, #203254 100%);
+      linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
   }
 
   body::before {

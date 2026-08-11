@@ -163,9 +163,9 @@
 
   async function documentMetadata(documentRecord) {
     const bytes = storage.base64ToBytes(documentRecord.dataBase64 || '');
-    const originalBytes = storage.base64ToBytes(documentRecord.originalDataBase64 || documentRecord.dataBase64 || '');
+    const originalBytes = storage.base64ToBytes(documentRecord.originalDataBase64 || '');
     const [hash, originalHash] = await Promise.all([sha256(bytes), sha256(originalBytes)]);
-    const { dataBase64, originalDataBase64, file, originalFile, ...metadata } = documentRecord;
+    const { dataBase64, originalDataBase64, ...metadata } = documentRecord;
     return documentFiles.normalizeDocument({
       ...metadata,
       size: bytes.byteLength,
@@ -180,6 +180,8 @@
   async function localSyncData(records = state.documents) {
     const documents = await Promise.all(records.map(documentMetadata));
     return documentFiles.normalizeData({
+      schema: documentFiles.SCHEMA,
+      version: documentFiles.VERSION,
       updatedAt: now(),
       documents,
       deletedDocuments: state.deletedDocuments,
@@ -255,7 +257,7 @@
         let originalDataBase64 = '';
         if (localRecord && localMetadata?.sha256 === metadata.sha256 && localMetadata?.originalSha256 === metadata.originalSha256) {
           dataBase64 = localRecord.dataBase64;
-          originalDataBase64 = localRecord.originalDataBase64 || dataBase64;
+          originalDataBase64 = localRecord.originalDataBase64;
         } else {
           dataBase64 = await readRemotePayload(snapshot.gist, metadata);
           originalDataBase64 = await readRemotePayload(snapshot.gist, metadata, true);
@@ -281,7 +283,7 @@
         if (!record || !documentFiles.needsPayloadUpload(metadata, remoteById.get(metadata.id))) continue;
         const payloads = {
           [metadata.payloadFile]: { content: record.dataBase64 || '' },
-          [metadata.originalPayloadFile]: { content: record.originalDataBase64 || record.dataBase64 || '' },
+          [metadata.originalPayloadFile]: { content: record.originalDataBase64 || '' },
         };
         const patched = await gistClient.patch(settings.gistId, settings.token, payloads, { etag: revision });
         revision = patched.etag || revision;

@@ -65,6 +65,31 @@ for (const appPath of pages) {
   });
 }
 
+test('tema da instalação é aplicado à interface e aos documentos', async ({ page }) => {
+  await page.goto('', { waitUntil: 'networkidle' });
+  const interfaceTheme = await page.evaluate(() => ({
+    configured: window.OFFICEJUR_CONFIG.theme.colors,
+    primary: getComputedStyle(document.documentElement).getPropertyValue('--navy').trim(),
+    accent: getComputedStyle(document.documentElement).getPropertyValue('--gold').trim(),
+    browser: document.querySelector('meta[name="theme-color"]')?.content,
+  }));
+  expect(interfaceTheme.primary).toBe(interfaceTheme.configured.primary);
+  expect(interfaceTheme.accent).toBe(interfaceTheme.configured.accent);
+  expect(interfaceTheme.browser).toBe(interfaceTheme.configured.primary);
+
+  await page.goto('documentos/procuracao/', { waitUntil: 'networkidle' });
+  const documentTheme = await page.evaluate(() => ({
+    configured: window.OFFICEJUR_CONFIG.theme.colors.pdfAccent,
+    pdf: window.OFFICEJUR_DOCUMENT_CONFIG.pdf.colors.gold,
+  }));
+  const hex = documentTheme.configured.slice(1);
+  expect(documentTheme.pdf).toEqual([
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ]);
+});
+
 test('headers com sincronização automática não exibem ação manual', async ({ page }) => {
   const synchronizedRoutes = [
     'calculos/',
@@ -373,7 +398,8 @@ test('Documentos cria DOCX com o modelo institucional da implantação', async (
   await page.locator('#document-name').fill('Petição com timbre');
   await expect(page.locator('#institutional-template-field')).toBeVisible();
   await expect(page.locator('#institutional-template')).not.toBeChecked();
-  await expect(page.locator('#institutional-template-detail')).toContainText('Gregório & Morais');
+  const configuredOfficeName = await page.evaluate(() => window.OFFICEJUR_CONFIG.office.shortName);
+  await expect(page.locator('#institutional-template-detail')).toContainText(configuredOfficeName);
   await page.locator('#document-type').selectOption('xlsx');
   await expect(page.locator('#institutional-template-field')).toBeHidden();
   await page.locator('#document-type').selectOption('docx');
@@ -383,7 +409,7 @@ test('Documentos cria DOCX com o modelo institucional da implantação', async (
 
   await expect.poll(() => page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('officejur-documentos-lab', 3);
+      const request = indexedDB.open('officejur-arquivos', 1);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -539,7 +565,7 @@ test('Documentos importa formato detectado, salva Base64 e reabre DOCX', async (
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   const stored = await page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('officejur-documentos-lab', 3);
+      const request = indexedDB.open('officejur-arquivos', 1);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

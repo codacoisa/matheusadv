@@ -22,15 +22,18 @@ const addPersonBtn = document.getElementById('add-person');
 const importBtn = document.getElementById('import');
 const importFile = document.getElementById('import-file');
 
-const GOLD = [179, 135, 49];
-const GRAY = [88, 88, 92];
-const FOOTER_GRAY = [125, 125, 128];
-const MAPS_URL = 'https://maps.app.goo.gl/r8CVrczAXdqNZc6u9';
-const WHATSAPP_URL = 'https://wa.me/5562993161514';
+const DOCUMENT_CONFIG = window.OFFICEJUR_DOCUMENT_CONFIG;
+const TEMPLATE_CONFIG = DOCUMENT_CONFIG.templates.honorarios;
+const PDF_COLORS = DOCUMENT_CONFIG.pdf.colors;
+const GOLD = PDF_COLORS.gold;
+const GRAY = PDF_COLORS.gray;
+const FOOTER_GRAY = PDF_COLORS.footerGray;
+const MAPS_URL = DOCUMENT_CONFIG.pdf.footer.mapsUrl;
+const WHATSAPP_URL = DOCUMENT_CONFIG.pdf.footer.whatsappUrl;
 const LEFT = 19;
 const WIDTH = 172;
 const PEOPLE_LIMIT = 4;
-const PDF_DRAFT_MARKER = 'GM_HONORARIOS_DRAFT:';
+const PDF_DRAFT_MARKER = TEMPLATE_CONFIG.draftMarker;
 const DOCUMENT_HANDOFF_PREFIX = 'officejur::documentos::handoff:';
 const DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
 const GIST_PROTECTED_MARKER = '__officejurGistProtected';
@@ -65,29 +68,8 @@ const PERSON_FIELD_GROUPS = [
   ] },
 ];
 
-const CONTRATADA_TEXT = 'Adauto Aparecido de Morais, inscrito na OAB/GO, sob o n.º 33.799; Jales Gregório de Oliveira Sousa, inscrito na OAB/GO, sob o n.º 62.131; e Matheus Ricardo de Sousa Ferreira, inscrito na OAB/GO, sob o n.º 60.162, todos integrantes do escritório Gregório & Morais, com endereço profissional indicado no rodapé deste instrumento.';
-
-const DEFAULT_CLAUSES = [
-  { id: 1, title: 'DO OBJETO', text: 'A CONTRATADA prestará os serviços advocatícios descritos no Quadro de Parâmetros da Contratação, observados o objeto e os limites ali definidos.' },
-  { id: 2, title: 'DOS HONORÁRIOS', text: 'Os honorários devidos pela prestação dos serviços são aqueles estabelecidos no Quadro de Parâmetros da Contratação, que integra este contrato.\nI - Em caso de inadimplemento, incidirão multa de 1% e juros de mora de 2% ao mês, calculados pro rata die.\nII - Após 30 dias de atraso, poderá a CONTRATADA considerar rescindido o contrato e exigir o pagamento imediato dos valores devidos, além das despesas incorridas.' },
-  { id: 3, title: 'DO INADIMPLEMENTO E SUSPENSÃO DA ATUAÇÃO', text: 'O inadimplemento autoriza a CONTRATADA a suspender a prática de atos não urgentes, sem prejuízo da adoção das medidas éticas cabíveis, inclusive renúncia ao mandato, permanecendo exigíveis os honorários vencidos e proporcionais ao trabalho realizado.' },
-  { id: 4, title: 'DA CIÊNCIA, ADEQUAÇÃO E LIVRE PACTUAÇÃO', text: 'O CONTRATANTE declara que os honorários foram livremente pactuados, compatíveis com a complexidade da causa, grau de zelo profissional e tempo estimado de dedicação, tendo sido devidamente esclarecida a distinção entre honorários contratuais e sucumbenciais.' },
-  { id: 5, title: 'DAS DESPESAS', text: 'Custas, taxas e despesas extraordinárias correrão por conta do CONTRATANTE, mediante prévia comunicação, podendo a CONTRATADA adiantar despesas de pequeno valor até o limite de R$ 150,00.' },
-  { id: 6, title: 'DAS OBRIGAÇÕES DO CONTRATANTE', text: 'Compete ao CONTRATANTE fornecer informações e documentos verídicos, manter seus dados atualizados, arcar com despesas comunicadas e efetuar os pagamentos pactuados.' },
-  { id: 7, title: 'DO ACORDO OU RECEBIMENTO DIRETO', text: 'Qualquer valor recebido direta ou indiretamente pelo CONTRATANTE, por acordo judicial, extrajudicial ou composição informal relacionada ao objeto deste contrato, ainda que sem a intervenção da CONTRATADA, tornará imediatamente exigíveis os honorários contratuais e de êxito previstos no Quadro de Parâmetros da Contratação.' },
-  { id: 8, title: 'DA EXCLUSIVIDADE', text: 'O CONTRATANTE compromete-se a não constituir outro patrono para o mesmo objeto sem ciência da CONTRATADA, sob pena de exigibilidade integral dos honorários.' },
-  { id: 9, title: 'DA RESCISÃO', text: 'O contrato poderá ser rescindido por qualquer das partes mediante notificação escrita. Em caso de rescisão imotivada, desistência ou revogação do mandato pelo CONTRATANTE, aplicam-se as condições previstas no Quadro de Parâmetros da Contratação. Os valores já pagos serão imputados aos serviços efetivamente prestados ou disponibilizados pela CONTRATADA, observada a proporcionalidade do trabalho realizado, sem prejuízo da multa rescisória, se prevista.' },
-  { id: 10, title: 'DA IRREVOGABILIDADE E IRRETRATABILIDADE', text: 'O presente contrato é celebrado em caráter irrevogável e irretratável, ressalvadas as hipóteses legais ou rescisão por mútuo acordo.' },
-  { id: 11, title: 'DO LEVANTAMENTO DE VALORES', text: 'A CONTRATADA poderá requerer a expedição de alvará em seu nome para levantamento de honorários contratuais e sucumbenciais.' },
-  { id: 12, title: 'DA PROTEÇÃO DE DADOS', text: 'O tratamento de dados pessoais observará a Lei nº 13.709/2018, limitando-se ao necessário à execução deste contrato.' },
-  { id: 13, title: 'DO COMPARTILHAMENTO DE DADOS', text: 'O CONTRATANTE autoriza o compartilhamento de seus dados pessoais com peritos, correspondentes jurídicos, tribunais, plataformas digitais e demais terceiros estritamente necessários à execução do objeto contratado, observadas as disposições da Lei nº 13.709/2018.' },
-  { id: 14, title: 'DO SIGILO PROFISSIONAL', text: 'O CONTRATANTE compromete-se a não divulgar estratégias, documentos ou pareceres sem autorização prévia.' },
-  { id: 19, title: 'DO USO DE INTELIGÊNCIA ARTIFICIAL', text: 'O CONTRATANTE declara ciência e consente expressamente que a CONTRATADA utilize ferramentas de inteligência artificial, inclusive generativa, como apoio à execução dos serviços contratados, inclusive para pesquisa, análise, organização, revisão e elaboração de documentos e comunicações relacionadas ao objeto deste contrato. A utilização observará as cláusulas de proteção de dados, compartilhamento de dados e sigilo profissional deste instrumento; o CONTRATANTE está ciente de que os resultados podem conter imprecisões e não substituirão a análise dos advogados, que permanecerão responsáveis pelo conteúdo final e pelas orientações prestadas. O CONTRATANTE poderá solicitar, por escrito, que a IA não seja utilizada em atividade específica, hipótese em que a CONTRATADA avaliará alternativa compatível.' },
-  { id: 15, title: 'DO SUBSTABELECIMENTO', text: 'A CONTRATADA poderá substabelecer os poderes recebidos, com ou sem reserva.' },
-  { id: 16, title: 'DA VIGÊNCIA', text: 'A vigência perdurará até a conclusão da atuação definida no Quadro de Parâmetros da Contratação.' },
-  { id: 17, title: 'DAS DISPOSIÇÕES GERAIS', text: 'A eventual tolerância ao descumprimento contratual não implica renúncia de direitos. As obrigações estendem-se aos sucessores das partes.' },
-  { id: 18, title: 'DO FORO', text: 'Fica eleito o foro da Comarca de Silvânia-GO para dirimir controvérsias decorrentes deste contrato.' },
-];
+const CONTRATADA_TEXT = TEMPLATE_CONFIG.contractedPartyText;
+const DEFAULT_CLAUSES = TEMPLATE_CONFIG.clauses;
 
 function strokeIcon(doc, color, weight, fn) {
   doc.setDrawColor(...color);
@@ -209,6 +191,7 @@ function setDraft(draft) {
     const value = draft?.[group]?.[field];
     if (value != null) element.value = value;
   }
+  if (!form.elements['document.location'].value) form.elements['document.location'].value = TEMPLATE_CONFIG.defaultLocation;
   if (!form.elements['document.date'].value) form.elements['document.date'].value = todayISO();
   if (draft?.params?.entradaForma === 'misto' && !draft?.params?.parteFixaForma) {
     form.elements['params.parteFixaForma'].value = 'vista';
@@ -689,22 +672,14 @@ function loadCroppedImage(src, crop) {
 }
 
 async function loadAssets() {
-  const [logo, wordmark, watermark] = await Promise.all([
-    loadCroppedImage('../../assets/logo.png', { x: 200, y: 234, w: 623, h: 962 }),
-    loadCroppedImage('../assets/wordmark.png', { x: 238, y: 384, w: 1068, h: 190 }),
-    loadCroppedImage('../assets/watermark.png', { x: 0, y: 0, w: 1414, h: 2000 }),
-  ]);
-  state.assets = { logo, wordmark, watermark };
+  state.assets = await window.OfficeJurPdfTemplate.loadAssets();
 }
 
 function drawWatermark(doc) {
-  if (!state.assets.watermark) return;
-  if (doc.GState && doc.setGState) doc.setGState(new doc.GState({ opacity: 0.18 }));
-  doc.addImage(state.assets.watermark, 'PNG', 134.4, 42.3, 150, 212.3);
-  if (doc.GState && doc.setGState) doc.setGState(new doc.GState({ opacity: 1 }));
+  window.OfficeJurPdfTemplate.drawWatermark(doc, state.assets);
 }
 
-function drawHeader(doc, title = 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS', fontSize = 11.5) {
+function drawHeader(doc, title = TEMPLATE_CONFIG.headerTitle, fontSize = 11.5) {
   if (state.assets.logo) doc.addImage(state.assets.logo, 'PNG', 95.3, 5, 19.4, 30);
   if (state.assets.wordmark) doc.addImage(state.assets.wordmark, 'PNG', 74.1, 38, 61.8, 11);
   doc.setDrawColor(...GOLD);
@@ -717,31 +692,7 @@ function drawHeader(doc, title = 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS', fontSi
 }
 
 function drawFooter(doc) {
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.25);
-  doc.line(0, 274, 210, 274);
-  doc.setLineWidth(0.8);
-  doc.line(0, 294, 210, 294);
-  doc.setLineWidth(0.3);
-  doc.line(0, 296, 210, 296);
-  doc.setFont('times', 'normal');
-  doc.setTextColor(...FOOTER_GRAY);
-  doc.setFontSize(9);
-
-  const rows = [
-    { icon: 'phone', text: '(62) 9 9316-1514', y: 282, link: WHATSAPP_URL },
-    { icon: 'pin', text: 'GO-010, Km 67, Zona Rural, Silvânia-GO', y: 287, link: MAPS_URL },
-    { icon: 'envelope', text: 'gregorioemorais.adv@gmail.com', y: 292 },
-  ];
-  const iconSize = 3;
-  const gap = 1.6;
-  rows.forEach(({ icon, text, y, link }) => {
-    const textWidth = doc.getTextWidth(text);
-    const startX = 105 - (iconSize + gap + textWidth) / 2;
-    drawIcon(doc, icon, startX, y - iconSize * 0.78, iconSize, FOOTER_GRAY);
-    if (link) doc.textWithLink(text, startX + iconSize + gap, y, { url: link });
-    else doc.text(text, startX + iconSize + gap, y);
-  });
+  window.OfficeJurPdfTemplate.drawFooter(doc, drawIcon);
 }
 
 function drawPageChrome(doc, title) {
@@ -822,7 +773,7 @@ function addContentPage(doc, title) {
 }
 
 function drawParameters(doc, draft, y) {
-  if (y > 235) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  if (y > 235) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
   doc.setDrawColor(35, 35, 35);
   doc.setLineWidth(0.2);
   doc.line(LEFT, y, LEFT + WIDTH, y);
@@ -844,7 +795,7 @@ function drawParameters(doc, draft, y) {
 
   items.forEach((item, idx) => {
     const number = idx + 1;
-    if (y > 250) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+    if (y > 250) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
     if (item.group) {
       doc.setFont('times', 'bold');
       doc.setFontSize(10.3);
@@ -852,7 +803,7 @@ function drawParameters(doc, draft, y) {
       doc.text(`${number}.  ${item.group}:`, LEFT, y);
       y += 5.2;
       item.bullets.forEach(b => {
-        if (y > 252) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+        if (y > 252) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
         y = drawParamItem(doc, null, b.label, b.value, y, { indent: 8 });
       });
     } else {
@@ -864,12 +815,12 @@ function drawParameters(doc, draft, y) {
 }
 
 function drawCommsNote(doc, draft, y) {
-  if (y > 248) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  if (y > 248) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
   const fixedForm = draft.params.entradaForma === 'misto'
     ? (draft.params.parteFixaForma || 'vista') : draft.params.entradaForma;
   const hasEntry = fixedForm === 'parcelado' && clean(draft.params.entradaSinalValor);
   if (hasEntry) {
-    if (y > 248) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+    if (y > 248) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
     doc.setFont('times', 'normal');
     doc.setFontSize(7.6);
     doc.setTextColor(140, 140, 142);
@@ -879,7 +830,7 @@ function drawCommsNote(doc, draft, y) {
     y += 4 + fnLines.length * 3.6;
   }
 
-  if (y > 248) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  if (y > 248) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
   doc.setFont('times', 'italic');
   doc.setFontSize(9.6);
   doc.setTextColor(...GRAY);
@@ -894,7 +845,7 @@ function drawCommsNote(doc, draft, y) {
 
 function drawClausesSection(doc, y, clauses) {
   if (!clauses.length) return y;
-  if (y > 250) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  if (y > 250) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
 
   doc.setDrawColor(35, 35, 35);
   doc.setLineWidth(0.2);
@@ -909,12 +860,12 @@ function drawClausesSection(doc, y, clauses) {
   clauses.forEach((clause, idx) => {
     const number = idx + 1;
     const paragraphs = clause.text.split('\n').map(clean).filter(Boolean);
-    if (y > 250) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+    if (y > 250) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
     doc.setFontSize(10.1);
     doc.setTextColor(...GRAY);
     y = drawLeadParagraph(doc, `${number}.  ${clause.title}:`, paragraphs[0] || '', LEFT, y, WIDTH, 4.9);
     for (let i = 1; i < paragraphs.length; i += 1) {
-      if (y > 250) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+      if (y > 250) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
       y = drawLeadParagraph(doc, null, paragraphs[i], LEFT + 6, y, WIDTH - 6, 4.9);
     }
     y += 2.4;
@@ -924,7 +875,7 @@ function drawClausesSection(doc, y, clauses) {
 }
 
 function drawDeclaration(doc, draft, y) {
-  if (y > 248) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  if (y > 248) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
   doc.setFontSize(10.3);
   doc.setTextColor(...GRAY);
   y = drawLeadParagraph(doc, 'DECLARO', 'que li, compreendi e concordo com o Quadro de Parâmetros da Contratação e com todas as cláusulas deste instrumento.', LEFT, y, WIDTH, 5) + 4;
@@ -933,7 +884,7 @@ function drawDeclaration(doc, draft, y) {
   const date = formatLongDate(draft.document.date);
   const closing = joinParts([location, date]);
   if (closing) {
-    if (y > 258) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+    if (y > 258) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
     drawIcon(doc, 'calendar', LEFT, y - 4, 4, GOLD);
     doc.setFont('times', 'normal');
     doc.setFontSize(10.5);
@@ -957,13 +908,8 @@ function drawSignature(doc, label, x, y, width = 78) {
 function generateDocument(draft = getDraft()) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-  doc.setProperties({
-    title: 'Contrato de Honorários Advocatícios',
-    author: 'Gregório & Morais Advogados',
-    subject: 'Contrato de honorários gerado pelo sistema Gregório & Morais',
-    keywords: encodePdfDraft(draft),
-  });
-  drawPageChrome(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  window.OfficeJurPdfTemplate.setProperties(doc, TEMPLATE_CONFIG, draft, encodePdfDraft);
+  drawPageChrome(doc, TEMPLATE_CONFIG.headerTitle);
 
   let y = 69;
   const peopleList = draft.people && draft.people.length ? draft.people : [{}];
@@ -980,12 +926,12 @@ function generateDocument(draft = getDraft()) {
   y = drawClausesSection(doc, y + 4, clauses);
   y = drawDeclaration(doc, draft, y + 4);
 
-  if (y > 242) y = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS');
+  if (y > 242) y = addContentPage(doc, TEMPLATE_CONFIG.headerTitle);
   const signaturePeople = peopleList.filter(person => buildContratanteText(person));
   const signatureCount = Math.max(1, signaturePeople.length);
   let sigY = y + 16;
   for (let i = 0; i < signatureCount; i += 1) {
-    if (sigY > 258) sigY = addContentPage(doc, 'CONTRATO DE HONORÁRIOS ADVOCATÍCIOS') + 16;
+    if (sigY > 258) sigY = addContentPage(doc, TEMPLATE_CONFIG.headerTitle) + 16;
     const label = signaturePeople[i]?.type === 'pj' ? 'CONTRATANTE/REPRESENTANTE LEGAL' : 'CONTRATANTE';
     drawSignature(doc, label, 66, sigY, 78);
     sigY += 18;
@@ -1095,7 +1041,7 @@ document.getElementById('clear').addEventListener('click', () => {
   renderClausesUI({});
   setClausesToggle(false);
   renderPeopleUI([{}]);
-  form.elements['document.location'].value = 'Silvânia/GO';
+  form.elements['document.location'].value = TEMPLATE_CONFIG.defaultLocation;
   form.elements['document.date'].value = todayISO();
   form.elements['document.filename'].value = 'contrato-de-honorarios';
   renderStages('');
@@ -1113,7 +1059,7 @@ async function init() {
     people: [transferredPerson],
     params: {},
     document: {
-      location: 'Silvânia/GO',
+      location: TEMPLATE_CONFIG.defaultLocation,
       date: todayISO(),
       filename: 'contrato-de-honorarios',
     },

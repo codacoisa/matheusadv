@@ -1,6 +1,8 @@
 :root {
   --officejur-header-height: 68px;
   --officejur-header-navy: #17213a;
+  --officejur-header-text: #fff;
+  --officejur-header-muted: #c8cfdd;
 }
 
 office-document-header {
@@ -21,7 +23,7 @@ office-document-header {
   height: var(--officejur-header-height);
   padding: 10px 22px;
   border-bottom: 1px solid rgba(255, 255, 255, .1);
-  color: #fff;
+  color: var(--officejur-header-text);
   background: var(--officejur-header-navy);
   box-shadow: 0 8px 28px rgba(23, 33, 58, .18);
 }
@@ -56,7 +58,7 @@ office-document-header {
   display: block;
   margin: 0;
   overflow: hidden;
-  color: #fff;
+  color: var(--officejur-header-text);
   font: 700 18px/1.15 Georgia, "Times New Roman", serif;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -68,7 +70,7 @@ office-document-header {
   display: block;
   margin-top: 2px;
   overflow: hidden;
-  color: #c8cfdd;
+  color: var(--officejur-header-muted);
   font: 700 11px/1.25 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   text-overflow: ellipsis;
   white-space: nowrap;

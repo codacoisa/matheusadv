@@ -29,7 +29,9 @@ cp "$ROOT_DIR/apps/portal/index.html" "$SITE_DIR/index.html"
 cp -R "$ROOT_DIR/packages/ui/assets/." "$SITE_DIR/assets/"
 cp -R "$ROOT_DIR/apps/portal/assets/." "$SITE_DIR/assets/"
 cp "$ROOT_DIR/config/office.js" "$SITE_DIR/assets/office-config.js"
-cp -R "$ROOT_DIR/config/document-templates" "$SITE_DIR/assets/document-templates"
+mkdir -p "$SITE_DIR/assets/document-templates/pdf"
+cp "$ROOT_DIR/config/document-templates/modelo-institucional.docx.base64" "$SITE_DIR/assets/document-templates/modelo-institucional.docx.base64"
+cp "$ROOT_DIR/config/document-templates/pdf/"*.png "$SITE_DIR/assets/document-templates/pdf/"
 cp "$ROOT_DIR/packages/ui/office-context.js" "$SITE_DIR/assets/office-context.js"
 cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/assets/fontawesome-7.3.0.min.js"
 
@@ -119,6 +121,7 @@ cp "$ROOT_DIR/node_modules/fflate/LICENSE" "$SITE_DIR/arquivos/assets/engine/ffl
 cp "$ROOT_DIR/apps/arquivos/index.html" "$SITE_DIR/arquivos/index.html"
 cp -R "$ROOT_DIR/apps/arquivos/assets/." "$SITE_DIR/arquivos/assets/"
 cp -R "$ROOT_DIR/apps/documentos/assets/." "$SITE_DIR/documentos/assets/"
+cp "$ROOT_DIR/config/document-config.js" "$SITE_DIR/documentos/assets/document-config.js"
 
 for source in "$ROOT_DIR/apps/documentos/"*; do
   module="$(basename "$source")"

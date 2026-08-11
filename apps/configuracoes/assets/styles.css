@@ -1,17 +1,17 @@
 :root {
   color-scheme: light;
-  --navy: #17213a;
-  --navy-2: #21304f;
-  --gold: #8b651f;
-  --gold2: #d8bc7a;
-  --paper: #f4f6f9;
-  --bg: #f4f6f9;
-  --ink: #182033;
-  --text: #182033;
-  --muted: #667085;
-  --line: #dce2ea;
-  --ok: #067647;
-  --danger: #b42318;
+--navy: var(--officejur-primary, #17213a);
+--navy-2: var(--officejur-primary-soft, #21304f);
+--gold: var(--officejur-accent, #8b651f);
+--gold2: var(--officejur-accent-light, #d8bc7a);
+--paper: var(--officejur-surface, #f4f6f9);
+--bg: var(--officejur-canvas, #f4f6f9);
+--ink: var(--officejur-text, #182033);
+--text: var(--officejur-text, #182033);
+--muted: var(--officejur-muted, #667085);
+--line: var(--officejur-line, #dce2ea);
+--ok: var(--officejur-success, #067647);
+--danger: var(--officejur-danger, #b42318);
 }
 
 * { box-sizing: border-box; }

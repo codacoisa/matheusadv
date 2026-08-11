@@ -1,10 +1,10 @@
     :root {
       color-scheme: dark;
-      --ink: #f7f5ff;
-      --muted: #c9c2dc;
+      --ink: var(--officejur-header-text, #f7f5ff);
+      --muted: var(--officejur-header-muted, #c9c2dc);
       --line: rgba(255,255,255,.14);
-      --violet: #9e77ed;
-      --violet-light: #d6bbfb;
+      --violet: var(--officejur-accent, #9e77ed);
+      --violet-light: var(--officejur-accent-light, #d6bbfb);
       --panel: rgba(255,255,255,.075);
     }
 
@@ -20,7 +20,7 @@
       background:
         radial-gradient(circle at 18% 5%, rgba(158,119,237,.26), transparent 28rem),
         radial-gradient(circle at 90% 35%, rgba(215,187,121,.12), transparent 24rem),
-        linear-gradient(145deg, #17122b, #17213a 62%, #111827);
+        linear-gradient(145deg, var(--officejur-primary-dark, #17122b), var(--officejur-primary, #17213a) 62%, var(--officejur-primary-soft, #111827));
     }
 
     body::before {

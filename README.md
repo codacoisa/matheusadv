@@ -21,7 +21,9 @@ O OfficeJur reúne, em um único monorepo, o portal interno, os geradores de doc
 
 ```text
 config/
-└── office.js                  # identidade e implantação do escritório
+├── office.js                  # identidade, produto e implantação
+├── document-config.js         # templates, cláusulas e identidade dos PDFs
+└── document-templates/        # modelo DOCX e ativos gráficos documentais
 
 apps/
 ├── portal/
@@ -52,11 +54,18 @@ tests/
 
 ## Configuração do escritório
 
-A instalação é personalizada em `config/office.js`. Esse arquivo concentra o nome do escritório, nome curto, descrição institucional, identificação para cobranças, URLs da implantação e caminhos dos elementos visuais.
+A instalação é personalizada em `config/office.js`. Esse arquivo concentra o nome do escritório, nome curto, descrição institucional, identificação para cobranças, URLs da implantação, caminhos dos elementos visuais e o tema de cores aplicado em todos os módulos e nos PDFs.
 
 Os módulos exibem o OfficeJur como produto e consomem os dados do escritório como contexto da instalação. Para trocar de escritório, edite a configuração e substitua os arquivos visuais indicados nela; não é necessário alterar cada aplicação.
 
-Os modelos de documentos ainda pertencem à implantação atual e não consomem essa configuração. Essa separação é intencional até que seja definido um formato seguro para parametrizar textos jurídicos, profissionais, assinaturas e identidade documental.
+`config/document-config.js` concentra a personalização dos geradores: metadados,
+localidade padrão, profissionais, texto da parte contratada, cláusulas,
+contatos do rodapé, recortes dos ativos gráficos e marcadores de
+rascunho. As cores são lidas do tema de `config/office.js`. O modelo DOCX institucional fica em
+`config/document-templates/modelo-institucional.docx.base64`, enquanto os
+ativos usados nos PDFs ficam em `config/document-templates/pdf/`. Assim, a
+troca de escritório fica limitada à configuração e aos arquivos da implantação,
+sem misturar a identidade do cliente ao código do produto.
 
 Os módulos continuam isolados internamente. Os geradores compartilham cabeçalho, estilos, utilitários de campos e rascunhos, imagens documentais e jsPDF em `apps/documentos/assets`; todo o sistema compartilha navegação, rodapé e imagens institucionais mantidos em `packages/ui`. Portal, Lab e Central de Guias mantêm marcação, estilos e comportamento em arquivos separados.
 
