@@ -77,6 +77,28 @@ test("cadastrar pessoa jurídica com representantes reutilizáveis", () => {
   assert.match(app, /activeClientRepresentatives/);
 });
 
+test("listar e editar pessoas independentemente de clientes", () => {
+  assert.match(html, /data-view="people"/);
+  assert.match(html, /id="people-view"/);
+  assert.match(html, /id="person-search"/);
+  assert.match(html, /id="people-grid"/);
+  assert.match(html, /id="new-person"/);
+  assert.match(app, /function renderPeople/);
+  assert.match(app, /function personRelations/);
+  assert.match(app, /data-edit-person/);
+  assert.match(app, /personDialogContext/);
+});
+
+test("integrar pacotes à área de contratações dos casos", () => {
+  assert.match(html, /id="contracts-hub-title">Honorários dos casos/);
+  assert.match(html, /id="toggle-packages"/);
+  assert.match(html, /id="packages-content"[^>]*hidden/);
+  assert.match(html, /id="package-overview"/);
+  assert.doesNotMatch(html, /id="packages-dialog"|Pacotes cadastrados/);
+  assert.match(app, /function setPackagesExpanded/);
+  assert.match(app, /client \? clientDisplayName\(client\) : "Cliente não encontrado"/);
+});
+
 test("remover do Gist o payload de PDFs excluídos", () => {
   assert.match(
     app,

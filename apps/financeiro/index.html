@@ -92,6 +92,9 @@
           <button data-view="clients">
             <i class="fa-solid fa-address-book"></i> Clientes
           </button>
+          <button data-view="people">
+            <i class="fa-solid fa-users"></i> Pessoas
+          </button>
           <button data-view="cases">
             <i class="fa-solid fa-folder-open"></i> Casos e processos
           </button>
@@ -245,6 +248,23 @@
           </div>
           <div id="clients-grid" class="cards"></div>
         </section>
+        <section class="view" id="people-view">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">CADASTRO CENTRAL</p>
+              <h1>Pessoas</h1>
+              <p>Pessoas físicas podem ser clientes, representantes de empresas ou apenas contatos cadastrados.</p>
+            </div>
+            <button class="btn primary" id="new-person" type="button">
+              <i class="fa-solid fa-user-plus"></i> Nova pessoa
+            </button>
+          </div>
+          <div class="panel filters">
+            <input id="person-search" placeholder="Buscar por nome, CPF, telefone, e-mail ou vínculo" />
+          </div>
+          <div id="people-summary" class="people-summary"></div>
+          <div id="people-grid" class="cards people-grid"></div>
+        </section>
         <section class="view" id="cases-view">
           <div class="page-head">
             <div>
@@ -255,18 +275,36 @@
                 cadastrado.
               </p>
             </div>
-            <div class="head-actions">
-              <button class="btn ghost" id="show-packages" type="button">
-                <i class="fa-solid fa-boxes-stacked"></i> Pacotes cadastrados
+            <button class="btn primary" id="new-case" type="button">
+              <i class="fa-solid fa-folder-plus"></i> Novo caso
+            </button>
+          </div>
+          <section class="panel contracts-hub" aria-labelledby="contracts-hub-title">
+            <div class="contracts-hub-main">
+              <span class="contracts-hub-icon"><i class="fa-solid fa-file-contract"></i></span>
+              <div>
+                <p class="eyebrow">CONTRATAÇÕES</p>
+                <h2 id="contracts-hub-title">Honorários dos casos</h2>
+                <p>Um caso pode ter contratação própria ou compartilhar a mesma contratação com outros casos do cliente por meio de um pacote.</p>
+              </div>
+            </div>
+            <div class="contracts-hub-actions">
+              <span id="package-overview" class="contracts-overview"></span>
+              <button class="btn ghost" id="toggle-packages" type="button" aria-expanded="false" aria-controls="packages-content">
+                <i class="fa-solid fa-boxes-stacked"></i> Ver pacotes
               </button>
               <button class="btn secondary" id="new-package" type="button">
-                <i class="fa-solid fa-box-archive"></i> Novo pacote
-              </button>
-              <button class="btn primary" id="new-case" type="button">
-                <i class="fa-solid fa-folder-plus"></i> Novo caso
+                <i class="fa-solid fa-plus"></i> Criar pacote
               </button>
             </div>
-          </div>
+            <div id="packages-content" class="packages-content" hidden>
+              <header>
+                <div><h3>Pacotes de honorários</h3><p>Contratações compartilhadas por dois ou mais casos do mesmo cliente.</p></div>
+                <span id="package-count" class="section-count"></span>
+              </header>
+              <div id="packages-grid" class="package-grid"></div>
+            </div>
+          </section>
           <div class="panel filters">
             <input
               id="case-search"
@@ -427,32 +465,6 @@
           </button>
         </div>
       </form>
-    </dialog>
-    <dialog id="packages-dialog">
-      <section
-        class="package-section package-list-card"
-        aria-labelledby="packages-title"
-      >
-        <header>
-          <div>
-            <p class="eyebrow">CONTRATAÇÕES COMPARTILHADAS</p>
-            <h2 id="packages-title">Pacotes de honorários</h2>
-            <p>Consulte os pacotes e o saldo conjunto dos casos vinculados.</p>
-          </div>
-          <div class="package-list-actions">
-            <span id="package-count" class="section-count"></span>
-            <button
-              class="icon-btn dark"
-              id="close-packages"
-              type="button"
-              aria-label="Fechar pacotes"
-            >
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-        </header>
-        <div id="packages-grid" class="package-grid"></div>
-      </section>
     </dialog>
     <dialog id="entry-dialog">
       <form method="dialog" id="entry-form">
@@ -679,7 +691,7 @@
     <dialog id="person-dialog">
       <form method="dialog" id="person-form">
         <div class="modal-head">
-          <div><p class="eyebrow">PESSOA</p><h2 id="person-modal-title">Nova pessoa</h2><p>Cadastro reutilizável para clientes PF e representantes de empresas.</p></div>
+          <div><p class="eyebrow">PESSOA</p><h2 id="person-modal-title">Nova pessoa</h2><p>Cadastro central para clientes, representantes e demais contatos.</p></div>
           <button class="icon-btn dark" value="cancel" formnovalidate><i class="fa-solid fa-xmark"></i></button>
         </div>
         <input type="hidden" name="id" />
@@ -691,7 +703,21 @@
           <label>Estado civil *<input name="maritalStatus" required /></label>
           <label class="span-2">Profissão *<input name="profession" required /></label>
           <label>RG<input name="rg" /></label><label>Órgão expedidor<input name="rgIssuer" /></label>
+          <div class="phone-fields span-2">
+            <label>País do telefone<select name="phoneCountry" aria-label="País do telefone da pessoa"></select></label>
+            <label>Telefone<div class="phone-number-field"><span id="person-phone-prefix">+55</span><input name="phoneNational" inputmode="tel" autocomplete="tel-national" aria-describedby="person-phone-hint" /></div><small id="person-phone-hint">Digite somente o número nacional.</small></label>
+          </div>
+          <label class="check whatsapp-check span-2"><input name="whatsapp" type="checkbox" /> Este número possui WhatsApp</label>
           <label class="span-2">E-mail<input name="email" type="email" /></label>
+          <label class="span-2">Logradouro<input name="street" autocomplete="street-address" aria-describedby="person-street-warning" /><small id="person-street-warning" class="field-warning" role="alert" hidden></small></label>
+          <label>Número<input name="addressNumber" /></label>
+          <label>Complemento<input name="complement" /></label>
+          <label>Quadra<input name="addressBlock" /></label>
+          <label>Lote<input name="addressLot" /></label>
+          <label>Bairro<input name="neighborhood" /></label>
+          <label>Cidade<input name="city" /></label>
+          <label>UF<input name="state" maxlength="2" /></label>
+          <label>CEP<input name="zip" inputmode="numeric" /></label>
           <label class="span-2">Observações<textarea name="notes" rows="3"></textarea></label>
         </div>
         <div class="modal-actions"><button class="btn ghost" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="default">Salvar pessoa</button></div>

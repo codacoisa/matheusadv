@@ -309,6 +309,10 @@
       });
     select.value = PHONE_DEFAULT_COUNTRY;
     syncPhoneField();
+    const personSelect = $("#person-form [name=phoneCountry]");
+    personSelect.innerHTML = select.innerHTML;
+    personSelect.value = PHONE_DEFAULT_COUNTRY;
+    syncPersonPhoneField();
   }
   function syncPhoneField(value) {
     const form = $("#client-form"),
@@ -319,6 +323,17 @@
     input.value = formatted.value;
     $("#phone-prefix").textContent = `+${phoneCallingCode(select.value)}`;
     $("#phone-hint").textContent =
+      `${flagEmoji(select.value)} ${phoneCountryName(select.value)} · digite o número sem o DDI.`;
+  }
+  function syncPersonPhoneField(value) {
+    const form = $("#person-form"),
+      select = form.elements.phoneCountry,
+      input = form.elements.phoneNational,
+      formatted = formatPhoneNational(value ?? input.value, select.value);
+    if (formatted.country !== select.value) select.value = formatted.country;
+    input.value = formatted.value;
+    $("#person-phone-prefix").textContent = `+${phoneCallingCode(select.value)}`;
+    $("#person-phone-hint").textContent =
       `${flagEmoji(select.value)} ${phoneCountryName(select.value)} · digite o número sem o DDI.`;
   }
   const FORBIDDEN_STREET_PART = /(^|[\s,;:/()\-])(n[uú]mero|nº|n\.º|quadra|qd\.?|lote|lt\.?)(?=$|[\s,;:/().\-]|\d)/iu;
@@ -336,29 +351,29 @@
   function streetRestrictionMessage(restriction) {
     return `Não informe “${restriction.token}” no logradouro. Preencha no campo ${restriction.field}.`;
   }
-  function clearStreetWarning() {
-    const warning = $("#street-warning");
+  function clearStreetWarning(selector = "#street-warning") {
+    const warning = $(selector);
     warning.hidden = true;
     warning.textContent = "";
   }
-  function showStreetWarning(restriction, notify = true) {
-    const warning = $("#street-warning"), message = streetRestrictionMessage(restriction);
+  function showStreetWarning(restriction, notify = true, selector = "#street-warning") {
+    const warning = $(selector), message = streetRestrictionMessage(restriction);
     warning.textContent = message;
     warning.hidden = false;
     if (notify) toast(message);
   }
-  function filterStreetInput(input) {
+  function filterStreetInput(input, selector = "#street-warning") {
     let value = input.value, restriction = streetRestriction(value), firstRestriction = restriction;
     while (restriction) {
       value = `${value.slice(0, restriction.start)}${value.slice(restriction.end)}`;
       restriction = streetRestriction(value);
     }
     if (!firstRestriction) {
-      clearStreetWarning();
+      clearStreetWarning(selector);
       return true;
     }
     input.value = value.replace(/\s{2,}/g, " ").trimStart();
-    showStreetWarning(firstRestriction);
+    showStreetWarning(firstRestriction, true, selector);
     return false;
   }
   function validCpf(value) {
@@ -934,7 +949,8 @@
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "",
-    representativePersonTarget = null;
+    representativePersonTarget = null,
+    personDialogContext = "people";
   const filesReady = bootAccess.then((allowed) => allowed ? loadFilesState() : financeFiles.emptyData())
     .then((loaded) => {
       if (!localAccessAllowed) return financeFiles.emptyData();
@@ -1124,6 +1140,7 @@
     renderDashboard();
     renderEntries();
     renderClients();
+    renderPeople();
     renderPackages();
     renderCases();
     renderTeam();
@@ -1416,6 +1433,46 @@
           .join("")
       : '<div class="panel empty">Nenhum cliente encontrado.</div>';
   }
+  function personRelations(personId) {
+    const relations = [];
+    data.clients.forEach((client) => {
+      if (client.type === "pf" && client.personId === personId)
+        relations.push({ type: "client", label: "Cliente pessoa física" });
+      if (client.type !== "pj") return;
+      (client.representatives || [])
+        .filter((link) => link.personId === personId)
+        .forEach((link) => relations.push({
+          type: "representative",
+          label: `Representante de ${clientDisplayName(client)}${link.role ? ` · ${link.role}` : ""}`,
+        }));
+    });
+    return relations;
+  }
+  function renderPeople() {
+    const search = $("#person-search")?.value.toLocaleLowerCase("pt-BR") || "",
+      records = data.people
+        .map((person) => ({ person, relations: personRelations(person.id) }))
+        .filter(({ person, relations }) =>
+          `${person.name} ${person.cpf} ${displayPhone(person)} ${person.email} ${relations.map((relation) => relation.label).join(" ")}`
+            .toLocaleLowerCase("pt-BR")
+            .includes(search),
+        )
+        .sort((left, right) => left.person.name.localeCompare(right.person.name, "pt-BR")),
+      clientPeople = data.people.filter((person) =>
+        data.clients.some((client) => client.type === "pf" && client.personId === person.id),
+      ).length,
+      representatives = data.people.filter((person) =>
+        data.clients.some((client) => client.type === "pj" && (client.representatives || []).some((link) => link.personId === person.id)),
+      ).length,
+      unlinked = data.people.filter((person) => !personRelations(person.id).length).length;
+    $("#people-summary").innerHTML = `<span><strong>${data.people.length}</strong> pessoas cadastradas</span><span><strong>${clientPeople}</strong> clientes PF</span><span><strong>${representatives}</strong> representantes</span><span><strong>${unlinked}</strong> sem vínculo</span>`;
+    $("#people-grid").innerHTML = records.length
+      ? records.map(({ person, relations }) => {
+          const initials = person.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+          return `<article class="person-card contact-card"><header><span class="avatar">${escapeHtml(initials || "PF")}</span><button class="link-btn" type="button" data-edit-person="${person.id}" title="Editar pessoa" aria-label="Editar ${escapeHtml(person.name)}"><i class="fa-solid fa-pen"></i></button></header><h3>${escapeHtml(person.name)}</h3><p>${escapeHtml(person.cpf || "CPF não informado")}${person.birthDate ? ` · ${date(person.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(person))}</span>${person.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(person.email)}</span>` : ""}${person.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(person.city)}${person.state ? `/${escapeHtml(person.state)}` : ""}</span>` : ""}</div><div class="person-links">${relations.length ? relations.map((relation) => `<span class="${relation.type}"><i class="fa-solid ${relation.type === "client" ? "fa-address-card" : "fa-building-shield"}"></i>${escapeHtml(relation.label)}</span>`).join("") : '<span class="available"><i class="fa-solid fa-circle-check"></i>Cadastro disponível para novos vínculos</span>'}</div></article>`;
+        }).join("")
+      : '<div class="panel empty">Nenhuma pessoa encontrada.</div>';
+  }
   function clientFileCases(clientId) {
     return data.cases
       .filter((item) => item.clientId === clientId)
@@ -1605,6 +1662,11 @@
   function renderPackages() {
     const grid = $("#packages-grid");
     if (!grid) return;
+    const active = data.packages.filter((item) => item.status !== "closed").length,
+      linkedCases = data.cases.filter((item) => item.packageId).length;
+    $("#package-overview").innerHTML = data.packages.length
+      ? `<strong>${active}</strong> ${active === 1 ? "pacote ativo" : "pacotes ativos"} · <strong>${linkedCases}</strong> ${linkedCases === 1 ? "caso compartilhado" : "casos compartilhados"}`
+      : "Nenhum pacote criado";
     $("#package-count").textContent =
       `${data.packages.length} ${data.packages.length === 1 ? "pacote" : "pacotes"}`;
     grid.innerHTML = data.packages.length
@@ -1697,7 +1759,7 @@
                 : contracted
                   ? `${money(received)} de ${money(contracted)} recebidos · saldo ${money(balance)}${success ? ` · êxito de ${successAgreement.successRate}% à parte` : ""}`
                   : `${money(ownReceived)} recebido neste caso`;
-            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client?.name || "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
+            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client ? clientDisplayName(client) : "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum caso encontrado para os filtros selecionados.</div>';
@@ -2346,13 +2408,22 @@
       select.innerHTML = personOptions(selected);
     });
   }
-  function openPersonDialog(personId = "", targetRow = null) {
+  function openPersonDialog(personId = "", targetRow = null, context = "people") {
     const form = $("#person-form"), person = personById(personId);
     form.reset();
     form.elements.id.value = person?.id || "";
+    form.elements.phoneCountry.value = PHONE_DEFAULT_COUNTRY;
     fillClientFormProfile(form, person);
     form.elements.cpf.value = maskCpf(person?.cpf || "");
+    const phone = phoneDetails(person?.phone, person?.phoneCountry);
+    form.elements.phoneCountry.value = phone.country;
+    form.elements.phoneNational.value = phone.national;
+    form.elements.zip.value = maskZip(person?.zip || "");
+    form.elements.state.value = String(person?.state || "").toUpperCase();
     representativePersonTarget = targetRow;
+    personDialogContext = context;
+    syncPersonPhoneField();
+    clearStreetWarning("#person-street-warning");
     $("#person-modal-title").textContent = person ? "Editar pessoa" : "Nova pessoa";
     $("#person-dialog").showModal();
   }
@@ -2674,7 +2745,7 @@
       eyebrow: "PROCESSO / CASO",
       title: x.title,
       subtitle: `${x.number} · ${x.area} · ${{ active: "Ativo", suspended: "Suspenso", closed: "Encerrado" }[x.status] || x.status}`,
-      body: `<div class="detail-grid">${detailField("Cliente", client?.name, "fa-user")}${detailField("Tipo", { judicial: "Judicial", administrative: "Administrativo", extrajudicial: "Extrajudicial", consulting: "Consultivo" }[x.type], "fa-folder")}${detailField("Contratação", packageItem ? `Pacote · ${packageItem.name}` : x.contractScope === "own" ? agreementLabel(agreement) : "Não informada", "fa-file-invoice-dollar")}${detailField("Parte fixa", stats.contracted ? money(stats.contracted) : "Não informada", "fa-coins")}${detailField("Situação financeira", financialStatus, balance < 0.005 && stats.contracted ? "fa-circle-check" : "fa-chart-line")}${detailField("Êxito", ["success", "mixed"].includes(agreement.mode) ? `${agreement.successRate}% · ${agreement.successBase || "base não informada"}` : "Não aplicável", "fa-percent")}${detailField("Responsável", teamName(assignments.find((a) => a.isLead)?.personId), "fa-user-tie")}</div>${x.notes ? `<div class="detail-note"><strong>Observações</strong><p>${x.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Equipe e participações</strong><span>${assignments.reduce((s, a) => s + Number(a.sharePercent || 0), 0)}%</span></header>${assignments.map((a) => `<button class="detail-list-row" data-view-team="${a.personId}"><span><strong>${teamName(a.personId)}${a.isLead ? " · Responsável" : ""}</strong><small>${assignmentRoleLabel(a.assignmentRole)}${a.notes ? ` · ${a.notes}` : ""}</small></span><b>${a.sharePercent || 0}%</b></button>`).join("") || '<p class="detail-empty">Nenhuma pessoa atribuída.</p>'}</div><div class="detail-totals"><span><small>Receitas deste caso</small><strong>${money(t.income)}</strong></span><span><small>Recebido neste caso</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
+      body: `<div class="detail-grid">${detailField("Cliente", client ? clientDisplayName(client) : "Cliente não encontrado", "fa-user")}${detailField("Tipo", { judicial: "Judicial", administrative: "Administrativo", extrajudicial: "Extrajudicial", consulting: "Consultivo" }[x.type], "fa-folder")}${detailField("Contratação", packageItem ? `Pacote · ${packageItem.name}` : x.contractScope === "own" ? agreementLabel(agreement) : "Não informada", "fa-file-invoice-dollar")}${detailField("Parte fixa", stats.contracted ? money(stats.contracted) : "Não informada", "fa-coins")}${detailField("Situação financeira", financialStatus, balance < 0.005 && stats.contracted ? "fa-circle-check" : "fa-chart-line")}${detailField("Êxito", ["success", "mixed"].includes(agreement.mode) ? `${agreement.successRate}% · ${agreement.successBase || "base não informada"}` : "Não aplicável", "fa-percent")}${detailField("Responsável", teamName(assignments.find((a) => a.isLead)?.personId), "fa-user-tie")}</div>${x.notes ? `<div class="detail-note"><strong>Observações</strong><p>${x.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Equipe e participações</strong><span>${assignments.reduce((s, a) => s + Number(a.sharePercent || 0), 0)}%</span></header>${assignments.map((a) => `<button class="detail-list-row" data-view-team="${a.personId}"><span><strong>${teamName(a.personId)}${a.isLead ? " · Responsável" : ""}</strong><small>${assignmentRoleLabel(a.assignmentRole)}${a.notes ? ` · ${a.notes}` : ""}</small></span><b>${a.sharePercent || 0}%</b></button>`).join("") || '<p class="detail-empty">Nenhuma pessoa atribuída.</p>'}</div><div class="detail-totals"><span><small>Receitas deste caso</small><strong>${money(t.income)}</strong></span><span><small>Recebido neste caso</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
       links: `<button class="btn ghost" type="button" data-view-client="${x.clientId}"><i class="fa-solid fa-user"></i> Ver cliente</button><button class="btn ghost" type="button" data-manage-team="${x.clientId}:${x.id}"><i class="fa-solid fa-user-group"></i> Equipe</button>`,
       onEdit: () => openCase(x.clientId, id),
     });
@@ -2691,7 +2762,7 @@
     showDetail({
       eyebrow: "PACOTE DE HONORÁRIOS",
       title: item.name,
-      subtitle: `${client?.name || "Cliente não encontrado"} · ${item.status === "closed" ? "Encerrado" : "Ativo"}`,
+      subtitle: `${client ? clientDisplayName(client) : "Cliente não encontrado"} · ${item.status === "closed" ? "Encerrado" : "Ativo"}`,
       body: `<div class="detail-grid">${detailField("Modalidade", agreementLabel(item.agreement), "fa-file-invoice-dollar")}${detailField("Parte fixa", money(stats.contracted), "fa-coins")}${detailField("Recebido em conjunto", money(stats.received), "fa-circle-check")}${detailField("Saldo do pacote", money(stats.balance), "fa-chart-line")}${detailField("Casos vinculados", String(cases.length), "fa-folder-tree")}${detailField("Recebíveis previstos", String(schedule.length), "fa-calendar-check")}</div>${item.notes ? `<div class="detail-note"><strong>Observações</strong><p>${item.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Casos do pacote</strong><span>${cases.length}</span></header>${cases.map((caseItem) => `<button class="detail-list-row" data-view-case="${caseItem.id}"><span><strong>${caseItem.title}</strong><small>${caseItem.number} · ${caseItem.area}</small></span><i class="fa-solid fa-chevron-right"></i></button>`).join("") || '<p class="detail-empty">Nenhum caso vinculado.</p>'}</div>`,
       links: `<button class="btn ghost" type="button" data-view-client="${item.clientId}"><i class="fa-solid fa-user"></i> Ver cliente</button><button class="btn ghost" type="button" data-new-case="${item.clientId}"><i class="fa-solid fa-folder-plus"></i> Novo caso</button>`,
       onEdit: () => openPackage(id),
@@ -3371,9 +3442,10 @@
     const row = editButton.closest(".representative-row"),
       personId = row.querySelector('[data-representative="personId"]').value;
     if (!personId) return toast("Selecione uma pessoa para editar.");
-    openPersonDialog(personId, row);
+    openPersonDialog(personId, row, "representative");
   });
-  $("#new-representative-person").addEventListener("click", () => openPersonDialog());
+  $("#new-representative-person").addEventListener("click", () => openPersonDialog("", null, "representative"));
+  $("#new-person").addEventListener("click", () => openPersonDialog());
   $("#person-form [name=cpf]").addEventListener(
     "input",
     (event) => (event.target.value = maskCpf(event.target.value)),
@@ -3384,10 +3456,19 @@
     const form = event.currentTarget,
       values = Object.fromEntries(new FormData(form)),
       name = titleCaseName(values.name),
-      cpfDigits = String(values.cpf || "").replace(/\D/g, "");
+      cpfDigits = String(values.cpf || "").replace(/\D/g, ""),
+      phoneInput = String(values.phoneNational || "").trim(),
+      phone = phoneInput ? parsePhone(phoneInput, values.phoneCountry) : null;
     if (name.split(/\s+/).length < 2) return toast("Informe o nome completo da pessoa.");
     if (!validCpf(values.cpf)) return toast("Informe um CPF válido para a pessoa.");
     if (!values.birthDate || values.birthDate >= iso()) return toast("Informe uma data de nascimento válida para a pessoa.");
+    if (phoneInput && !phone?.isValid()) return toast(`Informe um telefone válido para ${phoneCountryName(values.phoneCountry)}.`);
+    const forbiddenStreet = streetRestriction(values.street);
+    if (forbiddenStreet) {
+      showStreetWarning(forbiddenStreet, true, "#person-street-warning");
+      form.elements.street.focus();
+      return;
+    }
     if (data.people.some((person) => person.id !== values.id && String(person.cpf || "").replace(/\D/g, "") === cpfDigits))
       return toast("Já existe uma pessoa cadastrada com este CPF.");
     const old = data.people.find((person) => person.id === values.id),
@@ -3397,29 +3478,55 @@
         id: values.id || uid(),
         name,
         cpf: maskCpf(values.cpf),
+        phone: phone?.number || "",
+        phoneCountry: phone?.country || values.phoneCountry,
+        whatsapp: form.elements.whatsapp.checked,
+        email: values.email.trim(),
         nationality: normalizeDocumentPhrase(values.nationality),
         maritalStatus: normalizeDocumentPhrase(values.maritalStatus),
         profession: normalizeDocumentPhrase(values.profession),
+        rg: values.rg.trim(),
+        rgIssuer: values.rgIssuer.trim(),
+        street: values.street.trim(),
+        addressNumber: values.addressNumber.trim(),
+        addressBlock: values.addressBlock.trim(),
+        addressLot: values.addressLot.trim(),
+        complement: values.complement.trim(),
+        neighborhood: values.neighborhood.trim(),
+        city: values.city.trim(),
+        state: values.state.toUpperCase(),
+        zip: maskZip(values.zip),
+        notes: values.notes.trim(),
         createdAt: old?.createdAt || now(),
         updatedAt: now(),
       });
     if (old) data.people = data.people.map((item) => item.id === person.id ? person : item);
     else data.people.push(person);
-    const targetRow = representativePersonTarget;
+    const targetRow = representativePersonTarget,
+      dialogContext = personDialogContext;
     $("#person-dialog").close();
     refreshRepresentativePersonOptions();
     if (targetRow) {
       targetRow.querySelector('[data-representative="personId"]').value = person.id;
-    } else if (!old) {
+    } else if (dialogContext === "representative" && !old) {
       addRepresentativeRow({ personId: person.id, isPrimary: !readRepresentatives().some((link) => link.isPrimary), isSigner: true });
     }
     representativePersonTarget = null;
+    personDialogContext = "people";
     persist();
     toast("Pessoa salva e disponível para vínculos.");
   });
   $("#person-dialog").addEventListener("close", () => {
     representativePersonTarget = null;
+    personDialogContext = "people";
   });
+  $("#person-form [name=phoneNational]").addEventListener("input", (event) => syncPersonPhoneField(event.target.value));
+  $("#person-form [name=phoneCountry]").addEventListener("change", () => syncPersonPhoneField());
+  $("#person-form [name=zip]").addEventListener("input", (event) => (event.target.value = maskZip(event.target.value)));
+  $("#person-form [name=state]").addEventListener("input", (event) => {
+    event.target.value = event.target.value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 2);
+  });
+  $("#person-form [name=street]").addEventListener("input", (event) => filterStreetInput(event.currentTarget, "#person-street-warning"));
   $("#client-form [name=phoneNational]").addEventListener("input", (e) =>
     syncPhoneField(e.target.value),
   );
@@ -3684,6 +3791,7 @@
     });
     $("#package-dialog").close();
     persist();
+    setPackagesExpanded(true);
     toast("Pacote salvo e recebíveis compartilhados atualizados.");
   });
   $("#team-form [name=document]").addEventListener(
@@ -3860,12 +3968,19 @@
     updateCaseContractFields();
   };
   $("#case-form [name=contractScope]").onchange = updateCaseContractFields;
+  function setPackagesExpanded(expanded) {
+    const content = $("#packages-content"), button = $("#toggle-packages");
+    content.hidden = !expanded;
+    button.setAttribute("aria-expanded", String(expanded));
+    button.innerHTML = expanded
+      ? '<i class="fa-solid fa-chevron-up"></i> Ocultar pacotes'
+      : '<i class="fa-solid fa-boxes-stacked"></i> Ver pacotes';
+  }
   $("#new-package").onclick = () => openPackage();
-  $("#show-packages").onclick = () => {
+  $("#toggle-packages").onclick = () => {
     renderPackages();
-    $("#packages-dialog").showModal();
+    setPackagesExpanded($("#packages-content").hidden);
   };
-  $("#close-packages").onclick = () => $("#packages-dialog").close();
   $("#delete-package").onclick = async () => {
     const id = $("#package-form").elements.id.value,
       item = data.packages.find((candidate) => candidate.id === id),
@@ -3968,6 +4083,7 @@
     const edit = e.target.closest("[data-edit-entry]"),
       del = e.target.closest("[data-delete-entry]"),
       ec = e.target.closest("[data-edit-client]"),
+      ep = e.target.closest("[data-edit-person]"),
       nc = e.target.closest("[data-new-case],#new-case"),
       nt = e.target.closest("#new-team-member"),
       np = e.target.closest("[data-new-package]"),
@@ -4010,6 +4126,7 @@
       }
     }
     if (ec) openClient(ec.dataset.editClient);
+    if (ep) openPersonDialog(ep.dataset.editPerson);
     if (et) openTeamMember(et.dataset.editTeam);
     if (nt) openTeamMember();
     if (np) openPackage("", np.dataset.newPackage || "");
@@ -4049,6 +4166,7 @@
     ),
   );
   $("#client-search").oninput = renderClients;
+  $("#person-search").oninput = renderPeople;
   $("#case-search").oninput = renderCases;
   $("#case-status-filter").onchange = renderCases;
   $("#team-search").oninput = renderTeam;

@@ -12,7 +12,7 @@ async function prepareCalculationPage(page, path = 'calculos/') {
       const transaction = database.transaction('domains-v2', 'readwrite');
       const store = transaction.objectStore('domains-v2');
       const now = new Date().toISOString();
-      store.put({ name: 'people', value: { schema: 'officejur/financeiro-pessoas-data', version: 1, updatedAt: now, records: [{ id: 'person-test', name: 'Cliente de teste', cpf: '529.982.247-25', updatedAt: now }], deleted: [] } });
+      store.put({ name: 'people', value: { schema: 'officejur/financeiro-pessoas-data', version: 1, updatedAt: now, records: [{ id: 'person-test', name: 'Cliente de teste', cpf: '529.982.247-25', birthDate: '1990-01-10', maritalStatus: 'solteiro', profession: 'comerciante', updatedAt: now }], deleted: [] } });
       store.put({ name: 'clients', value: { schema: 'officejur/financeiro-clientes-data', version: 2, updatedAt: now, records: [{ id: 'client-test', type: 'pf', personId: 'person-test', updatedAt: now }], deleted: [] } });
       store.put({ name: 'cases', value: { schema: 'officejur/financeiro-casos-data', version: 1, updatedAt: now, records: [{ id: 'case-test', clientId: 'client-test', title: 'Ação de teste', number: '0000000-00.2026.8.00.0000', type: 'Judicial', status: 'active', updatedAt: now }], deleted: [] } });
       transaction.oncomplete = () => { database.close(); resolve(); };
@@ -448,6 +448,31 @@ test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) 
   await street.fill('Avenida Central qD. B');
   await expect(street).toHaveValue('Avenida Central B');
   await expect(page.locator('#street-warning')).toContainText('Preencha no campo Quadra');
+});
+
+test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ page }) => {
+  await prepareCalculationPage(page, 'financeiro/');
+
+  await page.locator('[data-view="people"]').click();
+  await expect(page.locator('#people-view')).toBeVisible();
+  const personCard = page.locator('.person-card').filter({ hasText: 'Cliente de teste' });
+  await expect(personCard).toContainText('Cliente pessoa física');
+  await personCard.locator('[data-edit-person]').click();
+  await page.locator('#person-form [name="email"]').fill('cliente@exemplo.com.br');
+  await page.locator('#person-form').getByRole('button', { name: 'Salvar pessoa' }).click();
+  await expect(personCard).toContainText('cliente@exemplo.com.br');
+
+  await page.locator('[data-view="cases"]').click();
+  await expect(page.locator('#contracts-hub-title')).toHaveText('Honorários dos casos');
+  await expect(page.locator('#package-overview')).toHaveText('Nenhum pacote criado');
+  await expect(page.locator('#packages-content')).toBeHidden();
+  await page.locator('#toggle-packages').click();
+  await expect(page.locator('#packages-content')).toBeVisible();
+  await expect(page.locator('#packages-grid')).toContainText('Nenhum pacote cadastrado');
+  await expect(page.locator('.case-card')).toContainText('Cliente de Teste');
+  await expect(page.locator('.case-card')).not.toContainText('Cliente não encontrado');
+  await page.locator('#new-package').click();
+  await expect(page.locator('#package-dialog')).toBeVisible();
 });
 
 test('Financeiro cadastra pessoa jurídica com representante reutilizável', async ({ page }) => {
