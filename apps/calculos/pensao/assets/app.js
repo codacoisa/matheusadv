@@ -3,6 +3,7 @@
   const app = document.querySelector("#app"), toast = document.querySelector("#toast"), syncStatus = document.querySelector("#sync-status");
   const core = window.OfficeJurCalculations, storageApi = window.OfficeJurCalculationStorage;
   const financeApi = window.OfficeJurCalculationFinance;
+  const caseContextApi = window.OfficeJurCalculationCaseContext;
   const indices = window.OfficeJurLegalIndices, pdf = window.OfficeJurCalculationPdf;
   const gistSettings = window.OfficeJurGistSettings, gistClient = window.OfficeJurGistClient;
   const access = window.OfficeJurGistAccessLease?.create();
@@ -75,7 +76,7 @@
       type: "pension", name: `Pensão — ${now.split("-").reverse().join("/")}`,
       status: "draft", calculationVersion: core.CALCULATION_VERSION, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       input: {
-        clientId: "", clientName: "", caseId: "", caseName: "", creditor: "", debtor: "", caseNumber: "", notes: "", startDate: now, endDate: now, calculationDate: now,
+        clientId: "", clientName: "", caseId: "", caseName: "", creditor: "", debtor: "", caseNumber: "", parties: [], partySource: "manual", notes: "", startDate: now, endDate: now, calculationDate: now,
         basisType: "minimum_wage", percentage: 30, fixedAmount: 0, referenceIncome: 0, includeThirteenth: false,
         installments: [], basisLabel: "",
         settings: {
@@ -190,9 +191,14 @@
     const selectedCase = financeApi?.findCase(financeData, i.caseId);
     if (i.caseId && (!selectedCase || String(selectedCase.clientId) !== String(i.clientId))) throw new Error("Selecione um caso pertencente ao cliente escolhido.");
     if (!i.clientId || !financeApi?.findClient(financeData, i.clientId)) throw new Error("Vincule o cálculo a um cliente do Financeiro.");
-    i.clientName = financeApi.clientLabel(financeApi.findClient(financeData, i.clientId));
-    i.caseName = selectedCase ? financeApi.caseLabel(selectedCase) : "";
-    if (selectedCase?.number) i.caseNumber = String(selectedCase.number);
+    const context = caseContextApi?.caseContext(financeData, i, financeApi) || {};
+    caseContextApi?.applyCaseContext(i, context, { preserveManual: true });
+    if (i.partySource === "financeiro") {
+      const creditor = caseContextApi?.partyForRole(context, "Credor") || caseContextApi?.partyForRole(context, "Exequente");
+      const debtor = caseContextApi?.partyForRole(context, "Devedor") || caseContextApi?.partyForRole(context, "Executado");
+      if (creditor) i.creditor = creditor.name;
+      if (debtor) i.debtor = debtor.name;
+    }
     i.percentage = Number(formData.get("percentage") || i.percentage || 0);
     i.fixedAmount = Number(formData.get("fixedAmount") || 0);
     i.referenceIncome = Number(formData.get("referenceIncome") || 0);
@@ -267,18 +273,27 @@
   async function syncFromGist() {
     await sync.fromGist();
   }
+  app.addEventListener("input", (event) => {
+    if (["creditor", "debtor"].includes(event.target.name)) current.input.partySource = "manual";
+  });
   app.addEventListener("change", (event) => {
     if (event.target.id === "clientId") {
       try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { /* A later submit will validate the complete form. */ }
       current.input.clientId = event.target.value;
       current.input.caseId = "";
+      current.input.partySource = "manual";
       render();
     }
     if (event.target.id === "caseId") {
       try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { /* A later submit will validate the complete form. */ }
       current.input.caseId = event.target.value;
-      const selectedCase = financeApi?.findCase(financeData, event.target.value);
-      if (selectedCase?.number) current.input.caseNumber = String(selectedCase.number);
+      current.input.partySource = "financeiro";
+      const context = caseContextApi?.caseContext(financeData, current.input, financeApi) || {};
+      caseContextApi?.applyCaseContext(current.input, context, { preserveManual: false });
+      const creditor = caseContextApi?.partyForRole(context, "Credor") || caseContextApi?.partyForRole(context, "Exequente");
+      const debtor = caseContextApi?.partyForRole(context, "Devedor") || caseContextApi?.partyForRole(context, "Executado");
+      if (creditor) current.input.creditor = creditor.name;
+      if (debtor) current.input.debtor = debtor.name;
       render();
     }
     if (event.target.id === "basisType") {

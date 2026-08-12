@@ -37,13 +37,29 @@ async function prepareCalculationPage(page, path = 'calculos/') {
       const now = new Date().toISOString();
       store.put({ name: 'people', value: { schema: 'officejur/financeiro-pessoas-data', version: 1, updatedAt: now, records: [{ id: 'person-test', name: 'Cliente de teste', cpf: '529.982.247-25', birthDate: '1990-01-10', maritalStatus: 'solteiro', profession: 'comerciante', updatedAt: now }], deleted: [] } });
       store.put({ name: 'clients', value: { schema: 'officejur/financeiro-clientes-data', version: 2, updatedAt: now, records: [{ id: 'client-test', type: 'pf', personId: 'person-test', updatedAt: now }], deleted: [] } });
-      store.put({ name: 'cases', value: { schema: 'officejur/financeiro-casos-data', version: 1, updatedAt: now, records: [{ id: 'case-test', clientId: 'client-test', title: 'Ação de teste', number: '0000000-00.2026.8.00.0000', type: 'Judicial', status: 'active', updatedAt: now }], deleted: [] } });
+      store.put({ name: 'cases', value: { schema: 'officejur/financeiro-casos-data', version: 1, updatedAt: now, records: [{ id: 'case-test', clientId: 'client-test', title: 'Ação de teste', number: '0000000-00.2026.8.00.0000', type: 'Judicial', status: 'active', parties: [{ id: 'party-claimant', name: 'Cliente de teste', role: 'Reclamante' }, { id: 'party-respondent', name: 'Parte contrária de teste', role: 'Reclamada' }], updatedAt: now }], deleted: [] } });
       transaction.oncomplete = () => { database.close(); resolve(); };
       transaction.onerror = () => reject(transaction.error);
     };
   }));
   await page.goto(path, { waitUntil: 'networkidle' });
 }
+
+test('cálculos usam cliente, caso e partes do mesmo contexto', async ({ page }) => {
+  await prepareCalculationPage(page, 'calculos/trabalhista/');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.locator('select[name="partyType"]').selectOption({ label: 'Reclamante' });
+  await page.locator('#caseId').selectOption('case-test');
+  await expect(page.locator('#caseNumber')).toHaveValue('0000000-00.2026.8.00.0000');
+  await expect(page.locator('input[name="party"]')).toHaveValue('Parte contrária de teste');
+
+  await page.goto('calculos/completo/', { waitUntil: 'networkidle' });
+  await page.locator('#clientId').selectOption('client-test');
+  await page.locator('#caseId').selectOption('case-test');
+  await expect(page.locator('#caseNumber')).toHaveValue('0000000-00.2026.8.00.0000');
+  await expect(page.locator('[data-party-index="0"] input')).toHaveValue('Cliente de teste');
+  await expect(page.locator('[data-party-index="1"] input')).toHaveValue('Parte contrária de teste');
+});
 
 const pages = [
   '',

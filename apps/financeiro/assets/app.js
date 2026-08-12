@@ -604,6 +604,15 @@
     normalized.assignments = Array.isArray(item.assignments)
       ? item.assignments
       : [];
+    normalized.parties = Array.isArray(item.parties)
+      ? item.parties
+          .filter((party) => party && String(party.name || "").trim())
+          .map((party, index) => ({
+            id: String(party.id || `party-${index + 1}`),
+            name: String(party.name || "").trim(),
+            role: String(party.role || "Autor").trim(),
+          }))
+      : [];
     return normalized;
   }
   function normalizePackage(item = {}) {
@@ -2705,6 +2714,29 @@
     $("#case-package-field").hidden = scope !== "package";
     $("#case-agreement-editor").hidden = scope !== "own";
   }
+  function renderCaseParties(parties = []) {
+    const rows = $("#case-parties-rows");
+    rows.innerHTML = "";
+    (parties.length ? parties : [{ id: uid(), name: "", role: "Autor" }]).forEach((party) => {
+      const row = document.createElement("div");
+      row.className = "case-party-row";
+      row.innerHTML = `<input data-case-party="name" value="${escapeHtml(party.name || "")}" placeholder="Nome da parte" aria-label="Nome da parte"><select data-case-party="role" aria-label="Polo da parte"><option ${party.role === "Autor" ? "selected" : ""}>Autor</option><option ${party.role === "Réu" ? "selected" : ""}>Réu</option><option ${party.role === "Credor" ? "selected" : ""}>Credor</option><option ${party.role === "Devedor" ? "selected" : ""}>Devedor</option><option ${party.role === "Reclamante" ? "selected" : ""}>Reclamante</option><option ${party.role === "Reclamada" ? "selected" : ""}>Reclamada</option><option ${party.role === "Exequente" ? "selected" : ""}>Exequente</option><option ${party.role === "Executado" ? "selected" : ""}>Executado</option></select><button class="icon-btn" type="button" data-remove-case-party aria-label="Remover parte">×</button>`;
+      row.querySelector("[data-remove-case-party]").onclick = () => {
+        row.remove();
+        if (!$("#case-parties-rows").children.length) renderCaseParties([]);
+      };
+      rows.append(row);
+    });
+  }
+  function readCaseParties() {
+    return [...document.querySelectorAll("#case-parties-rows .case-party-row")]
+      .map((row) => ({
+        id: uid(),
+        name: row.querySelector('[data-case-party="name"]').value.trim(),
+        role: row.querySelector('[data-case-party="role"]').value,
+      }))
+      .filter((party) => party.name);
+  }
   function openCase(clientId = "", caseId = "") {
     if (!data.clients.length) {
       showView("clients");
@@ -2747,6 +2779,7 @@
       $("#case-agreement-editor"),
       item?.agreement || blankAgreement(),
     );
+    renderCaseParties(item?.parties || []);
     updateCaseContractFields();
     $("#case-modal-title").textContent = item
       ? "Editar processo ou caso"
@@ -3987,6 +4020,7 @@
         agreement,
         notes: fd.notes.trim(),
         assignments: old?.assignments || [],
+        parties: readCaseParties(),
         createdAt: old?.createdAt || now(),
         updatedAt: now(),
       };
@@ -4244,6 +4278,12 @@
     updateCaseContractFields();
   };
   $("#case-form [name=contractScope]").onchange = updateCaseContractFields;
+  $("#add-case-party").onclick = () => {
+    const parties = readCaseParties();
+    parties.push({ id: uid(), name: "", role: "Autor" });
+    renderCaseParties(parties);
+    $("#case-parties-rows .case-party-row:last-child [data-case-party=name]").focus();
+  };
   function setPackagesExpanded(expanded) {
     const content = $("#packages-content"), button = $("#toggle-packages");
     content.hidden = !expanded;

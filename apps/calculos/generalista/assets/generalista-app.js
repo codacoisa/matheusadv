@@ -9,6 +9,7 @@
   const core = window.OfficeJurGenericCalculations;
   const storage = window.OfficeJurCalculationStorage;
   const finance = window.OfficeJurCalculationFinance;
+  const caseContextApi = window.OfficeJurCalculationCaseContext;
   const indices = window.OfficeJurLegalIndices;
   const syncFactory = window.OfficeJurCalculationSync;
   const gistSettings = window.OfficeJurGistSettings;
@@ -58,7 +59,7 @@
       id: uid(), code: `OJ-GEN-${now.slice(0, 4)}-${uid().slice(0, 6).toUpperCase()}`, type: mode, name: complete ? `Cálculo completo — ${now.split("-").reverse().join("/")}` : `Cálculo fácil — ${now.split("-").reverse().join("/")}`,
       status: "draft", calculationVersion: core.VERSION, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       input: {
-        clientId: "", clientName: "", caseNumber: "", judgmentDate: "", parties: [{ id: uid(), name: "", role: "Autor" }], calculationDate: now,
+        clientId: "", clientName: "", caseId: "", caseName: "", caseNumber: "", judgmentDate: "", parties: [{ id: uid(), name: "", role: "Autor", source: "manual" }], calculationDate: now,
         items: [blankItem()], settings: { correctionType: "none", correctionProrata: true, interestRate: 0, interestPeriodicity: "monthly", interestProrata: true, penaltyRate: 0, feeRate: 0, feeType: "percent", feeAmount: 0 },
         penalties: [], fees: [], costs: [], notes: "",
       }, indexSnapshot: null, result: null,
@@ -66,6 +67,10 @@
   }
   function clientOptions(selected) {
     return `<option value="">Selecione um cliente</option>${(financeData.clients || []).map((client) => `<option value="${escape(client.id)}" ${String(selected || "") === String(client.id) ? "selected" : ""}>${escape(finance.clientLabel(client))}</option>`).join("")}`;
+  }
+  function caseOptions(clientId, selected) {
+    const cases = finance?.casesForClient(financeData, clientId) || [];
+    return `<option value="">Nenhum caso vinculado</option>${cases.map((item) => `<option value="${escape(item.id)}" ${String(selected || "") === String(item.id) ? "selected" : ""}>${escape(finance.caseLabel(item))}</option>`).join("")}`;
   }
   function financeNotice() {
     if (!financeData.loaded) return '<div class="finance-notice error"><strong>Não foi possível ler o Financeiro.</strong><span>Atualize a página para tentar novamente.</span></div>';
@@ -78,7 +83,7 @@
   }
   function basicFields(includeParties = complete) {
     const i = current.input;
-    return `<div class="form-grid">${financeNotice()}${field("Nome do cálculo", "name", current.name, "text", "full", true)}<div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" required>${clientOptions(i.clientId)}</select></div>${complete ? `${field("Número do processo", "caseNumber", i.caseNumber)}${field("Data do trânsito em julgado", "judgmentDate", i.judgmentDate, "date")}` : field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true)}${includeParties ? `<div class="field full"><label>Partes envolvidas</label><div class="party-list">${i.parties.map((party, index) => `<div class="party-row" data-party-index="${index}"><input data-party-field="name" aria-label="Nome da parte ${index + 1}" placeholder="Nome da parte ${index + 1}" value="${escape(party.name)}"><select data-party-field="role" aria-label="Tipo da parte ${index + 1}">${["Autor", "Credor", "Devedor", "Réu"].map((role) => `<option ${party.role === role ? "selected" : ""}>${role}</option>`).join("")}</select>${index ? `<button class="danger small" type="button" data-action="remove-party" data-index="${index}" aria-label="Remover parte">×</button>` : ""}</div>`).join("")}<button class="link-button" type="button" data-action="add-party">＋ Adicionar parte envolvida</button></div></div>` : ""}</div>`;
+    return `<div class="form-grid">${financeNotice()}${field("Nome do cálculo", "name", current.name, "text", "full", true)}<div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" required>${clientOptions(i.clientId)}</select></div><div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>${field("Número do processo", "caseNumber", i.caseNumber)}${complete ? field("Data do trânsito em julgado", "judgmentDate", i.judgmentDate, "date") : field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true)}${includeParties ? `<div class="field full"><label>Partes envolvidas</label><div class="party-list">${i.parties.map((party, index) => `<div class="party-row" data-party-index="${index}"><input data-party-field="name" aria-label="Nome da parte ${index + 1}" placeholder="Nome da parte ${index + 1}" value="${escape(party.name)}"><select data-party-field="role" aria-label="Tipo da parte ${index + 1}">${["Autor", "Credor", "Devedor", "Réu"].map((role) => `<option ${party.role === role ? "selected" : ""}>${role}</option>`).join("")}</select>${index ? `<button class="danger small" type="button" data-action="remove-party" data-index="${index}" aria-label="Remover parte">×</button>` : ""}</div>`).join("")}<button class="link-button" type="button" data-action="add-party">＋ Adicionar parte envolvida</button></div></div>` : ""}</div>`;
   }
   function easyStep() {
     const i = current.input, s = i.settings;
@@ -120,6 +125,10 @@
     if (name !== undefined) current.name = name;
     current.input.clientId = clientId;
     current.input.clientName = finance.clientLabel(finance.findClient(financeData, clientId));
+    current.input.caseId = document.querySelector("#caseId")?.value || "";
+    const context = caseContextApi?.caseContext(financeData, current.input, finance) || {};
+    caseContextApi?.applyCaseContext(current.input, context, { preserveManual: true });
+    if (current.input.caseId && !context.caseId) throw new Error("Selecione um caso pertencente ao cliente escolhido.");
     if (document.querySelector("#caseNumber")) current.input.caseNumber = document.querySelector("#caseNumber").value.trim();
     if (document.querySelector("#judgmentDate")) current.input.judgmentDate = document.querySelector("#judgmentDate").value;
     if (document.querySelector("#calculationDate")) current.input.calculationDate = document.querySelector("#calculationDate").value;
@@ -214,6 +223,23 @@
     if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlocked();
   });
   app.addEventListener("change", (event) => {
+    if (event.target.id === "clientId") {
+      try { captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }
+      current.input.clientId = event.target.value;
+      current.input.caseId = "";
+      current.input.caseName = "";
+      current.input.caseNumber = "";
+      render();
+      return;
+    }
+    if (event.target.id === "caseId") {
+      try { captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }
+      current.input.caseId = event.target.value;
+      const context = caseContextApi?.caseContext(financeData, current.input, finance) || {};
+      caseContextApi?.applyCaseContext(current.input, context, { preserveManual: false });
+      render();
+      return;
+    }
     if (event.target.id !== "feeType") return;
     try { captureEasy(); } catch (_) { /* a mudança de seletor não deve apagar o formulário incompleto */ }
     current.input.settings.feeType = event.target.value;
@@ -248,7 +274,6 @@
     const found = data.records.find((item) => item.id === requested && item.type === mode);
     if (!found) { notify("Cálculo não encontrado.", true); return; }
     current = structuredClone(found);
-    if (!current.input.parties) current.input.parties = [{ id: uid(), name: "", role: "Autor" }];
     if (new URLSearchParams(window.location.search).get("pdf") === "1" && current.result) setTimeout(() => window.print(), 300);
     step = current.result ? (complete ? 4 : 2) : 1;
   }

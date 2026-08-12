@@ -25,6 +25,18 @@ Módulo permanente do OfficeJur para memórias de cálculo reproduzíveis.
 
 O demonstrativo não substitui a conferência do título judicial, dos termos iniciais e dos critérios definidos no caso concreto.
 
+## Contrato obrigatório de identificação
+
+Todo cálculo publicado deve carregar `assets/finance-link.js` e
+`assets/case-context.js`. O fluxo inicial é sempre cliente → caso/processo →
+contexto de partes: o caso selecionado preenche número, título e partes
+disponíveis, mas os campos continuam editáveis. A escolha do papel do cliente
+é explícita; o sistema não presume que ele seja autor, réu, credor ou devedor.
+
+Ao criar uma nova calculadora, use `OfficeJurCalculationCaseContext` para
+validar o vínculo, aplicar o snapshot e preservar edições manuais. O formato
+atual do cálculo deve ser usado desde a criação do registro.
+
 No cálculo trabalhista, percentuais, bases, reflexos e pagamentos permanecem
 editáveis. As premissas são declaradas no resultado e no PDF para permitir a
 revisão pelo profissional responsável.

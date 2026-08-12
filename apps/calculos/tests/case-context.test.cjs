@@ -1,0 +1,51 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const context = require("../assets/case-context.js");
+const finance = require("../assets/finance-link.js");
+
+const data = {
+  clients: [{ id: "c1", name: "Cliente" }],
+  cases: [{
+    id: "case-1",
+    clientId: "c1",
+    title: "Ação de teste",
+    number: "0001",
+    parties: [
+      { id: "p1", name: "Cliente", role: "Reclamante" },
+      { id: "p2", name: "Empresa", role: "Reclamada" },
+    ],
+  }],
+};
+
+test("monta contexto cliente-caso com número e partes do Financeiro", () => {
+  assert.deepEqual(context.caseContext(data, { clientId: "c1", caseId: "case-1" }, finance), {
+    version: context.VERSION,
+    clientId: "c1",
+    clientName: "Cliente",
+    caseId: "case-1",
+    caseName: "Ação de teste — 0001",
+    caseNumber: "0001",
+    parties: [
+      { id: "p1", name: "Cliente", role: "Reclamante", source: "financeiro" },
+      { id: "p2", name: "Empresa", role: "Reclamada", source: "financeiro" },
+    ],
+  });
+});
+
+test("rejeita caso de outro cliente e mantém partes manuais", () => {
+  const input = {
+    clientId: "c1",
+    parties: [{ id: "manual", name: "Parte manual", role: "Autor", source: "manual" }],
+  };
+  const invalid = context.validateCaseContext(data, { clientId: "c1", caseId: "missing" }, finance);
+  assert.deepEqual(invalid, { valid: false, reason: "case" });
+  context.applyCaseContext(input, context.caseContext(data, { clientId: "c1", caseId: "case-1" }, finance));
+  assert.equal(input.caseNumber, "0001");
+  assert.deepEqual(input.parties, [{ id: "manual", name: "Parte manual", role: "Autor", source: "manual" }]);
+});
+
+test("localiza a parte contrária sem presumir o papel do cliente", () => {
+  const current = context.caseContext(data, { clientId: "c1", caseId: "case-1" }, finance);
+  assert.equal(context.opposingParty(current, "Reclamante", { Reclamante: "Reclamada" }).name, "Empresa");
+  assert.equal(context.partyForRole(current, "Reclamada").name, "Empresa");
+});
