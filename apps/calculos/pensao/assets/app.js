@@ -76,7 +76,7 @@
       type: "pension", name: `Pensão — ${now.split("-").reverse().join("/")}`,
       status: "draft", calculationVersion: core.CALCULATION_VERSION, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       input: {
-        clientId: "", clientName: "", caseId: "", caseName: "", creditor: "", debtor: "", caseNumber: "", parties: [], partySource: "manual", notes: "", startDate: now, endDate: now, calculationDate: now,
+        clientId: "", clientName: "", caseId: "", caseName: "", clientParty: null, opposingParty: null, additionalParties: [], clientRole: "Exequente / Credor", clientPartyRole: "Exequente / Credor", creditor: "", debtor: "", caseNumber: "", parties: [], partySource: "manual", notes: "", startDate: now, endDate: now, calculationDate: now,
         basisType: "minimum_wage", percentage: 30, fixedAmount: 0, referenceIncome: 0, includeThirteenth: false,
         installments: [], basisLabel: "",
         settings: {
@@ -94,14 +94,19 @@
   }
   const field = (label, name, value, type = "text", cls = "") => `<div class="field ${cls}"><label class="required" for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${escape(value)}" required></div>`;
 
+  function additionalPartyOptions(selected) { const context = caseContextApi?.partyContext(financeData, current.input, financeApi) || {}; return `<option value="manual" ${selected === "manual" ? "selected" : ""}>Preencher manualmente</option>${(context.caseParties || []).map((party) => `<option value="case:${escape(party.id)}" ${selected === `case:${party.id}` ? "selected" : ""}>Importar: ${escape(party.name)} — ${escape(party.role)}</option>`).join("")}`; }
+  function additionalPartiesHtml() { return `<section class="field full"><label>Partes adicionais</label><p class="hint">Opcional. Importe cada parte do processo ou preencha manualmente.</p>${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}<button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte adicional</button></section>`; }
+
   function stepOne() {
     const i = current.input;
     return `<div class="form-grid">
       ${field("Nome do cálculo", "name", current.name, "text", "full")}
       <div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" name="clientId" required>${clientOptions(i.clientId)}</select></div>
       <div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId" name="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>
-      ${field("Exequente / credor", "creditor", i.creditor)}
-      ${field("Executado / devedor", "debtor", i.debtor)}
+      <div class="field"><label>Parte principal — cliente<input id="clientPartyName" value="${escape(i.clientParty?.name || i.clientName || "")}" readonly></label></div>
+      <div class="field"><label class="required" for="clientPartyRole">Polo do cliente</label><select id="clientPartyRole" name="clientPartyRole" required><option ${i.clientRole === "Exequente / Credor" || i.clientPartyRole === "Exequente / Credor" ? "selected" : ""}>Exequente / Credor</option><option ${i.clientRole === "Executado / Devedor" || i.clientPartyRole === "Executado / Devedor" ? "selected" : ""}>Executado / Devedor</option></select></div>
+      ${field(`Parte contrária — ${caseContextApi?.oppositeRole(i.clientRole || i.clientPartyRole) || "oposto"}`, "opposingPartyName", i.opposingParty?.name || "")}
+      ${additionalPartiesHtml()}
       ${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}
       ${field("Início das parcelas", "startDate", i.startDate, "date", "third")}
       ${field("Fim das parcelas", "endDate", i.endDate, "date", "third")}
@@ -183,27 +188,29 @@
     app.focus({ preventScroll: true });
   }
 
+  function captureAdditionalParties() { const context = caseContextApi?.partyContext(financeData, current.input, financeApi) || {}; current.input.additionalParties = [...document.querySelectorAll("[data-additional-index]")].map((row) => { const source = row.querySelector('[data-additional-field="source"]')?.value || "manual"; const selected = source.startsWith("case:") ? (context.caseParties || []).find((party) => String(party.id) === source.slice(5)) : null; if (selected) return { ...selected, source: "case", sourceId: selected.sourceId || selected.id }; return { id: row.dataset.additionalIndex || uid(), name: row.querySelector('[data-additional-field="name"]')?.value.trim() || "", role: row.querySelector('[data-additional-field="role"]')?.value.trim() || "", source: "manual", sourceId: "" }; }); }
   function captureStepOne(form) {
     const formData = new FormData(form), i = current.input;
     const previousSignature = installmentSignature(i);
     current.name = String(formData.get("name") || "").trim();
-    ["clientId", "caseId", "creditor", "debtor", "caseNumber", "startDate", "endDate", "calculationDate", "basisType", "notes"].forEach((key) => { i[key] = String(formData.get(key) || ""); });
+    ["clientId", "caseId", "clientPartyRole", "opposingPartyName", "caseNumber", "startDate", "endDate", "calculationDate", "basisType", "notes"].forEach((key) => { i[key] = String(formData.get(key) || ""); });
+    i.clientRole = i.clientPartyRole;
     const selectedCase = financeApi?.findCase(financeData, i.caseId);
     if (i.caseId && (!selectedCase || String(selectedCase.clientId) !== String(i.clientId))) throw new Error("Selecione um caso pertencente ao cliente escolhido.");
     if (!i.clientId || !financeApi?.findClient(financeData, i.clientId)) throw new Error("Vincule o cálculo a um cliente do Financeiro.");
-    const context = caseContextApi?.caseContext(financeData, i, financeApi) || {};
-    caseContextApi?.applyCaseContext(i, context, { preserveManual: true });
-    if (i.partySource === "financeiro") {
-      const creditor = caseContextApi?.partyForRole(context, "Credor") || caseContextApi?.partyForRole(context, "Exequente");
-      const debtor = caseContextApi?.partyForRole(context, "Devedor") || caseContextApi?.partyForRole(context, "Executado");
-      if (creditor) i.creditor = creditor.name;
-      if (debtor) i.debtor = debtor.name;
-    }
+    const context = caseContextApi?.partyContext(financeData, i, financeApi) || {};
+    caseContextApi?.applyCaseContext(i, context);
+    i.clientParty = context.clientParty;
+    i.opposingParty = { ...(i.opposingParty || {}), name: i.opposingPartyName, role: context.opposingRole, source: "manual", sourceId: "" };
+    i.partySource = "manual";
+    i.creditor = i.clientParty?.role === "Exequente / Credor" ? i.clientParty.name : i.opposingParty.name;
+    i.debtor = i.clientParty?.role === "Executado / Devedor" ? i.clientParty.name : i.opposingParty.name;
+    captureAdditionalParties();
     i.percentage = Number(formData.get("percentage") || i.percentage || 0);
     i.fixedAmount = Number(formData.get("fixedAmount") || 0);
     i.referenceIncome = Number(formData.get("referenceIncome") || 0);
     i.includeThirteenth = formData.has("includeThirteenth");
-    if (!current.name || !i.startDate || !i.endDate || !i.calculationDate) throw new Error("Preencha os campos obrigatórios.");
+    if (!current.name || !i.startDate || !i.endDate || !i.calculationDate || !i.opposingParty.name) throw new Error("Preencha nome, cliente, polo do cliente, parte contrária e período.");
     if (i.calculationDate < i.endDate) throw new Error("A data-base não pode anteceder o fim das parcelas.");
     i.basisLabel = basisLabel(i);
     const nextSignature = installmentSignature(i);
@@ -274,26 +281,35 @@
     await sync.fromGist();
   }
   app.addEventListener("input", (event) => {
-    if (["creditor", "debtor"].includes(event.target.name)) current.input.partySource = "manual";
+    if (event.target.name === "opposingPartyName") current.input.partySource = "manual";
   });
   app.addEventListener("change", (event) => {
     if (event.target.id === "clientId") {
       try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { /* A later submit will validate the complete form. */ }
       current.input.clientId = event.target.value;
+      current.input.clientName = "";
       current.input.caseId = "";
+      current.input.caseName = "";
+      current.input.caseNumber = "";
+      current.input.clientParty = null;
       current.input.partySource = "manual";
       render();
     }
     if (event.target.id === "caseId") {
       try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { /* A later submit will validate the complete form. */ }
       current.input.caseId = event.target.value;
-      current.input.partySource = "financeiro";
       const context = caseContextApi?.caseContext(financeData, current.input, financeApi) || {};
-      caseContextApi?.applyCaseContext(current.input, context, { preserveManual: false });
-      const creditor = caseContextApi?.partyForRole(context, "Credor") || caseContextApi?.partyForRole(context, "Exequente");
-      const debtor = caseContextApi?.partyForRole(context, "Devedor") || caseContextApi?.partyForRole(context, "Executado");
-      if (creditor) current.input.creditor = creditor.name;
-      if (debtor) current.input.debtor = debtor.name;
+      caseContextApi?.applyCaseContext(current.input, context);
+      render();
+    }
+    if (event.target.id === "clientPartyRole") {
+      try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { current.input.clientPartyRole = event.target.value; }
+      current.input.clientPartyRole = event.target.value;
+      current.input.clientRole = event.target.value;
+      render();
+    }
+    if (event.target.dataset.additionalField === "source") {
+      try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { captureAdditionalParties(); }
       render();
     }
     if (event.target.id === "basisType") {
@@ -320,6 +336,8 @@
     const target = event.target.closest("button"); if (!target || busy) return;
     const action = target.dataset.action;
     if (action === "catalog") { window.location.href = "../"; return; }
+    if (action === "add-additional") { try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { captureAdditionalParties(); } current.input.additionalParties.push({ id: uid(), name: "", role: "", source: "manual", sourceId: "" }); render(); }
+    if (action === "remove-additional") { try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { captureAdditionalParties(); } current.input.additionalParties.splice(Number(target.dataset.index), 1); render(); }
     if (action === "back") {
       if (step === 2) captureStepTwo();
       if (step === 3) captureStepThree();

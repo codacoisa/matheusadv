@@ -220,12 +220,13 @@
     y = 62;
 
     const employment = input.employment || {};
+    const partyByRole = role => value(input.clientParty?.role === role ? input.clientParty.name : input.opposingParty?.role === role ? input.opposingParty.name : input.parties?.find?.((party) => party.role === role)?.name);
     drawSection("Identificação do cálculo");
     infoGrid([
       ["Nome", value(record.name || input.name)],
       ["Data-base", date(input.calculationDate)],
-      ["Reclamante", value(input.claimant || input.client || input.creditor || input.employee || input.parties?.find?.((party) => party.type === "claimant")?.name)],
-      ["Reclamada", value(input.respondent || input.party || input.debtor || input.employer || input.parties?.find?.((party) => party.type === "respondent")?.name)],
+      ["Reclamante", partyByRole("Reclamante")],
+      ["Reclamada", partyByRole("Reclamada")],
       ["Cliente", value(input.clientName || input.clientId)],
       ["Caso", value(input.caseName || input.caseId, "Não vinculado")],
       ["Cargo", value(input.role || input.position)],

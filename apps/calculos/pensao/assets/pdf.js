@@ -152,8 +152,8 @@
     infoGrid([
       ["Nome", record.name],
       ["Data-base", fmtDate(record.input.calculationDate)],
-      ["Exequente", record.input.creditor || "Não informado"],
-      ["Executado", record.input.debtor || "Não informado"],
+      ["Exequente", record.input.clientParty?.role === "Exequente / Credor" ? record.input.clientParty.name : record.input.opposingParty?.role === "Exequente / Credor" ? record.input.opposingParty.name : record.input.creditor || "Não informado"],
+      ["Executado", record.input.clientParty?.role === "Executado / Devedor" ? record.input.clientParty.name : record.input.opposingParty?.role === "Executado / Devedor" ? record.input.opposingParty.name : record.input.debtor || "Não informado"],
       ["Cliente", record.input.clientName || record.input.clientId || "Não informado"],
       ["Caso", record.input.caseName || record.input.caseId || "Não vinculado"],
       ["Processo", record.input.caseNumber || "Não informado"],
