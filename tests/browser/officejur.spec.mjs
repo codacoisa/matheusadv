@@ -611,6 +611,8 @@ test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ 
   await personForm.locator('[name="maritalStatus"]').fill('solteiro');
   await personForm.locator('[name="profession"]').fill('empresário');
   await personForm.locator('[name="phoneNational"]').fill('62999999999');
+  await personForm.locator('[name="zip"]').fill('74000123');
+  await expect(personForm.locator('[data-address-status]')).toContainText('Endereço localizado pelo CEP');
   await personForm.locator('[name="street"]').fill('Rua das Flores');
   await personForm.locator('[name="neighborhood"]').fill('Centro');
   await personForm.locator('[name="state"]').selectOption('GO');
@@ -727,6 +729,8 @@ test('Financeiro cadastra pessoa jurídica com representante reutilizável', asy
   await clientForm.locator('[name="tradeName"]').fill('Empresa Exemplo');
   await clientForm.locator('[name="cnpj"]').fill('04.252.011/0001-10');
   await clientForm.locator('[name="phoneNational"]').fill('62999999999');
+  await clientForm.locator('[name="zip"]').fill('74000123');
+  await expect(clientForm.locator('[data-address-status]')).toContainText('Endereço localizado pelo CEP');
   await clientForm.locator('[name="street"]').fill('Avenida Central');
   await clientForm.locator('[name="neighborhood"]').fill('Centro');
   await clientForm.locator('[name="state"]').selectOption('GO');
