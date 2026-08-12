@@ -620,7 +620,7 @@
       </form>
     </dialog>
     <dialog id="client-dialog">
-      <form method="dialog" id="client-form">
+      <form method="dialog" id="client-form" data-address-start-with-zip="true">
         <div class="modal-head">
           <div>
             <p class="eyebrow">CLIENTE</p>
@@ -709,9 +709,10 @@
               name="street"
               required
               autocomplete="street-address"
-              placeholder="Ex.: Rua das Flores"
+              placeholder="Preencha o CEP primeiro"
+              readonly
               aria-describedby="street-help street-warning" />
-              <small id="street-help">Informe somente o tipo e o nome do logradouro.</small>
+              <small id="street-help">Comece pelo CEP para liberar o preenchimento do logradouro.</small>
               <small id="street-warning" class="field-warning" role="alert" hidden></small>
             </label
           ><label>Número<input name="addressNumber" /></label
@@ -749,7 +750,7 @@
       </form>
     </dialog>
     <dialog id="person-dialog">
-      <form method="dialog" id="person-form">
+      <form method="dialog" id="person-form" data-address-start-with-zip="true">
         <div class="modal-head">
           <div><p class="eyebrow">PESSOA</p><h2 id="person-modal-title">Nova pessoa</h2><p>Cadastro central para clientes, representantes e demais contatos.</p></div>
           <button class="icon-btn dark" value="cancel" formnovalidate><i class="fa-solid fa-xmark"></i></button>
@@ -769,7 +770,7 @@
           </div>
           <label class="check whatsapp-check span-2"><input name="whatsapp" type="checkbox" /> Este número possui WhatsApp</label>
           <label class="span-2">E-mail<input name="email" type="email" /></label>
-          <label class="span-2">Logradouro<input name="street" autocomplete="street-address" aria-describedby="person-street-warning" /><small id="person-street-warning" class="field-warning" role="alert" hidden></small></label>
+          <label class="span-2">Logradouro<input name="street" autocomplete="street-address" placeholder="Preencha o CEP primeiro" readonly aria-describedby="person-street-help person-street-warning" /><small id="person-street-help">Comece pelo CEP para liberar o preenchimento do logradouro.</small><small id="person-street-warning" class="field-warning" role="alert" hidden></small></label>
           <label>Número<input name="addressNumber" /></label>
           <label>Complemento<input name="complement" /></label>
           <label>Quadra<input name="addressBlock" /></label>

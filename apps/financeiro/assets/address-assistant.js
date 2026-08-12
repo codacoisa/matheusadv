@@ -121,8 +121,19 @@
     const state = form.elements.state;
     const city = form.elements.city;
     const zip = form.elements.zip;
+    const street = form.elements.street;
+    const requiresZip = form.dataset.addressStartWithZip === "true";
     if (!state || !city || !zip) return null;
     let cityRequest = 0;
+    let lastLookupZip = "";
+
+    function updateStreetAccess() {
+      if (!requiresZip || !street) return;
+      const unlocked = digits(zip.value).length === 8;
+      street.readOnly = !unlocked;
+      street.setAttribute("aria-readonly", String(!unlocked));
+      street.title = unlocked ? "" : "Preencha o CEP para liberar o logradouro.";
+    }
 
     setOptions(state, STATES, state.value.toUpperCase(), "Selecione a UF");
 
@@ -159,12 +170,15 @@
       const selectedCity = selectedCityOverride ?? city.value;
       setOptions(state, STATES, selectedState, "Selecione a UF");
       zip.value = maskZip(zip.value);
+      updateStreetAccess();
       await loadCities(selectedCity);
     }
 
     async function fillFromZip() {
       zip.value = maskZip(zip.value);
-      if (digits(zip.value).length !== 8) return;
+      const normalizedZip = digits(zip.value);
+      if (normalizedZip.length !== 8 || normalizedZip === lastLookupZip) return;
+      lastLookupZip = normalizedZip;
       setStatus(form, "Consultando o CEP…", "loading");
       try {
         const address = await lookupZip(zip.value);
@@ -186,12 +200,15 @@
     state.addEventListener("change", () => loadCities());
     zip.addEventListener("input", () => {
       zip.value = maskZip(zip.value);
+      updateStreetAccess();
       if (digits(zip.value).length === 8) void fillFromZip();
       else setStatus(form);
     });
     zip.addEventListener("blur", () => {
+      updateStreetAccess();
       if (digits(zip.value).length === 8) void fillFromZip();
     });
+    updateStreetAccess();
     void refresh();
     return { fillFromZip, loadCities, refresh };
   }

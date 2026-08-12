@@ -10,6 +10,10 @@ const styles = fs.readFileSync(
   "utf8",
 );
 const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
+const addressAssistant = fs.readFileSync(
+  path.join(root, "assets", "address-assistant.js"),
+  "utf8",
+);
 
 test("padronizar o estado da nuvem no cabeçalho", () => {
   assert.match(html, /office-cloud-status id="sync-label"/);
@@ -74,6 +78,17 @@ test("usar endereço assistido nos cadastros centrais", () => {
   });
   assert.match(app, /OfficeJurAddressAssistant/);
   assert.match(app, /addressAssistant\?\.setup/);
+});
+
+test("exigir CEP antes de liberar o logradouro", () => {
+  ["client-form", "person-form"].forEach((id) => {
+    const start = html.indexOf(`id="${id}"`);
+    const end = html.indexOf("</form>", start);
+    const form = html.slice(start, end);
+    assert.match(form, /data-address-start-with-zip="true"/);
+    assert.match(form, /name="street"[^>]*placeholder="Preencha o CEP primeiro"[^>]*readonly/);
+  });
+  assert.match(addressAssistant, /Preencha o CEP para liberar o logradouro/);
 });
 
 test("separar número, quadra e lote do logradouro do cliente", () => {

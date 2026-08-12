@@ -532,6 +532,11 @@ test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) 
   await page.locator('#quick-client').click();
   const street = page.locator('#client-form [name="street"]');
 
+  await expect(street).toHaveAttribute('readonly', '');
+  await expect(street).toHaveAttribute('placeholder', 'Preencha o CEP primeiro');
+  await page.locator('#client-form [name="zip"]').fill('74000123');
+  await expect(page.locator('#client-form [data-address-status]')).toContainText('Endereço localizado pelo CEP');
+  await expect(street).not.toHaveAttribute('readonly', '');
   await street.fill('Rua das Flores Nº 10 QUADRA A lt 3');
   await expect(street).toHaveValue('Rua das Flores 10 A 3');
   await expect(page.locator('#street-warning')).toContainText('Preencha no campo Número');
@@ -561,6 +566,25 @@ test('Financeiro preenche o endereço por CEP e restringe cidade à lista do IBG
     'Goiânia',
     'Silvânia',
   ]);
+});
+
+test('Financeiro exige CEP antes de liberar logradouro em cliente e pessoa', async ({ page }) => {
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.locator('#quick-client').click();
+  const clientStreet = page.locator('#client-form [name="street"]');
+  await expect(clientStreet).toHaveAttribute('readonly', '');
+  await page.locator('#client-form [name="zip"]').fill('74000123');
+  await expect(clientStreet).not.toHaveAttribute('readonly', '');
+
+  await page.locator('#client-dialog .modal-head button[value="cancel"]').click();
+  await expect(page.locator('#client-dialog')).not.toBeVisible();
+  await page.locator('[data-view="clients"]').click();
+  await page.locator('#open-people').click();
+  await page.locator('#new-person').click();
+  const personStreet = page.locator('#person-form [name="street"]');
+  await expect(personStreet).toHaveAttribute('readonly', '');
+  await page.locator('#person-form [name="zip"]').fill('74000123');
+  await expect(personStreet).not.toHaveAttribute('readonly', '');
 });
 
 test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ page }) => {
