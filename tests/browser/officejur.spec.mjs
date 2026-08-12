@@ -48,6 +48,8 @@ async function prepareCalculationPage(page, path = 'calculos/') {
 test('cálculos usam cliente, caso e partes do mesmo contexto', async ({ page }) => {
   await prepareCalculationPage(page, 'calculos/trabalhista/');
   await page.locator('#clientId').selectOption('client-test');
+  await expect(page.locator('#caseId')).toHaveValue('');
+  await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
   await page.locator('select[name="partyType"]').selectOption({ label: 'Reclamante' });
   await page.locator('#caseId').selectOption('case-test');
   await expect(page.locator('#caseNumber')).toHaveValue('0000000-00.2026.8.00.0000');
@@ -58,17 +60,33 @@ test('cálculos usam cliente, caso e partes do mesmo contexto', async ({ page })
 
   await page.goto('calculos/completo/', { waitUntil: 'networkidle' });
   await page.locator('#clientId').selectOption('client-test');
+  await expect(page.locator('#caseId')).toHaveValue('');
+  await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
   await page.locator('#caseId').selectOption('case-test');
   await expect(page.locator('#caseNumber')).toHaveValue('0000000-00.2026.8.00.0000');
   await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
   await expect(page.locator('input[name="opposingPartyName"]')).toHaveValue('');
-  await page.getByRole('button', { name: '＋ Adicionar parte adicional' }).click();
+  const addGeneralParty = page.getByRole('button', { name: '＋ Adicionar parte adicional' });
+  await expect(addGeneralParty).toBeVisible();
+  await addGeneralParty.click();
+  await addGeneralParty.click();
+  await expect(page.locator('[data-additional-index]')).toHaveCount(2);
+  await expect(page.locator('[data-additional-index="0"] [data-additional-field="source"]')).not.toContainText('Cliente de teste');
   await page.locator('[data-additional-index="0"] [data-additional-field="source"]').selectOption('case:party-respondent');
   await expect(page.locator('[data-additional-index="0"] [data-additional-field="name"]')).toHaveValue('Parte contrária de teste');
+  await page.locator('[data-additional-index="1"] [data-additional-field="name"]').fill('Parte manual de teste');
+  await page.locator('[data-additional-index="1"] [data-additional-field="role"]').fill('Assistente');
+  await page.locator('#caseId').selectOption('');
+  await expect(page.locator('[data-additional-index]')).toHaveCount(1);
+  await expect(page.locator('[data-additional-index="0"] [data-additional-field="name"]')).toHaveValue('Parte manual de teste');
 
   await page.goto('calculos/pensao/', { waitUntil: 'networkidle' });
   await page.locator('#clientId').selectOption('client-test');
+  await expect(page.locator('#caseId')).toHaveValue('');
+  await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
   await page.locator('#clientPartyRole').selectOption({ label: 'Executado / Devedor' });
+  const addPensionParty = page.getByRole('button', { name: '＋ Adicionar parte adicional' });
+  await expect(addPensionParty).toBeVisible();
   await page.locator('#caseId').selectOption('case-test');
   await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
   await expect(page.locator('input[name="opposingPartyName"]')).toHaveValue('');

@@ -81,8 +81,9 @@
     const labels = complete ? [["Dados básicos", "identificação do cálculo e das partes"], ["Parcelas", "débitos, pagamentos e índices"], ["Encargos", "multas, honorários e custas"], ["Resultado", "memória do cálculo"]] : [["Dados do cálculo", "critérios, valores e lançamentos"], ["Resultado", "memória do cálculo"]];
     return `<ol class="wizard-steps steps-${labels.length}">${labels.map((item, index) => `<li class="wizard-step ${step === index + 1 ? "active" : ""} ${step > index + 1 ? "done" : ""}"><span>${index + 1}</span><div><strong>${item[0]}</strong><small>${item[1]}</small></div></li>`).join("")}</ol>`;
   }
-  function additionalPartyOptions(selected) { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; return `<option value="manual" ${selected === "manual" ? "selected" : ""}>Preencher manualmente</option>${(context.caseParties || []).map((party) => `<option value="case:${escape(party.id)}" ${selected === `case:${party.id}` ? "selected" : ""}>Importar: ${escape(party.name)} — ${escape(party.role)}</option>`).join("")}`; }
-  function additionalPartiesHtml() { return `<section class="party-manager" aria-labelledby="additional-parties-title"><div class="party-manager-head"><div><h3 id="additional-parties-title">Partes adicionais</h3><p class="hint">Importe do processo ou inclua manualmente quando necessário.</p></div><button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte</button></div><div class="party-list">${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}</div></section>`; }
+  function additionalPartyOptions(selected) { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; const clientName = context.clientParty?.name || ""; return `<option value="manual" ${selected === "manual" ? "selected" : ""}>Preencher manualmente</option>${(context.caseParties || []).filter((party) => party.name !== clientName).map((party) => `<option value="case:${escape(party.id)}" ${selected === `case:${party.id}` ? "selected" : ""}>Importar: ${escape(party.name)} — ${escape(party.role)}</option>`).join("")}`; }
+  function removeImportedAdditionalParties() { current.input.additionalParties = (current.input.additionalParties || []).filter((party) => party.source !== "case"); }
+  function additionalPartiesHtml() { return `<section class="party-manager" aria-labelledby="additional-parties-title"><div class="party-manager-head"><div><h3 id="additional-parties-title">Partes adicionais</h3><p class="hint">Importe do processo ou inclua manualmente quando necessário.</p></div><button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte adicional</button></div><div class="party-list">${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}</div></section>`; }
   function basicFields() {
     const i = current.input, role = i.clientRole || i.clientPartyRole || "Autor", opposingRole = caseContextApi?.oppositeRole(role) || "Réu";
     const calculationField = complete ? field("Data do trânsito em julgado", "judgmentDate", i.judgmentDate, "date") : field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true);
@@ -122,7 +123,7 @@
     app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Generalista</p><h1>Atualização monetária ${complete ? "completa" : "simples"}</h1><p class="hint">${escape(current.code)} • versão ${escape(current.calculationVersion)}</p>${steps()}<form id="generalista-form">${content}<div class="wizard-actions"><button class="secondary" type="button" data-action="${step === 1 ? "cancel" : "back"}">${step === 1 ? "Cancelar" : "Voltar"}</button><div>${step < last ? `<button class="secondary" type="button" data-action="save">Salvar rascunho</button><button class="primary" type="submit">${step === last - 1 ? "Calcular" : "Próximo"}</button>` : `<button class="secondary" type="button" data-action="save">Salvar</button><button class="primary" type="button" data-action="print">Imprimir demonstrativo</button>`}</div></div></form></section>`;
     app.focus({ preventScroll: true });
   }
-  function captureAdditionalParties() { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; current.input.additionalParties = [...document.querySelectorAll("[data-additional-index]")].map((row) => { const source = row.querySelector('[data-additional-field="source"]')?.value || "manual"; const selected = source.startsWith("case:") ? (context.caseParties || []).find((party) => String(party.id) === source.slice(5)) : null; if (selected) return { ...selected, source: "case", sourceId: selected.sourceId || selected.id }; return { id: row.dataset.additionalIndex || uid(), name: row.querySelector('[data-additional-field="name"]')?.value.trim() || "", role: row.querySelector('[data-additional-field="role"]')?.value.trim() || "", source: "manual", sourceId: "" }; }); }
+  function captureAdditionalParties() { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; current.input.additionalParties = [...document.querySelectorAll("[data-additional-index]")].map((row) => { const source = row.querySelector('[data-additional-field="source"]')?.value || "manual"; const selected = source.startsWith("case:") ? (context.caseParties || []).find((party) => String(party.id) === source.slice(5)) : null; if (source.startsWith("case:")) return selected ? { ...selected, source: "case", sourceId: selected.sourceId || selected.id } : null; return { id: row.dataset.additionalIndex || uid(), name: row.querySelector('[data-additional-field="name"]')?.value.trim() || "", role: row.querySelector('[data-additional-field="role"]')?.value.trim() || "", source: "manual", sourceId: "" }; }).filter(Boolean); }
   function captureBasic() {
     const name = document.querySelector("#name")?.value.trim();
     const clientId = document.querySelector("#clientId")?.value || "";
@@ -230,21 +231,26 @@
   });
   app.addEventListener("change", (event) => {
     if (event.target.id === "clientId") {
-      try { captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }
+      try { captureAdditionalParties(); captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }
       current.input.clientId = event.target.value;
       current.input.clientName = "";
       current.input.caseId = "";
       current.input.caseName = "";
       current.input.caseNumber = "";
-      current.input.clientParty = null;
+      removeImportedAdditionalParties();
+      const context = caseContextApi?.partyContext(financeData, current.input, finance) || {};
+      caseContextApi?.applyCaseContext(current.input, context);
+      current.input.clientParty = context.clientParty;
       render();
       return;
     }
     if (event.target.id === "caseId") {
-      try { captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }
+      try { captureAdditionalParties(); captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }
+      removeImportedAdditionalParties();
       current.input.caseId = event.target.value;
-      const context = caseContextApi?.caseContext(financeData, current.input, finance) || {};
+      const context = caseContextApi?.partyContext(financeData, current.input, finance) || {};
       caseContextApi?.applyCaseContext(current.input, context);
+      current.input.clientParty = context.clientParty;
       render();
       return;
     }
