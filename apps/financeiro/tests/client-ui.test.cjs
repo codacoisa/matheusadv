@@ -90,6 +90,10 @@ test("exigir CEP antes de liberar o logradouro", () => {
   });
   assert.match(addressAssistant, /Preencha o CEP para liberar o logradouro/);
   assert.match(addressAssistant, /street\.placeholder = unlocked \? "Ex\.: Rua das Flores" : "Preencha o CEP primeiro"/);
+  assert.match(addressAssistant, /data-address-street-help/);
+  assert.match(addressAssistant, /streetHelp\.textContent = unlocked/);
+  assert.match(html, /id="street-help" data-address-street-help/);
+  assert.match(html, /id="person-street-help" data-address-street-help/);
 });
 
 test("separar número, quadra e lote do logradouro do cliente", () => {

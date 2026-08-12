@@ -122,6 +122,7 @@
     const city = form.elements.city;
     const zip = form.elements.zip;
     const street = form.elements.street;
+    const streetHelp = form.querySelector("[data-address-street-help]");
     const requiresZip = form.dataset.addressStartWithZip === "true";
     if (!state || !city || !zip) return null;
     let cityRequest = 0;
@@ -134,6 +135,11 @@
       street.setAttribute("aria-readonly", String(!unlocked));
       street.title = unlocked ? "" : "Preencha o CEP para liberar o logradouro.";
       street.placeholder = unlocked ? "Ex.: Rua das Flores" : "Preencha o CEP primeiro";
+      if (streetHelp) {
+        streetHelp.textContent = unlocked
+          ? "Informe somente o tipo e o nome do logradouro."
+          : "Comece pelo CEP para liberar o preenchimento do logradouro.";
+      }
     }
 
     setOptions(state, STATES, state.value.toUpperCase(), "Selecione a UF");
