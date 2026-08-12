@@ -2720,6 +2720,7 @@
     (parties.length ? parties : [{ id: uid(), name: "", role: "Autor" }]).forEach((party) => {
       const row = document.createElement("div");
       row.className = "case-party-row";
+      row.dataset.partyId = party.id || uid();
       row.innerHTML = `<input data-case-party="name" value="${escapeHtml(party.name || "")}" placeholder="Nome da parte" aria-label="Nome da parte"><select data-case-party="role" aria-label="Polo da parte"><option ${party.role === "Autor" ? "selected" : ""}>Autor</option><option ${party.role === "Réu" ? "selected" : ""}>Réu</option><option ${party.role === "Credor" ? "selected" : ""}>Credor</option><option ${party.role === "Devedor" ? "selected" : ""}>Devedor</option><option ${party.role === "Reclamante" ? "selected" : ""}>Reclamante</option><option ${party.role === "Reclamada" ? "selected" : ""}>Reclamada</option><option ${party.role === "Exequente" ? "selected" : ""}>Exequente</option><option ${party.role === "Executado" ? "selected" : ""}>Executado</option></select><button class="icon-btn" type="button" data-remove-case-party aria-label="Remover parte">×</button>`;
       row.querySelector("[data-remove-case-party]").onclick = () => {
         row.remove();
@@ -2731,7 +2732,7 @@
   function readCaseParties() {
     return [...document.querySelectorAll("#case-parties-rows .case-party-row")]
       .map((row) => ({
-        id: uid(),
+        id: row.dataset.partyId,
         name: row.querySelector('[data-case-party="name"]').value.trim(),
         role: row.querySelector('[data-case-party="role"]').value,
       }))

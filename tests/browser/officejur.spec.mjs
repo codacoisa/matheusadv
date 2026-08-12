@@ -51,14 +51,29 @@ test('cálculos usam cliente, caso e partes do mesmo contexto', async ({ page })
   await page.locator('select[name="partyType"]').selectOption({ label: 'Reclamante' });
   await page.locator('#caseId').selectOption('case-test');
   await expect(page.locator('#caseNumber')).toHaveValue('0000000-00.2026.8.00.0000');
-  await expect(page.locator('input[name="party"]')).toHaveValue('Parte contrária de teste');
+  await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
+  await expect(page.locator('input[name="opposingPartyName"]')).toHaveValue('');
+  await page.locator('input[name="opposingPartyName"]').fill('Parte contrária preenchida');
+  await expect(page.getByText('Parte contrária — Reclamada')).toBeVisible();
 
   await page.goto('calculos/completo/', { waitUntil: 'networkidle' });
   await page.locator('#clientId').selectOption('client-test');
   await page.locator('#caseId').selectOption('case-test');
   await expect(page.locator('#caseNumber')).toHaveValue('0000000-00.2026.8.00.0000');
-  await expect(page.locator('[data-party-index="0"] input')).toHaveValue('Cliente de teste');
-  await expect(page.locator('[data-party-index="1"] input')).toHaveValue('Parte contrária de teste');
+  await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
+  await expect(page.locator('input[name="opposingPartyName"]')).toHaveValue('');
+  await page.getByRole('button', { name: '＋ Adicionar parte adicional' }).click();
+  await page.locator('[data-additional-index="0"] [data-additional-field="source"]').selectOption('case:party-respondent');
+  await expect(page.locator('[data-additional-index="0"] [data-additional-field="name"]')).toHaveValue('Parte contrária de teste');
+
+  await page.goto('calculos/pensao/', { waitUntil: 'networkidle' });
+  await page.locator('#clientId').selectOption('client-test');
+  await page.locator('#clientPartyRole').selectOption({ label: 'Executado / Devedor' });
+  await page.locator('#caseId').selectOption('case-test');
+  await expect(page.locator('#clientPartyName')).toHaveValue('Cliente de teste');
+  await expect(page.locator('input[name="opposingPartyName"]')).toHaveValue('');
+  await page.locator('input[name="opposingPartyName"]').fill('Credor preenchido');
+  await expect(page.getByText('Parte contrária — Exequente / Credor')).toBeVisible();
 });
 
 const pages = [
@@ -1137,10 +1152,10 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   await card.getByRole('link', { name: 'Iniciar cálculo' }).click();
   await page.getByLabel('Forma estipulada').selectOption('fixed');
   await page.getByLabel('Nome do cálculo').fill('Teste de pensão');
-  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.locator('#clientId').selectOption('client-test');
   await page.getByLabel('Caso / processo (opcional)').selectOption('case-test');
-  await page.getByLabel('Exequente / credor').fill('Credora de teste');
-  await page.getByLabel('Executado / devedor').fill('Devedor de teste');
+  await page.locator('#clientPartyRole').selectOption({ label: 'Exequente / Credor' });
+  await page.getByLabel(/Parte contrária — Executado \/ Devedor/).fill('Devedor de teste');
   await page.getByLabel('Número do processo').fill('0000000-00.2026.8.00.0000');
   await page.getByLabel('Valor mensal (R$)').fill('500');
   await page.getByRole('button', { name: 'Próximo' }).click();
@@ -1181,7 +1196,8 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
   await expect(page.locator('.wizard-step.active')).toHaveCount(1);
   await expect(page.locator('#generalista-form .wizard-actions > div')).toHaveCSS('gap', '10px');
   await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
-  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
   await page.getByLabel('Valor do item 1').fill('150');
   await page.getByRole('button', { name: 'Calcular' }).click();
   await expect(page.locator('.wizard-steps.steps-2 .wizard-step.done')).toHaveCount(1);
@@ -1199,7 +1215,8 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await expect(page.locator('.wizard-step').nth(2).locator('small')).toHaveText('multas, honorários e custas');
   await expect(page.locator('.wizard-steps.steps-4')).toHaveCSS('display', 'grid');
   await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
-  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.locator('.wizard-steps.steps-4 .wizard-step.done')).toHaveCount(1);
   await expect(page.locator('.generalista-items.detailed')).toHaveCSS('overflow-x', 'auto');
@@ -1252,8 +1269,9 @@ test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page })
   await expect(page).toHaveURL(/calculos\/trabalhista\/$/);
 
   await page.getByLabel('Nome do cálculo').fill('Verbas de teste');
-  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.locator('#clientId').selectOption('client-test');
   await page.getByLabel('Caso / processo (opcional)').selectOption('case-test');
+  await page.getByLabel(/Parte contrária — Reclamante/).fill('Reclamante de teste');
   await page.getByLabel('Salário-base inicial (R$)').fill('3000');
   await page.getByLabel(/Empregado ainda ativo/).check();
   await expect(page.locator('#labor-form .wizard-actions > div')).toHaveCSS('gap', '10px');
@@ -1334,7 +1352,8 @@ test('cálculo trabalhista usa a sincronização compartilhada do Gist', async (
   await prepareCalculationPage(page, 'calculos/trabalhista/');
   await expect(page.locator('#sync-status')).toHaveText('Nuvem sincronizada');
   await page.getByLabel('Nome do cálculo').fill('Rascunho sincronizado');
-  await page.getByLabel('Cliente').selectOption('client-test');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Reclamante/).fill('Reclamante de teste');
   await page.getByLabel(/Empregado ainda ativo/).check();
   await page.getByRole('button', { name: 'Salvar rascunho' }).click();
 
