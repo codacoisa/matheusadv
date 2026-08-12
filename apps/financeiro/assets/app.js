@@ -7,6 +7,7 @@
   const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
   let localAccessAllowed = true;
   const financeFiles = window.FinanceFiles;
+  const financeReceipt = window.FinanceReceipt;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
@@ -1448,6 +1449,11 @@
     });
     return relations;
   }
+  function clientForPerson(personId) {
+    return data.clients.find(
+      (client) => client.type === "pf" && client.personId === personId,
+    );
+  }
   function renderPeople() {
     const search = $("#person-search")?.value.toLocaleLowerCase("pt-BR") || "",
       records = data.people
@@ -1469,7 +1475,8 @@
     $("#people-grid").innerHTML = records.length
       ? records.map(({ person, relations }) => {
           const initials = person.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-          return `<article class="person-card contact-card"><header><span class="avatar">${escapeHtml(initials || "PF")}</span><button class="link-btn" type="button" data-edit-person="${person.id}" title="Editar pessoa" aria-label="Editar ${escapeHtml(person.name)}"><i class="fa-solid fa-pen"></i></button></header><h3>${escapeHtml(person.name)}</h3><p>${escapeHtml(person.cpf || "CPF não informado")}${person.birthDate ? ` · ${date(person.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(person))}</span>${person.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(person.email)}</span>` : ""}${person.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(person.city)}${person.state ? `/${escapeHtml(person.state)}` : ""}</span>` : ""}</div><div class="person-links">${relations.length ? relations.map((relation) => `<span class="${relation.type}"><i class="fa-solid ${relation.type === "client" ? "fa-address-card" : "fa-building-shield"}"></i>${escapeHtml(relation.label)}</span>`).join("") : '<span class="available"><i class="fa-solid fa-circle-check"></i>Cadastro disponível para novos vínculos</span>'}</div></article>`;
+          const client = clientForPerson(person.id);
+          return `<article class="person-row"><span class="avatar">${escapeHtml(initials || "PF")}</span><div class="person-identity"><h3>${escapeHtml(person.name)}</h3><p>${escapeHtml(person.cpf || "CPF não informado")}${person.birthDate ? ` · ${date(person.birthDate)}` : ""}</p></div><div class="person-contact"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(person))}</span><span><i class="fa-solid fa-envelope"></i>${escapeHtml(person.email || "Sem e-mail")}</span><span><i class="fa-solid fa-location-dot"></i>${escapeHtml(person.city ? `${person.city}${person.state ? `/${person.state}` : ""}` : "Localidade não informada")}</span></div><div class="person-links">${relations.length ? relations.map((relation) => `<span class="${relation.type}"><i class="fa-solid ${relation.type === "client" ? "fa-address-card" : "fa-building-shield"}"></i>${escapeHtml(relation.label)}</span>`).join("") : '<span class="available"><i class="fa-solid fa-circle-check"></i>Contato sem vínculo</span>'}</div><div class="table-actions person-actions"><button type="button" data-view-person="${person.id}" title="Visualizar pessoa" aria-label="Visualizar ${escapeHtml(person.name)}"><i class="fa-solid fa-eye"></i></button><button type="button" data-edit-person="${person.id}" title="Editar pessoa" aria-label="Editar ${escapeHtml(person.name)}"><i class="fa-solid fa-pen"></i></button>${client ? "" : `<button type="button" data-promote-person="${person.id}" title="Tornar cliente" aria-label="Tornar ${escapeHtml(person.name)} cliente"><i class="fa-solid fa-user-plus"></i></button>`}</div></article>`;
         }).join("")
       : '<div class="panel empty">Nenhuma pessoa encontrada.</div>';
   }
@@ -2074,8 +2081,9 @@
     $$(".view").forEach((x) =>
       x.classList.toggle("active", x.id === `${v}-view`),
     );
+    const navView = v === "people" ? "clients" : v;
     $$("#nav button").forEach((x) =>
-      x.classList.toggle("active", x.dataset.view === v),
+      x.classList.toggle("active", x.dataset.view === navView),
     );
     location.hash = v;
   }
@@ -2321,13 +2329,16 @@
       paidDate = form.elements.paidDate,
       paidAmount = form.elements.paidAmount,
       status = form.elements.status.value,
-      hasPayment = status === "paid" || status === "partial";
+      hasPayment = status === "paid" || status === "partial",
+      canGenerateReceipt = hasPayment && form.elements.kind.value === "income";
     paidDate.required = hasPayment;
     paidAmount.required = status === "partial";
     $("#paid-amount-field").hidden = status !== "partial";
     $("#paid-date-label").textContent = hasPayment
       ? "Data do pagamento *"
       : "Data do pagamento";
+    $("#receipt-option").hidden = !canGenerateReceipt;
+    if (!canGenerateReceipt) $("#generate-receipt").checked = false;
     if (!hasPayment) {
       paidDate.value = "";
       paidAmount.value = "";
@@ -2448,12 +2459,13 @@
       else field.value = value ?? "";
     });
   }
-  function openClient(id = "") {
+  function openClient(id = "", sourcePersonId = "") {
     const f = $("#client-form");
     f.reset();
     f.elements.id.value = id;
     f.elements.phoneCountry.value = PHONE_DEFAULT_COUNTRY;
-    const c = data.clients.find((x) => x.id === id);
+    const c = data.clients.find((x) => x.id === id),
+      sourcePerson = !c && sourcePersonId ? personById(sourcePersonId) : null;
     if (c) {
       const profile = clientProfile(c);
       fillClientFormProfile(f, profile);
@@ -2467,6 +2479,22 @@
       f.elements.zip.value = maskZip(profile.zip);
       f.elements.state.value = String(profile.state || "").toUpperCase();
       renderRepresentatives(c.representatives);
+    } else if (sourcePerson) {
+      fillClientFormProfile(f, {
+        ...sourcePerson,
+        type: "pf",
+        personId: sourcePerson.id,
+        document: sourcePerson.cpf,
+      });
+      f.elements.type.value = "pf";
+      f.elements.personId.value = sourcePerson.id;
+      const phone = phoneDetails(sourcePerson.phone, sourcePerson.phoneCountry);
+      f.elements.phoneCountry.value = phone.country;
+      f.elements.phoneNational.value = phone.national;
+      f.elements.document.value = maskCpf(sourcePerson.cpf);
+      f.elements.zip.value = maskZip(sourcePerson.zip);
+      f.elements.state.value = String(sourcePerson.state || "").toUpperCase();
+      renderRepresentatives();
     } else {
       f.elements.type.value = "pf";
       renderRepresentatives();
@@ -2476,7 +2504,9 @@
     clearStreetWarning();
     $("#client-modal-title").textContent = c
       ? "Editar cliente"
-      : "Novo cliente";
+      : sourcePerson
+        ? "Tornar pessoa cliente"
+        : "Novo cliente";
     $("#delete-client").hidden = !c;
     $("#client-dialog").showModal();
   }
@@ -2686,6 +2716,33 @@
       onEdit?.();
     };
     if (!dialog.open) dialog.showModal();
+  }
+  function viewPerson(id) {
+    const person = personById(id);
+    if (!person) return;
+    const relations = personRelations(id),
+      client = clientForPerson(id),
+      address = [
+        person.street,
+        person.addressNumber,
+        person.addressBlock ? `Quadra ${person.addressBlock}` : "",
+        person.addressLot ? `Lote ${person.addressLot}` : "",
+        person.complement,
+        person.neighborhood,
+        person.city,
+        person.state,
+        person.zip,
+      ].filter(Boolean).join(", ");
+    showDetail({
+      eyebrow: "PESSOA CADASTRADA",
+      title: person.name,
+      subtitle: `CPF ${person.cpf || "não informado"}${person.birthDate ? ` · Nascimento ${date(person.birthDate)}` : ""}`,
+      body: `<div class="detail-grid">${detailField("Telefone", displayPhone(person), "fa-phone")}${detailField("E-mail", person.email, "fa-envelope")}${detailField("Profissão", person.profession, "fa-briefcase")}${detailField("Estado civil", person.maritalStatus, "fa-heart")}${detailField("RG", person.rg ? `${person.rg}${person.rgIssuer ? ` · ${person.rgIssuer}` : ""}` : "", "fa-id-card")}${detailField("Endereço", address, "fa-location-dot")}</div>${person.notes ? `<div class="detail-note"><strong>Observações</strong><p>${escapeHtml(person.notes)}</p></div>` : ""}<div class="detail-section"><header><strong>Vínculos</strong><span>${relations.length}</span></header>${relations.map((relation) => `<div class="detail-list-row"><span><strong>${escapeHtml(relation.label)}</strong></span></div>`).join("") || '<p class="detail-empty">Esta pessoa ainda não possui vínculo com cliente.</p>'}</div>`,
+      links: client
+        ? `<button class="btn ghost" type="button" data-view-client="${client.id}"><i class="fa-solid fa-address-card"></i> Ver cliente</button>`
+        : `<button class="btn secondary" type="button" data-promote-person="${person.id}"><i class="fa-solid fa-user-plus"></i> Tornar cliente</button>`,
+      onEdit: () => openPersonDialog(id),
+    });
   }
   function viewClient(id) {
     const client = data.clients.find((item) => item.id === id);
@@ -3254,10 +3311,13 @@
   $$("[data-new-entry]").forEach((b) => (b.onclick = () => openEntry()));
   $("#quick-client").onclick = () => openClient();
   $$("[data-new-client]").forEach((b) => (b.onclick = () => openClient()));
+  $("#open-people").onclick = () => showView("people");
+  $("#back-to-clients").onclick = () => showView("clients");
   $("#close-detail").onclick = () => $("#detail-dialog").close();
   $("#entry-form [name=kind]").onchange = (e) => {
     fillCategories(e.target.value);
     renderAllocationPreview();
+    updateEntryPaymentRequirement();
   };
   $("#entry-form [name=clientId]").onchange = (e) => {
     fillCaseSelect(e.target.value, "");
@@ -3280,7 +3340,9 @@
     const f = e.currentTarget,
       fd = Object.fromEntries(new FormData(f)),
       amount = num(fd.amount),
-      old = data.entries.find((x) => x.id === fd.id);
+      old = data.entries.find((x) => x.id === fd.id),
+      previousPaidAmount = old ? realizedAmountOf(old) : 0,
+      wantsReceipt = $("#generate-receipt").checked;
     let paidAmount =
         fd.status === "paid"
           ? amount
@@ -3290,6 +3352,7 @@
       overflowPlan = null,
       distributeOverflow = false,
       limitedToCurrent = false;
+    const requestedPaymentAmount = paidAmount;
     if (!fd.description || !amount || !fd.dueDate)
       return toast("Preencha descrição, valor e vencimento.");
     if (fd.kind === "income" && !fd.clientId)
@@ -3408,20 +3471,50 @@
     }
     $("#entry-dialog").close();
     persist();
+    let receiptGenerated = false;
+    if (wantsReceipt && obj.kind === "income" && requestedPaymentAmount > 0) {
+      try {
+        const client = data.clients.find((item) => item.id === obj.clientId),
+          profile = client ? clientProfile(client) : null,
+          caseItem = data.cases.find((item) => item.id === obj.caseId),
+          packageItem = data.packages.find((item) => item.id === obj.packageId),
+          receiptPaidAmount = distributeOverflow
+            ? requestedPaymentAmount
+            : paidAmount,
+          newPaymentAmount = receiptPaidAmount > previousPaidAmount
+            ? receiptPaidAmount - previousPaidAmount
+            : receiptPaidAmount;
+        financeReceipt.download({
+          entry: obj,
+          paymentAmount: newPaymentAmount,
+          clientName: profile?.name || clientName(obj.clientId),
+          clientDocument: profile?.document || "",
+          linkLabel: caseItem
+            ? `o caso ${caseItem.number} — ${caseItem.title}`
+            : packageItem
+              ? `o pacote ${packageItem.name}`
+              : "",
+        });
+        receiptGenerated = true;
+      } catch (error) {
+        return toast(`Lançamento salvo, mas o recibo não pôde ser gerado: ${error.message}`);
+      }
+    }
+    const receiptSuffix = receiptGenerated ? " Recibo gerado em PDF." : "";
     if (distributeOverflow)
       return toast(
-        `Pagamento distribuído entre a parcela atual e ${overflowPlan.updates.length} parcela(s) seguinte(s).`,
+        `Pagamento distribuído entre a parcela atual e ${overflowPlan.updates.length} parcela(s) seguinte(s).${receiptSuffix}`,
       );
     if (limitedToCurrent)
-      return toast("Valor limitado ao total da parcela atual.");
+      return toast(`Valor limitado ao total da parcela atual.${receiptSuffix}`);
     toast(
-      obj.packageId
+      (obj.packageId
         ? "Lançamento vinculado ao pacote."
         : obj.caseId
           ? "Lançamento e distribuição vinculados ao caso."
           : obj.clientId
             ? "Lançamento vinculado ao cliente."
-            : "Despesa geral do escritório salva.",
+            : "Despesa geral do escritório salva.") + receiptSuffix,
     );
   });
   $("#client-form [name=document]").addEventListener(
@@ -4092,11 +4185,14 @@
       mt = e.target.closest("[data-manage-team]"),
       et = e.target.closest("[data-edit-team]"),
       sc = e.target.closest("[data-show-client]"),
+      vperson = e.target.closest("[data-view-person]"),
+      promotePerson = e.target.closest("[data-promote-person]"),
       vc = e.target.closest("[data-view-client]"),
       vx = e.target.closest("[data-view-case]"),
       vp = e.target.closest("[data-view-package]"),
       vt = e.target.closest("[data-view-team]"),
       ve = e.target.closest("[data-view-entry]");
+    if (vperson) viewPerson(vperson.dataset.viewPerson);
     if (vc) viewClient(vc.dataset.viewClient);
     if (vx) viewCase(vx.dataset.viewCase);
     if (vp) viewPackage(vp.dataset.viewPackage);
@@ -4127,6 +4223,10 @@
     }
     if (ec) openClient(ec.dataset.editClient);
     if (ep) openPersonDialog(ep.dataset.editPerson);
+    if (promotePerson) {
+      if ($("#detail-dialog").open) $("#detail-dialog").close();
+      openClient("", promotePerson.dataset.promotePerson);
+    }
     if (et) openTeamMember(et.dataset.editTeam);
     if (nt) openTeamMember();
     if (np) openPackage("", np.dataset.newPackage || "");

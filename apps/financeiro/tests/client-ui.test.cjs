@@ -77,16 +77,33 @@ test("cadastrar pessoa jurídica com representantes reutilizáveis", () => {
   assert.match(app, /activeClientRepresentatives/);
 });
 
-test("listar e editar pessoas independentemente de clientes", () => {
-  assert.match(html, /data-view="people"/);
+test("listar pessoas como subpágina de clientes e permitir promoção", () => {
+  assert.doesNotMatch(html, /<button data-view="people"/);
+  assert.match(html, /id="open-people"/);
+  assert.match(html, /id="back-to-clients"/);
   assert.match(html, /id="people-view"/);
   assert.match(html, /id="person-search"/);
   assert.match(html, /id="people-grid"/);
   assert.match(html, /id="new-person"/);
   assert.match(app, /function renderPeople/);
   assert.match(app, /function personRelations/);
+  assert.match(app, /function clientForPerson/);
+  assert.match(app, /function viewPerson/);
+  assert.match(app, /data-view-person/);
   assert.match(app, /data-edit-person/);
+  assert.match(app, /data-promote-person/);
+  assert.match(app, /Tornar pessoa cliente/);
   assert.match(app, /personDialogContext/);
+  assert.match(styles, /\.person-row\s*\{/);
+});
+
+test("oferecer recibo em PDF ao registrar pagamento", () => {
+  assert.match(html, /jspdf\.umd\.min\.js/);
+  assert.match(html, /receipt\.js/);
+  assert.match(html, /id="receipt-option"[^>]*hidden/);
+  assert.match(html, /id="generate-receipt"/);
+  assert.match(app, /financeReceipt\.download/);
+  assert.match(app, /Recibo gerado em PDF/);
 });
 
 test("integrar pacotes à área de contratações dos casos", () => {

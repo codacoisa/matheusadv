@@ -453,14 +453,39 @@ test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) 
 test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
 
-  await page.locator('[data-view="people"]').click();
+  await page.locator('[data-view="clients"]').click();
+  await page.locator('#open-people').click();
   await expect(page.locator('#people-view')).toBeVisible();
-  const personCard = page.locator('.person-card').filter({ hasText: 'Cliente de teste' });
-  await expect(personCard).toContainText('Cliente pessoa física');
-  await personCard.locator('[data-edit-person]').click();
+  await expect(page.locator('[data-view="clients"]')).toHaveClass(/active/);
+  const personRow = page.locator('.person-row').filter({ hasText: 'Cliente de teste' });
+  await expect(personRow).toContainText('Cliente pessoa física');
+  await expect(personRow.locator('[data-view-person]')).toBeVisible();
+  await expect(personRow.locator('[data-promote-person]')).toHaveCount(0);
+  await personRow.locator('[data-edit-person]').click();
   await page.locator('#person-form [name="email"]').fill('cliente@exemplo.com.br');
   await page.locator('#person-form').getByRole('button', { name: 'Salvar pessoa' }).click();
-  await expect(personCard).toContainText('cliente@exemplo.com.br');
+  await expect(personRow).toContainText('cliente@exemplo.com.br');
+
+  await page.locator('#new-person').click();
+  const personForm = page.locator('#person-form');
+  await personForm.locator('[name="name"]').fill('Contato Futuro');
+  await personForm.locator('[name="cpf"]').fill('111.444.777-35');
+  await personForm.locator('[name="birthDate"]').fill('1992-05-20');
+  await personForm.locator('[name="maritalStatus"]').fill('solteiro');
+  await personForm.locator('[name="profession"]').fill('empresário');
+  await personForm.locator('[name="phoneNational"]').fill('62999999999');
+  await personForm.locator('[name="street"]').fill('Rua das Flores');
+  await personForm.locator('[name="neighborhood"]').fill('Centro');
+  await personForm.locator('[name="city"]').fill('Silvânia');
+  await personForm.getByRole('button', { name: 'Salvar pessoa' }).click();
+  const futureRow = page.locator('.person-row').filter({ hasText: 'Contato Futuro' });
+  await expect(futureRow).toContainText('Contato sem vínculo');
+  await futureRow.locator('[data-promote-person]').click();
+  await expect(page.locator('#client-modal-title')).toHaveText('Tornar pessoa cliente');
+  await expect(page.locator('#client-form [name="personId"]')).toHaveValue(/.+/);
+  await page.locator('#save-client').click();
+  await expect(futureRow).toContainText('Cliente pessoa física');
+  await expect(futureRow.locator('[data-promote-person]')).toHaveCount(0);
 
   await page.locator('[data-view="cases"]').click();
   await expect(page.locator('#contracts-hub-title')).toHaveText('Honorários dos casos');
@@ -473,6 +498,24 @@ test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ 
   await expect(page.locator('.case-card')).not.toContainText('Cliente não encontrado');
   await page.locator('#new-package').click();
   await expect(page.locator('#package-dialog')).toBeVisible();
+});
+
+test('Financeiro gera recibo em PDF ao registrar pagamento', async ({ page }) => {
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('#new-entry').click();
+  const form = page.locator('#entry-form');
+  await form.locator('[name="description"]').fill('Pagamento de honorários');
+  await form.locator('[name="amount"]').fill('500,00');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="status"]').selectOption('paid');
+  await form.locator('[name="paidDate"]').fill('2026-08-11');
+  await expect(page.locator('#receipt-option')).toBeVisible();
+  await page.locator('#generate-receipt').check();
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#save-entry').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^recibo-2026-.*Cliente-de-teste\.pdf$/);
+  await expect(page.locator('#toast')).toContainText('Recibo gerado em PDF');
 });
 
 test('Financeiro cadastra pessoa jurídica com representante reutilizável', async ({ page }) => {

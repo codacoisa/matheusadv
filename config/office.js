@@ -96,6 +96,16 @@
       fileName: 'Modelo v3b.docx',
       base64Url: assetUrl('document-templates/modelo-institucional.docx.base64'),
       sha256: 'd968b58d915411c69e2be157748caa72c965cc0a2bdeef64f19d07bd34d44e95'
+    }),
+    // Dados usados nos recibos de pagamentos gerados pelo Financeiro.
+    // `issuerName` identifica quem recebeu o valor. Preencha `issuerDocument`
+    // com CPF ou CNPJ somente quando ele deva constar no recibo impresso.
+    // `location` aparece ao lado da data e `signatureLabel` sob a assinatura.
+    receipt: Object.freeze({
+      issuerName: office.name,
+      issuerDocument: '',
+      location: 'Silvânia/GO',
+      signatureLabel: office.name
     })
   });
 

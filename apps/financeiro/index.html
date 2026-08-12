@@ -23,7 +23,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=28" />
+    <link rel="stylesheet" href="./assets/styles.css?v=29" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <link rel="stylesheet" href="./assets/site-header.css?v=1" />
     <link rel="stylesheet" href="./assets/local-access-blocked.css?v=1" />
@@ -38,13 +38,15 @@
     <script src="./assets/ledger.js?v=2" defer></script>
     <script src="./assets/metrics.js?v=3" defer></script>
     <script src="./assets/files.js?v=5" defer></script>
+    <script src="../documentos/assets/jspdf.umd.min.js" defer></script>
+    <script src="./assets/receipt.js?v=1" defer></script>
     <script src="./assets/storage.js?v=2" defer></script>
     <script src="./assets/data-store.js?v=2" defer></script>
     <script src="./assets/gist-settings.js?v=3" defer></script>
     <script src="./assets/gist-client.js?v=1" defer></script>
     <script src="./assets/gist-access-lease.js?v=4" defer></script>
     <script src="./assets/local-access-blocked.js?v=2" defer></script>
-    <script src="./assets/app.js?v=34" defer></script>
+    <script src="./assets/app.js?v=35" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -91,9 +93,6 @@
           </button>
           <button data-view="clients">
             <i class="fa-solid fa-address-book"></i> Clientes
-          </button>
-          <button data-view="people">
-            <i class="fa-solid fa-users"></i> Pessoas
           </button>
           <button data-view="cases">
             <i class="fa-solid fa-folder-open"></i> Casos e processos
@@ -236,9 +235,14 @@
               <h1>Cadastro de clientes</h1>
               <p>Dados pessoais, documentos e canais de contato.</p>
             </div>
-            <button class="btn primary" data-new-client>
-              <i class="fa-solid fa-user-plus"></i> Novo cliente
-            </button>
+            <div class="head-actions">
+              <button class="btn ghost" id="open-people" type="button">
+                <i class="fa-solid fa-users"></i> Pessoas cadastradas
+              </button>
+              <button class="btn primary" data-new-client>
+                <i class="fa-solid fa-user-plus"></i> Novo cliente
+              </button>
+            </div>
           </div>
           <div class="panel filters">
             <input
@@ -251,19 +255,24 @@
         <section class="view" id="people-view">
           <div class="page-head">
             <div>
-              <p class="eyebrow">CADASTRO CENTRAL</p>
-              <h1>Pessoas</h1>
-              <p>Pessoas físicas podem ser clientes, representantes de empresas ou apenas contatos cadastrados.</p>
+              <p class="eyebrow">CLIENTES · PESSOAS</p>
+              <h1>Pessoas cadastradas</h1>
+              <p>Consulte contatos, representantes e pessoas que ainda não contrataram o escritório.</p>
             </div>
-            <button class="btn primary" id="new-person" type="button">
-              <i class="fa-solid fa-user-plus"></i> Nova pessoa
-            </button>
+            <div class="head-actions">
+              <button class="btn ghost" id="back-to-clients" type="button">
+                <i class="fa-solid fa-arrow-left"></i> Clientes
+              </button>
+              <button class="btn primary" id="new-person" type="button">
+                <i class="fa-solid fa-user-plus"></i> Nova pessoa
+              </button>
+            </div>
           </div>
           <div class="panel filters">
             <input id="person-search" placeholder="Buscar por nome, CPF, telefone, e-mail ou vínculo" />
           </div>
           <div id="people-summary" class="people-summary"></div>
-          <div id="people-grid" class="cards people-grid"></div>
+          <div id="people-grid" class="panel people-list"></div>
         </section>
         <section class="view" id="cases-view">
           <div class="page-head">
@@ -550,6 +559,10 @@
             </select></label
           ><label class="span-2"
             >Observações<textarea name="notes" rows="3"></textarea>
+          </label>
+          <label class="check receipt-check span-2" id="receipt-option" hidden>
+            <input id="generate-receipt" type="checkbox" />
+            <span><strong>Gerar recibo deste pagamento</strong><small>Baixar um PDF compacto para imprimir ou entregar ao cliente após salvar.</small></span>
           </label>
         </div>
         <div class="modal-actions">
