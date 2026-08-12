@@ -402,6 +402,61 @@
     };
     return calculate(12) === Number(digits[12]) && calculate(13) === Number(digits[13]);
   }
+  function documentDigits(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+  function setDocumentWarning(field, selector, message = "") {
+    const warning = $(selector);
+    field.setCustomValidity(message);
+    field.setAttribute("aria-invalid", message ? "true" : "false");
+    warning.textContent = message;
+    warning.hidden = !message;
+    return !message;
+  }
+  function personCpfAvailability(form, notify = false) {
+    const field = form.elements.cpf,
+      digits = documentDigits(field.value),
+      currentId = form.elements.id.value,
+      duplicate = digits.length === 11
+        ? data.people.find((person) => person.id !== currentId && documentDigits(person.cpf) === digits)
+        : null,
+      message = duplicate ? "Já existe uma pessoa cadastrada com este CPF." : "";
+    setDocumentWarning(field, "#person-cpf-warning", message);
+    if (message && notify) toast(message);
+    return !message;
+  }
+  function clientDocumentAvailability(form, notify = false) {
+    const type = form.elements.type.value,
+      currentClientId = form.elements.id.value;
+    if (type === "pf") {
+      setDocumentWarning(form.elements.cnpj, "#client-cnpj-warning");
+      const field = form.elements.document,
+        digits = documentDigits(field.value),
+        currentPersonId = form.elements.personId.value,
+        person = digits.length === 11
+          ? data.people.find((item) => documentDigits(item.cpf) === digits)
+          : null,
+        registeredClient = person ? clientForPerson(person.id) : null;
+      let message = "";
+      if (registeredClient && registeredClient.id !== currentClientId)
+        message = "Já existe um cliente cadastrado com este CPF.";
+      else if (person && person.id !== currentPersonId)
+        message = "Esta pessoa já está cadastrada. Abra Pessoas cadastradas e use Tornar cliente.";
+      setDocumentWarning(field, "#client-cpf-warning", message);
+      if (message && notify) toast(message);
+      return !message;
+    }
+    setDocumentWarning(form.elements.document, "#client-cpf-warning");
+    const field = form.elements.cnpj,
+      digits = documentDigits(field.value),
+      duplicate = digits.length === 14
+        ? data.clients.find((client) => client.id !== currentClientId && client.type === "pj" && documentDigits(client.cnpj) === digits)
+        : null,
+      message = duplicate ? "Já existe um cliente cadastrado com este CNPJ." : "";
+    setDocumentWarning(field, "#client-cnpj-warning", message);
+    if (message && notify) toast(message);
+    return !message;
+  }
   const date = (v) =>
     v ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR") : "—";
   const monthLabel = (v) =>
@@ -2434,6 +2489,7 @@
     representativePersonTarget = targetRow;
     personDialogContext = context;
     syncPersonPhoneField();
+    setDocumentWarning(form.elements.cpf, "#person-cpf-warning");
     clearStreetWarning("#person-street-warning");
     $("#person-modal-title").textContent = person ? "Editar pessoa" : "Nova pessoa";
     $("#person-dialog").showModal();
@@ -2450,6 +2506,7 @@
     ["legalName", "cnpj"].forEach((name) => {
       form.elements[name].required = type === "pj";
     });
+    clientDocumentAvailability(form);
   }
   function fillClientFormProfile(form, profile) {
     Object.entries(profile || {}).forEach(([key, value]) => {
@@ -2501,6 +2558,7 @@
     }
     syncClientKind();
     syncPhoneField();
+    clientDocumentAvailability(f);
     clearStreetWarning();
     $("#client-modal-title").textContent = c
       ? "Editar cliente"
@@ -3519,11 +3577,17 @@
   });
   $("#client-form [name=document]").addEventListener(
     "input",
-    (e) => (e.target.value = maskCpf(e.target.value)),
+    (e) => {
+      e.target.value = maskCpf(e.target.value);
+      clientDocumentAvailability(e.target.form);
+    },
   );
   $("#client-form [name=cnpj]").addEventListener(
     "input",
-    (e) => (e.target.value = maskCnpj(e.target.value)),
+    (e) => {
+      e.target.value = maskCnpj(e.target.value);
+      clientDocumentAvailability(e.target.form);
+    },
   );
   $("#client-form [name=type]").addEventListener("change", syncClientKind);
   $("#add-representative").addEventListener("click", () => addRepresentativeRow());
@@ -3541,7 +3605,10 @@
   $("#new-person").addEventListener("click", () => openPersonDialog());
   $("#person-form [name=cpf]").addEventListener(
     "input",
-    (event) => (event.target.value = maskCpf(event.target.value)),
+    (event) => {
+      event.target.value = maskCpf(event.target.value);
+      personCpfAvailability(event.target.form);
+    },
   );
   $("#person-form").addEventListener("submit", (event) => {
     if (event.submitter?.value === "cancel") return;
@@ -3549,9 +3616,9 @@
     const form = event.currentTarget,
       values = Object.fromEntries(new FormData(form)),
       name = titleCaseName(values.name),
-      cpfDigits = String(values.cpf || "").replace(/\D/g, ""),
       phoneInput = String(values.phoneNational || "").trim(),
       phone = phoneInput ? parsePhone(phoneInput, values.phoneCountry) : null;
+    if (!personCpfAvailability(form, true)) return;
     if (name.split(/\s+/).length < 2) return toast("Informe o nome completo da pessoa.");
     if (!validCpf(values.cpf)) return toast("Informe um CPF válido para a pessoa.");
     if (!values.birthDate || values.birthDate >= iso()) return toast("Informe uma data de nascimento válida para a pessoa.");
@@ -3562,8 +3629,6 @@
       form.elements.street.focus();
       return;
     }
-    if (data.people.some((person) => person.id !== values.id && String(person.cpf || "").replace(/\D/g, "") === cpfDigits))
-      return toast("Já existe uma pessoa cadastrada com este CPF.");
     const old = data.people.find((person) => person.id === values.id),
       person = normalizePerson({
         ...old,
@@ -3657,6 +3722,7 @@
     const f = e.currentTarget,
       fd = Object.fromEntries(new FormData(f)),
       phone = parsePhone(fd.phoneNational, fd.phoneCountry);
+    if (!clientDocumentAvailability(f, true)) return;
     if (!phone?.isValid())
       return toast(
         `Informe um telefone válido para ${phoneCountryName(fd.phoneCountry)} (+${phoneCallingCode(fd.phoneCountry)}).`,
@@ -3697,15 +3763,12 @@
     let obj;
     if (fd.type === "pf") {
       const name = titleCaseName(fd.name),
-        cpfDigits = String(fd.document || "").replace(/\D/g, ""),
         personId = fd.personId || uid();
       if (name.split(/\s+/).length < 2) return toast("Informe o nome completo do cliente.");
       if (!validCpf(fd.document)) return toast("Informe um CPF válido.");
       if (!fd.birthDate || fd.birthDate >= iso()) return toast("Informe uma data de nascimento válida.");
       if (!fd.maritalStatus.trim()) return toast("Informe o estado civil do cliente.");
       if (!fd.profession.trim()) return toast("Informe a profissão do cliente.");
-      if (data.people.some((person) => person.id !== personId && String(person.cpf || "").replace(/\D/g, "") === cpfDigits))
-        return toast("Já existe uma pessoa cadastrada com este CPF.");
       const oldPerson = personById(personId),
         person = normalizePerson({
           ...oldPerson,
@@ -3734,12 +3797,9 @@
       });
     } else {
       const legalName = titleCaseName(fd.legalName, { company: true }),
-        cnpjDigits = String(fd.cnpj || "").replace(/\D/g, ""),
         representatives = readRepresentatives();
       if (!legalName) return toast("Informe a razão social do cliente.");
       if (!validCnpj(fd.cnpj)) return toast("Informe um CNPJ válido.");
-      if (data.clients.some((client) => client.id !== clientId && client.type === "pj" && String(client.cnpj || "").replace(/\D/g, "") === cnpjDigits))
-        return toast("Já existe um cliente cadastrado com este CNPJ.");
       if (!representatives.length) return toast("Adicione ao menos um representante da pessoa jurídica.");
       if (representatives.some((link) => !link.personId || !link.role)) return toast("Selecione a pessoa e informe o cargo de cada representante.");
       if (representatives.filter((link) => link.isPrimary).length !== 1) return toast("Marque exatamente um representante principal.");

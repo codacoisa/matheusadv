@@ -46,7 +46,7 @@
     <script src="./assets/gist-client.js?v=1" defer></script>
     <script src="./assets/gist-access-lease.js?v=4" defer></script>
     <script src="./assets/local-access-blocked.js?v=2" defer></script>
-    <script src="./assets/app.js?v=35" defer></script>
+    <script src="./assets/app.js?v=36" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -607,7 +607,8 @@
               name="document"
               required
               inputmode="numeric"
-              placeholder="000.000.000-00" /></label
+              aria-describedby="client-cpf-warning"
+              placeholder="000.000.000-00" /><small id="client-cpf-warning" class="field-warning" role="alert" hidden></small></label
           ><label
             >Data de nascimento *<input name="birthDate" type="date" required
           /></label>
@@ -620,7 +621,7 @@
           <div class="form-grid span-2 client-kind-fields" data-client-kind="pj" hidden>
             <label class="span-2">Razão social *<input name="legalName" placeholder="Empresa Exemplo Ltda." /></label>
             <label class="span-2">Nome fantasia<input name="tradeName" /></label>
-            <label>CNPJ *<input name="cnpj" inputmode="numeric" placeholder="00.000.000/0000-00" /></label>
+            <label>CNPJ *<input name="cnpj" inputmode="numeric" aria-describedby="client-cnpj-warning" placeholder="00.000.000/0000-00" /><small id="client-cnpj-warning" class="field-warning" role="alert" hidden></small></label>
             <label>Natureza jurídica<input name="legalNature" /></label>
             <label>Inscrição estadual<input name="stateRegistration" /></label>
             <label>Inscrição municipal<input name="municipalRegistration" /></label>
@@ -710,7 +711,7 @@
         <input type="hidden" name="id" />
         <div class="form-grid">
           <label class="span-2">Nome completo *<input name="name" required autocomplete="name" /></label>
-          <label>CPF *<input name="cpf" required inputmode="numeric" placeholder="000.000.000-00" /></label>
+          <label>CPF *<input name="cpf" required inputmode="numeric" aria-describedby="person-cpf-warning" placeholder="000.000.000-00" /><small id="person-cpf-warning" class="field-warning" role="alert" hidden></small></label>
           <label>Data de nascimento *<input name="birthDate" type="date" required /></label>
           <label>Nacionalidade<input name="nationality" placeholder="Ex.: brasileira" /></label>
           <label>Estado civil *<input name="maritalStatus" required /></label>

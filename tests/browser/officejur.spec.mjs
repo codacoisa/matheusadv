@@ -518,6 +518,26 @@ test('Financeiro gera recibo em PDF ao registrar pagamento', async ({ page }) =>
   await expect(page.locator('#toast')).toContainText('Recibo gerado em PDF');
 });
 
+test('Financeiro avisa ao preencher CPF já cadastrado', async ({ page }) => {
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('#quick-client').click();
+  const clientForm = page.locator('#client-form');
+  await clientForm.locator('[name="document"]').fill('529.982.247-25');
+  await expect(page.locator('#client-cpf-warning')).toBeVisible();
+  await expect(page.locator('#client-cpf-warning')).toHaveText('Já existe um cliente cadastrado com este CPF.');
+  await expect(clientForm.locator('[name="document"]')).toHaveAttribute('aria-invalid', 'true');
+  await clientForm.getByRole('button', { name: 'Cancelar' }).click();
+
+  await page.locator('[data-view="clients"]').click();
+  await page.locator('#open-people').click();
+  await page.locator('#new-person').click();
+  const personForm = page.locator('#person-form');
+  await personForm.locator('[name="cpf"]').fill('529.982.247-25');
+  await expect(page.locator('#person-cpf-warning')).toBeVisible();
+  await expect(page.locator('#person-cpf-warning')).toHaveText('Já existe uma pessoa cadastrada com este CPF.');
+  await expect(personForm.locator('[name="cpf"]')).toHaveAttribute('aria-invalid', 'true');
+});
+
 test('Financeiro cadastra pessoa jurídica com representante reutilizável', async ({ page }) => {
   await page.goto('financeiro/', { waitUntil: 'networkidle' });
   await page.locator('#quick-client').click();

@@ -97,6 +97,19 @@ test("listar pessoas como subpágina de clientes e permitir promoção", () => {
   assert.match(styles, /\.person-row\s*\{/);
 });
 
+test("avisar imediatamente quando CPF ou CNPJ já estiver cadastrado", () => {
+  assert.match(html, /id="client-cpf-warning"[^>]*role="alert"/);
+  assert.match(html, /id="client-cnpj-warning"[^>]*role="alert"/);
+  assert.match(html, /id="person-cpf-warning"[^>]*role="alert"/);
+  assert.match(app, /function personCpfAvailability/);
+  assert.match(app, /function clientDocumentAvailability/);
+  assert.match(app, /Já existe uma pessoa cadastrada com este CPF/);
+  assert.match(app, /Já existe um cliente cadastrado com este CPF/);
+  assert.match(app, /Já existe um cliente cadastrado com este CNPJ/);
+  assert.match(app, /use Tornar cliente/);
+  assert.match(app, /setCustomValidity\(message\)/);
+});
+
 test("oferecer recibo em PDF ao registrar pagamento", () => {
   assert.match(html, /jspdf\.umd\.min\.js/);
   assert.match(html, /receipt\.js/);
