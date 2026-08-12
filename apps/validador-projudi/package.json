@@ -15,7 +15,7 @@
     "pkijs": "3.4.0"
   },
   "devDependencies": {
-    "esbuild": "0.28.1"
+    "esbuild": "0.28.2"
   },
   "engines": {
     "node": ">=22"
