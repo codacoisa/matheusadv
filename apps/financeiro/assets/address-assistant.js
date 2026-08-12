@@ -133,6 +133,7 @@
       street.readOnly = !unlocked;
       street.setAttribute("aria-readonly", String(!unlocked));
       street.title = unlocked ? "" : "Preencha o CEP para liberar o logradouro.";
+      street.placeholder = unlocked ? "Ex.: Rua das Flores" : "Preencha o CEP primeiro";
     }
 
     setOptions(state, STATES, state.value.toUpperCase(), "Selecione a UF");

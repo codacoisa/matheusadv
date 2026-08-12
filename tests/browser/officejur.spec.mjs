@@ -575,6 +575,7 @@ test('Financeiro exige CEP antes de liberar logradouro em cliente e pessoa', asy
   await expect(clientStreet).toHaveAttribute('readonly', '');
   await page.locator('#client-form [name="zip"]').fill('74000123');
   await expect(clientStreet).not.toHaveAttribute('readonly', '');
+  await expect(clientStreet).toHaveAttribute('placeholder', 'Ex.: Rua das Flores');
 
   await page.locator('#client-dialog .modal-head button[value="cancel"]').click();
   await expect(page.locator('#client-dialog')).not.toBeVisible();
@@ -585,6 +586,7 @@ test('Financeiro exige CEP antes de liberar logradouro em cliente e pessoa', asy
   await expect(personStreet).toHaveAttribute('readonly', '');
   await page.locator('#person-form [name="zip"]').fill('74000123');
   await expect(personStreet).not.toHaveAttribute('readonly', '');
+  await expect(personStreet).toHaveAttribute('placeholder', 'Ex.: Rua das Flores');
 });
 
 test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ page }) => {

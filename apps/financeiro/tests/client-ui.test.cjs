@@ -89,6 +89,7 @@ test("exigir CEP antes de liberar o logradouro", () => {
     assert.match(form, /name="street"[^>]*placeholder="Preencha o CEP primeiro"[^>]*readonly/);
   });
   assert.match(addressAssistant, /Preencha o CEP para liberar o logradouro/);
+  assert.match(addressAssistant, /street\.placeholder = unlocked \? "Ex\.: Rua das Flores" : "Preencha o CEP primeiro"/);
 });
 
 test("separar número, quadra e lote do logradouro do cliente", () => {
