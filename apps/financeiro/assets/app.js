@@ -1461,30 +1461,148 @@
     const number = phoneDetails(phone, country).e164.replace(/\D/g, "");
     return number ? `https://wa.me/${number}` : "";
   }
+  const clientCollator = new Intl.Collator("pt-BR", {
+    sensitivity: "base",
+    numeric: true,
+  });
+  function clientLocationKey(client) {
+    const city = String(client.city || "").trim().toLocaleLowerCase("pt-BR"),
+      state = String(client.state || "").trim().toUpperCase();
+    return city ? `${city}::${state}` : "";
+  }
+  function clientFinancialSummary(clientId) {
+    const entries = data.entries.filter(
+        (entry) => entry.clientId === clientId && entry.kind === "income",
+      ),
+      received = entries.reduce(
+        (sum, entry) => sum + realizedAmountOf(entry),
+        0,
+      ),
+      balance = entries.reduce(
+        (sum, entry) => sum + remainingAmountOf(entry),
+        0,
+      ),
+      overdue = entries.reduce(
+        (sum, entry) =>
+          sum + (statusOf(entry) === "overdue" ? remainingAmountOf(entry) : 0),
+        0,
+      );
+    return { entries, received, balance, overdue };
+  }
+  function refreshClientCityOptions(clients) {
+    const select = $("#client-city-filter"),
+      selected = select.value,
+      cities = new Map();
+    clients.forEach((client) => {
+      const key = clientLocationKey(client);
+      if (!key) return;
+      cities.set(
+        key,
+        `${String(client.city).trim()}${client.state ? `/${String(client.state).toUpperCase()}` : ""}`,
+      );
+    });
+    select.innerHTML =
+      '<option value="">Todas as cidades</option>' +
+      [...cities]
+        .sort((left, right) => clientCollator.compare(left[1], right[1]))
+        .map(
+          ([value, label]) =>
+            `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`,
+        )
+        .join("");
+    select.value = cities.has(selected) ? selected : "";
+  }
+  function clientSort(rows, order) {
+    const byName = (left, right) =>
+      clientCollator.compare(left.client.name, right.client.name);
+    return rows.sort((left, right) => {
+      let result = 0;
+      if (order === "name-desc") result = -byName(left, right);
+      else if (order === "document-asc")
+        result = clientCollator.compare(
+          documentDigits(left.client.document),
+          documentDigits(right.client.document),
+        );
+      else if (order === "city-asc")
+        result = clientCollator.compare(
+          `${left.client.city || ""} ${left.client.state || ""}`,
+          `${right.client.city || ""} ${right.client.state || ""}`,
+        );
+      else if (order === "updated-desc")
+        result = String(right.client.updatedAt || "").localeCompare(
+          String(left.client.updatedAt || ""),
+        );
+      else if (order === "cases-desc")
+        result = right.cases.length - left.cases.length;
+      else if (order === "received-desc")
+        result = right.finance.received - left.finance.received;
+      else if (order === "balance-desc")
+        result = right.finance.balance - left.finance.balance;
+      else result = byName(left, right);
+      return result || byName(left, right);
+    });
+  }
   function renderClients() {
-    const q = $("#client-search")?.value.toLowerCase() || "";
-    const clients = data.clients.map(clientProfile).filter((c) =>
-      `${c.name} ${c.document} ${displayPhone(c)} ${c.email}`
-        .toLowerCase()
-        .includes(q),
-    );
-    $("#clients-grid").innerHTML = clients.length
-      ? clients
+    const allClients = data.clients.map(clientProfile);
+    refreshClientCityOptions(allClients);
+    const q = $("#client-search").value.toLocaleLowerCase("pt-BR"),
+      type = $("#client-type-filter").value,
+      financial = $("#client-financial-filter").value,
+      city = $("#client-city-filter").value,
+      order = $("#client-order").value,
+      rows = clientSort(
+        allClients
+          .map((client) => ({
+            client,
+            cases: data.cases.filter((item) => item.clientId === client.id),
+            clientFiles: filesData.files.filter(
+              (file) => file.clientId === client.id,
+            ),
+            finance: clientFinancialSummary(client.id),
+          }))
+          .filter(({ client, finance }) => {
+            const matchesSearch =
+                !q ||
+                `${client.name} ${client.document} ${displayPhone(client)} ${client.email} ${client.city} ${client.state} ${client.tradeName}`
+                  .toLocaleLowerCase("pt-BR")
+                  .includes(q),
+              matchesFinancial =
+                !financial ||
+                (financial === "overdue" && finance.overdue > 0) ||
+                (financial === "open" && finance.balance > 0) ||
+                (financial === "settled" &&
+                  finance.entries.length > 0 &&
+                  finance.balance <= 0) ||
+                (financial === "without-entries" && !finance.entries.length);
+            return (
+              matchesSearch &&
+              (!type || client.type === type) &&
+              (!city || clientLocationKey(client) === city) &&
+              matchesFinancial
+            );
+          }),
+        order,
+      ),
+      filtered = Boolean(q || type || financial || city || order !== "name-asc");
+    $("#client-filter-summary").textContent = `Exibindo ${rows.length} de ${allClients.length} ${allClients.length === 1 ? "cliente" : "clientes"}.`;
+    $("#clear-client-filters").disabled = !filtered;
+    $("#clients-grid").innerHTML = rows.length
+      ? rows
           .map((c) => {
-            const cases = data.cases.filter((x) => x.clientId === c.id),
-              clientFiles = filesData.files.filter(
-                (file) => file.clientId === c.id,
-              ),
-              es = data.entries.filter((e) => e.clientId === c.id),
-              rec = es
-                .filter((e) => e.kind === "income")
-                .reduce((s, e) => s + realizedAmountOf(e), 0);
-            return `<article class="client-card contact-card"><header><span class="avatar">${escapeHtml(c.name
+            const { client, cases, clientFiles, finance } = c,
+              financeDetail = finance.overdue > 0
+                ? `<small class="client-balance overdue">${money(finance.overdue)} em atraso</small>`
+                : finance.balance > 0
+                  ? `<small class="client-balance">${money(finance.balance)} a receber</small>`
+                  : finance.entries.length
+                    ? '<small class="client-balance settled">Quitado</small>'
+                    : '<small class="client-balance muted">Sem lançamentos</small>';
+            return `<article class="client-card contact-card"><header><span class="avatar">${escapeHtml(client.name
               .split(/\s+/)
               .slice(0, 2)
               .map((x) => x[0])
               .join("")
-              .toUpperCase())}</span><span>${c.whatsapp && c.phone ? `<a class="contact-icon whatsapp" href="${waUrl(c.phone, c.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${c.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${c.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${c.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(c.name)}</h3><p>${escapeHtml(c.document || "Documento não informado")}${c.type === "pj" ? ` · ${escapeHtml(c.tradeName || "Pessoa jurídica")}` : c.birthDate ? ` · ${date(c.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(c))}</span>${c.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(c.email)}</span>` : ""}${c.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(c.city)}${c.state ? `/${escapeHtml(c.state)}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(rec)}<small>recebido</small></div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${c.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${c.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${c.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
+              .toUpperCase())}</span><span>${client.whatsapp && client.phone ? `<a class="contact-icon whatsapp" href="${waUrl(client.phone, client.phoneCountry)}" target="_blank" rel="noopener" title="Conversar pelo WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ""}<button class="link-btn file-folder-btn" data-client-files="${client.id}" title="Arquivos do cliente" aria-label="Arquivos do cliente"><i class="fa-solid ${clientFiles.length ? "fa-folder-open" : "fa-folder"}"></i>${clientFiles.length ? `<b>${clientFiles.length}</b>` : ""}</button><button class="link-btn" data-view-client="${client.id}" title="Visualizar cliente"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-edit-client="${client.id}" title="Editar cliente"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(client.name)}</h3><p>${escapeHtml(client.document || "Documento não informado")}${client.type === "pj" ? ` · ${escapeHtml(client.tradeName || "Pessoa jurídica")}` : client.birthDate ? ` · ${date(client.birthDate)}` : ""}</p><div class="contact-lines"><span><i class="fa-solid fa-phone"></i>${escapeHtml(displayPhone(client))}</span>${client.email ? `<span><i class="fa-solid fa-envelope"></i>${escapeHtml(client.email)}</span>` : ""}${client.city ? `<span><i class="fa-solid fa-location-dot"></i>${escapeHtml(client.city)}${client.state ? `/${escapeHtml(client.state)}` : ""}</span>` : ""}</div><div class="case-line"><div><strong>${cases.length}</strong><small>${cases.length === 1 ? "caso vinculado" : "casos vinculados"}</small></div><div class="amount income">${money(finance.received)}<small>recebido</small>${financeDetail}</div></div><details class="document-menu"><summary><span><i class="fa-solid fa-file-signature"></i> Gerar documento</span><i class="fa-solid fa-chevron-down"></i></summary><div class="document-options"><button type="button" data-client-document="${client.id}" data-document-type="procuracao"><i class="fa-solid fa-file-signature"></i><span><strong>Procuração</strong><small>Abrir gerador preenchido</small></span></button><button type="button" data-client-document="${client.id}" data-document-type="honorarios"><i class="fa-solid fa-scale-balanced"></i><span><strong>Contrato de honorários</strong><small>Abrir gerador preenchido</small></span></button></div></details><button class="add-case-btn" data-new-case="${client.id}"><i class="fa-solid fa-folder-plus"></i> Cadastrar caso para este cliente</button></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum cliente encontrado.</div>';
@@ -4306,6 +4424,9 @@
     }
     if (sc) {
       showView("clients");
+      $("#client-type-filter").value = "";
+      $("#client-financial-filter").value = "";
+      $("#client-city-filter").value = "";
       $("#client-search").value = clientName(sc.dataset.showClient);
       renderClients();
     }
@@ -4326,6 +4447,21 @@
     ),
   );
   $("#client-search").oninput = renderClients;
+  [
+    "#client-type-filter",
+    "#client-financial-filter",
+    "#client-city-filter",
+    "#client-order",
+  ].forEach((selector) => ($(selector).onchange = renderClients));
+  $("#clear-client-filters").onclick = () => {
+    $("#client-search").value = "";
+    $("#client-type-filter").value = "";
+    $("#client-financial-filter").value = "";
+    $("#client-city-filter").value = "";
+    $("#client-order").value = "name-asc";
+    renderClients();
+    $("#client-search").focus();
+  };
   $("#person-search").oninput = renderPeople;
   $("#case-search").oninput = renderCases;
   $("#case-status-filter").onchange = renderCases;

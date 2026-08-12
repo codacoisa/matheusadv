@@ -538,6 +538,48 @@ test('Financeiro avisa ao preencher CPF já cadastrado', async ({ page }) => {
   await expect(personForm.locator('[name="cpf"]')).toHaveAttribute('aria-invalid', 'true');
 });
 
+test('Financeiro filtra e ordena a carteira de clientes', async ({ page }) => {
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('officejur-financeiro', 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction('domains-v2', 'readwrite');
+      const store = transaction.objectStore('domains-v2');
+      const now = new Date().toISOString();
+      store.put({ name: 'clients', value: { schema: 'officejur/financeiro-clientes-data', version: 2, updatedAt: now, records: [
+        { id: 'client-test', type: 'pf', personId: 'person-test', updatedAt: now },
+        { id: 'client-company', type: 'pj', legalName: 'Empresa Alfa Ltda', tradeName: 'Alfa', cnpj: '04.252.011/0001-10', city: 'Anápolis', state: 'GO', updatedAt: now },
+      ], deleted: [] } });
+      store.put({ name: 'entries', value: { schema: 'officejur/financeiro-lancamentos-data', version: 1, updatedAt: now, records: [
+        { id: 'entry-settled', clientId: 'client-test', kind: 'income', description: 'Honorários quitados', category: 'Honorários fixos', amount: 500, paidAmount: 500, dueDate: '2026-01-10', paidDate: '2026-01-10', status: 'paid', updatedAt: now },
+        { id: 'entry-overdue', clientId: 'client-company', kind: 'income', description: 'Honorários em atraso', category: 'Honorários fixos', amount: 1000, paidAmount: 0, dueDate: '2026-01-10', paidDate: '', status: 'pending', updatedAt: now },
+      ], deleted: [] } });
+      transaction.oncomplete = () => { database.close(); resolve(); };
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('[data-view="clients"]').click();
+
+  const names = page.locator('#clients-grid .client-card h3');
+  await expect(names).toHaveText(['Cliente de teste', 'Empresa Alfa Ltda']);
+  await page.locator('#client-order').selectOption('name-desc');
+  await expect(names).toHaveText(['Empresa Alfa Ltda', 'Cliente de teste']);
+
+  await page.locator('#client-financial-filter').selectOption('overdue');
+  await expect(names).toHaveText(['Empresa Alfa Ltda']);
+  await expect(page.locator('#client-filter-summary')).toHaveText('Exibindo 1 de 2 clientes.');
+
+  await page.locator('#clear-client-filters').click();
+  await page.locator('#client-type-filter').selectOption('pf');
+  await expect(names).toHaveText(['Cliente de teste']);
+  await page.locator('#client-type-filter').selectOption('');
+  await page.locator('#client-city-filter').selectOption({ label: 'Anápolis/GO' });
+  await expect(names).toHaveText(['Empresa Alfa Ltda']);
+});
+
 test('Financeiro cadastra pessoa jurídica com representante reutilizável', async ({ page }) => {
   await page.goto('financeiro/', { waitUntil: 'networkidle' });
   await page.locator('#quick-client').click();

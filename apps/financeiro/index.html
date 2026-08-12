@@ -23,7 +23,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=29" />
+    <link rel="stylesheet" href="./assets/styles.css?v=30" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <link rel="stylesheet" href="./assets/site-header.css?v=1" />
     <link rel="stylesheet" href="./assets/local-access-blocked.css?v=1" />
@@ -46,7 +46,7 @@
     <script src="./assets/gist-client.js?v=1" defer></script>
     <script src="./assets/gist-access-lease.js?v=4" defer></script>
     <script src="./assets/local-access-blocked.js?v=2" defer></script>
-    <script src="./assets/app.js?v=36" defer></script>
+    <script src="./assets/app.js?v=37" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -244,11 +244,56 @@
               </button>
             </div>
           </div>
-          <div class="panel filters">
-            <input
-              id="client-search"
-              placeholder="Buscar por nome, CPF, telefone ou e-mail"
-            />
+          <div class="panel client-filter-panel">
+            <label class="client-search-field">
+              <span>Buscar clientes</span>
+              <input
+                id="client-search"
+                type="search"
+                placeholder="Nome, CPF/CNPJ, telefone, e-mail ou cidade"
+              />
+            </label>
+            <div class="client-filter-grid">
+              <label>Tipo
+                <select id="client-type-filter">
+                  <option value="">Todos</option>
+                  <option value="pf">Pessoa física</option>
+                  <option value="pj">Pessoa jurídica</option>
+                </select>
+              </label>
+              <label>Situação financeira
+                <select id="client-financial-filter">
+                  <option value="">Todas</option>
+                  <option value="overdue">Em atraso</option>
+                  <option value="open">Com saldo a receber</option>
+                  <option value="settled">Quitados</option>
+                  <option value="without-entries">Sem lançamentos</option>
+                </select>
+              </label>
+              <label>Cidade
+                <select id="client-city-filter">
+                  <option value="">Todas as cidades</option>
+                </select>
+              </label>
+              <label>Ordenar por
+                <select id="client-order">
+                  <option value="name-asc">Nome (A–Z)</option>
+                  <option value="name-desc">Nome (Z–A)</option>
+                  <option value="document-asc">CPF/CNPJ</option>
+                  <option value="city-asc">Cidade</option>
+                  <option value="updated-desc">Atualizados recentemente</option>
+                  <option value="cases-desc">Mais casos</option>
+                  <option value="received-desc">Maior valor recebido</option>
+                  <option value="balance-desc">Maior saldo a receber</option>
+                </select>
+              </label>
+            </div>
+            <div class="client-filter-footer">
+              <span id="client-filter-summary" role="status"></span>
+              <button class="btn ghost compact" id="clear-client-filters" type="button">
+                <i class="fa-solid fa-filter-circle-xmark"></i> Limpar filtros
+              </button>
+            </div>
           </div>
           <div id="clients-grid" class="cards"></div>
         </section>

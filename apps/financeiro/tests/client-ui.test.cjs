@@ -110,6 +110,24 @@ test("avisar imediatamente quando CPF ou CNPJ já estiver cadastrado", () => {
   assert.match(app, /setCustomValidity\(message\)/);
 });
 
+test("filtrar e ordenar clientes por critérios operacionais", () => {
+  [
+    "client-type-filter",
+    "client-financial-filter",
+    "client-city-filter",
+    "client-order",
+    "client-filter-summary",
+    "clear-client-filters",
+  ].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
+  assert.match(app, /function clientFinancialSummary/);
+  assert.match(app, /function refreshClientCityOptions/);
+  assert.match(app, /function clientSort/);
+  assert.match(app, /finance\.overdue > 0/);
+  assert.match(app, /finance\.balance > 0/);
+  assert.match(app, /finance\.entries\.length > 0/);
+  assert.match(styles, /\.client-filter-grid\s*\{/);
+});
+
 test("oferecer recibo em PDF ao registrar pagamento", () => {
   assert.match(html, /jspdf\.umd\.min\.js/);
   assert.match(html, /receipt\.js/);
