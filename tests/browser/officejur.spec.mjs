@@ -2,6 +2,29 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { minimalDocx, minimalPptx, minimalXlsx } from './office-fixtures.cjs';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('https://servicodados.ibge.gov.br/api/v1/localidades/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { nome: 'Anápolis' },
+        { nome: 'Goiânia' },
+        { nome: 'Silvânia' },
+      ]),
+    }));
+  await page.route('https://viacep.com.br/ws/**', route =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        cep: '74000-123',
+        logradouro: 'Avenida Central',
+        bairro: 'Centro',
+        localidade: 'Goiânia',
+        uf: 'GO',
+      }),
+    }));
+});
+
 async function prepareCalculationPage(page, path = 'calculos/') {
   await page.goto('financeiro/', { waitUntil: 'networkidle' });
   await page.evaluate(() => new Promise((resolve, reject) => {
@@ -472,6 +495,25 @@ test('Financeiro separa número, quadra e lote do logradouro', async ({ page }) 
   await expect(page.locator('#street-warning')).toContainText('Preencha no campo Quadra');
 });
 
+test('Financeiro preenche o endereço por CEP e restringe cidade à lista do IBGE', async ({ page }) => {
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.locator('#quick-client').click();
+  const form = page.locator('#client-form');
+
+  await form.locator('[name="zip"]').fill('74000123');
+  await expect(form.locator('[data-address-status]')).toContainText('Endereço localizado pelo CEP');
+  await expect(form.locator('[name="street"]')).toHaveValue('Avenida Central');
+  await expect(form.locator('[name="neighborhood"]')).toHaveValue('Centro');
+  await expect(form.locator('[name="state"]')).toHaveValue('GO');
+  await expect(form.locator('[name="city"]')).toHaveValue('Goiânia');
+  await expect(form.locator('[name="city"] option')).toHaveText([
+    'Selecione a cidade',
+    'Anápolis',
+    'Goiânia',
+    'Silvânia',
+  ]);
+});
+
 test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
 
@@ -498,7 +540,8 @@ test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ 
   await personForm.locator('[name="phoneNational"]').fill('62999999999');
   await personForm.locator('[name="street"]').fill('Rua das Flores');
   await personForm.locator('[name="neighborhood"]').fill('Centro');
-  await personForm.locator('[name="city"]').fill('Silvânia');
+  await personForm.locator('[name="state"]').selectOption('GO');
+  await personForm.locator('[name="city"]').selectOption('Silvânia');
   await personForm.getByRole('button', { name: 'Salvar pessoa' }).click();
   const futureRow = page.locator('.person-row').filter({ hasText: 'Contato Futuro' });
   await expect(futureRow).toContainText('Contato sem vínculo');
@@ -613,7 +656,8 @@ test('Financeiro cadastra pessoa jurídica com representante reutilizável', asy
   await clientForm.locator('[name="phoneNational"]').fill('62999999999');
   await clientForm.locator('[name="street"]').fill('Avenida Central');
   await clientForm.locator('[name="neighborhood"]').fill('Centro');
-  await clientForm.locator('[name="city"]').fill('Goiânia');
+  await clientForm.locator('[name="state"]').selectOption('GO');
+  await clientForm.locator('[name="city"]').selectOption('Goiânia');
 
   await page.locator('#new-representative-person').click();
   const personForm = page.locator('#person-form');

@@ -10,6 +10,7 @@
   const financeReceipt = window.FinanceReceipt;
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
+  const addressAssistant = window.OfficeJurAddressAssistant;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
     MP_KEY = "officejur::financeiro::mercado-pago::settings",
     MP_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
@@ -1022,6 +1023,11 @@
       throw error;
     });
   setupPhoneCountries();
+  addressAssistant?.setup([
+    $("#client-form"),
+    $("#person-form"),
+    $("#team-form"),
+  ]);
   setupAgreementEditor($("#case-agreement-editor"));
   setupAgreementEditor($("#package-agreement-editor"));
   function captureMissingDeletions() {
@@ -1991,7 +1997,7 @@
     const people = data.team.filter(
       (p) =>
         (!status || p.status === status) &&
-        `${p.name} ${p.registration} ${p.specialties} ${roleLabel(p.role)}`
+        `${p.name} ${p.registration} ${p.specialties} ${p.city || ""} ${p.state || ""} ${roleLabel(p.role)}`
           .toLowerCase()
           .includes(q),
     );
@@ -2604,6 +2610,7 @@
     form.elements.phoneNational.value = phone.national;
     form.elements.zip.value = maskZip(person?.zip || "");
     form.elements.state.value = String(person?.state || "").toUpperCase();
+    void addressAssistant?.refresh(form, person?.city || "");
     representativePersonTarget = targetRow;
     personDialogContext = context;
     syncPersonPhoneField();
@@ -2641,8 +2648,10 @@
     f.elements.phoneCountry.value = PHONE_DEFAULT_COUNTRY;
     const c = data.clients.find((x) => x.id === id),
       sourcePerson = !c && sourcePersonId ? personById(sourcePersonId) : null;
+    let selectedCity = "";
     if (c) {
       const profile = clientProfile(c);
+      selectedCity = profile.city || "";
       fillClientFormProfile(f, profile);
       f.elements.type.value = c.type;
       f.elements.personId.value = c.personId || "";
@@ -2655,6 +2664,7 @@
       f.elements.state.value = String(profile.state || "").toUpperCase();
       renderRepresentatives(c.representatives);
     } else if (sourcePerson) {
+      selectedCity = sourcePerson.city || "";
       fillClientFormProfile(f, {
         ...sourcePerson,
         type: "pf",
@@ -2675,6 +2685,7 @@
       renderRepresentatives();
     }
     syncClientKind();
+    void addressAssistant?.refresh(f, selectedCity);
     syncPhoneField();
     clientDocumentAvailability(f);
     clearStreetWarning();
@@ -2794,6 +2805,7 @@
         p.registration || "",
       ).toUpperCase();
     }
+    void addressAssistant?.refresh(f, p?.city || "");
     $("#team-modal-title").textContent = p ? "Editar pessoa" : "Nova pessoa";
     $("#delete-team-member").hidden = !p;
     $("#team-dialog").showModal();
@@ -3026,7 +3038,7 @@
       eyebrow: "EQUIPE",
       title: p.name,
       subtitle: `${roleLabel(p.role)} · ${p.status === "active" ? "Ativo" : "Inativo"} · ${cases.length} ${cases.length === 1 ? "caso" : "casos"}`,
-      body: `<div class="detail-grid">${detailField("OAB / registro", p.registration, "fa-id-badge")}${detailField("CPF/CNPJ", p.document, "fa-id-card")}${detailField("Telefone", p.phone, "fa-phone")}${detailField("E-mail", p.email, "fa-envelope")}${detailField("Especialidades", p.specialties, "fa-scale-balanced")}${detailField("Participação registrada", money(expected), "fa-coins")}</div>${p.notes ? `<div class="detail-note"><strong>Observações</strong><p>${p.notes}</p></div>` : ""}`,
+      body: `<div class="detail-grid">${detailField("OAB / registro", p.registration, "fa-id-badge")}${detailField("CPF/CNPJ", p.document, "fa-id-card")}${detailField("Telefone", p.phone, "fa-phone")}${detailField("E-mail", p.email, "fa-envelope")}${detailField("Localidade", [p.city, p.state].filter(Boolean).join("/") || "Não informada", "fa-location-dot")}${detailField("CEP", p.zip, "fa-map-location-dot")}${detailField("Especialidades", p.specialties, "fa-scale-balanced")}${detailField("Participação registrada", money(expected), "fa-coins")}</div>${p.notes ? `<div class="detail-note"><strong>Observações</strong><p>${p.notes}</p></div>` : ""}`,
       links: `${cases.length ? `<button class="btn ghost" type="button" data-show-team-cases="${p.id}"><i class="fa-solid fa-folder-open"></i> Ver casos e processos</button>` : ""}${p.phone ? `<a class="btn ghost" href="tel:${String(p.phone).replace(/[^\d+]/g, "")}"><i class="fa-solid fa-phone"></i> Ligar</a>` : ""}${p.email ? `<a class="btn ghost" href="mailto:${p.email}"><i class="fa-solid fa-envelope"></i> E-mail</a>` : ""}`,
       onEdit: () => openTeamMember(id),
     });
@@ -3763,22 +3775,22 @@
         phone: phone?.number || "",
         phoneCountry: phone?.country || values.phoneCountry,
         whatsapp: form.elements.whatsapp.checked,
-        email: values.email.trim(),
+        email: String(values.email || "").trim(),
         nationality: normalizeDocumentPhrase(values.nationality),
         maritalStatus: normalizeDocumentPhrase(values.maritalStatus),
         profession: normalizeDocumentPhrase(values.profession),
-        rg: values.rg.trim(),
-        rgIssuer: values.rgIssuer.trim(),
-        street: values.street.trim(),
-        addressNumber: values.addressNumber.trim(),
-        addressBlock: values.addressBlock.trim(),
-        addressLot: values.addressLot.trim(),
-        complement: values.complement.trim(),
-        neighborhood: values.neighborhood.trim(),
-        city: values.city.trim(),
-        state: values.state.toUpperCase(),
+        rg: String(values.rg || "").trim(),
+        rgIssuer: String(values.rgIssuer || "").trim(),
+        street: String(values.street || "").trim(),
+        addressNumber: String(values.addressNumber || "").trim(),
+        addressBlock: String(values.addressBlock || "").trim(),
+        addressLot: String(values.addressLot || "").trim(),
+        complement: String(values.complement || "").trim(),
+        neighborhood: String(values.neighborhood || "").trim(),
+        city: String(values.city || "").trim(),
+        state: String(values.state || "").toUpperCase(),
         zip: maskZip(values.zip),
-        notes: values.notes.trim(),
+        notes: String(values.notes || "").trim(),
         createdAt: old?.createdAt || now(),
         updatedAt: now(),
       });
@@ -3804,28 +3816,12 @@
   });
   $("#person-form [name=phoneNational]").addEventListener("input", (event) => syncPersonPhoneField(event.target.value));
   $("#person-form [name=phoneCountry]").addEventListener("change", () => syncPersonPhoneField());
-  $("#person-form [name=zip]").addEventListener("input", (event) => (event.target.value = maskZip(event.target.value)));
-  $("#person-form [name=state]").addEventListener("input", (event) => {
-    event.target.value = event.target.value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 2);
-  });
   $("#person-form [name=street]").addEventListener("input", (event) => filterStreetInput(event.currentTarget, "#person-street-warning"));
   $("#client-form [name=phoneNational]").addEventListener("input", (e) =>
     syncPhoneField(e.target.value),
   );
   $("#client-form [name=phoneCountry]").addEventListener("change", () =>
     syncPhoneField(),
-  );
-  $("#client-form [name=zip]").addEventListener(
-    "input",
-    (e) => (e.target.value = maskZip(e.target.value)),
-  );
-  $("#client-form [name=state]").addEventListener(
-    "input",
-    (e) =>
-      (e.target.value = e.target.value
-        .replace(/[^a-z]/gi, "")
-        .toUpperCase()
-        .slice(0, 2)),
   );
   $("#client-form [name=name]").addEventListener(
     "blur",
@@ -4112,6 +4108,9 @@
         document: maskDocument(fd.document),
         phone: maskPhone(fd.phone),
         registration: fd.registration.toUpperCase(),
+        city: String(fd.city || "").trim(),
+        state: String(fd.state || "").toUpperCase(),
+        zip: maskZip(fd.zip),
         id: fd.id || uid(),
         createdAt: old?.createdAt || now(),
         updatedAt: now(),

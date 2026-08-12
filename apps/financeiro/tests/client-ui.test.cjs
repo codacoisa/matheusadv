@@ -45,18 +45,35 @@ test("alinhar a faixa de casos nos cartões de clientes", () => {
 });
 
 test("exigir os campos complementares do cliente", () => {
-  ["maritalStatus", "profession", "street", "neighborhood", "city"].forEach(
+  ["maritalStatus", "profession", "street", "neighborhood"].forEach(
     (name) =>
       assert.match(
         html,
         new RegExp(`<input[^>]*name="${name}"[^>]*required`, "s"),
       ),
   );
+  assert.match(html, /<select[^>]*name="state"[^>]*required/);
+  assert.match(html, /<select[^>]*name="city"[^>]*required/);
   assert.match(app, /Informe o estado civil do cliente/);
   assert.match(app, /Informe a profissão do cliente/);
   assert.match(app, /street:\s*"endereço"/);
   assert.match(app, /neighborhood:\s*"bairro"/);
   assert.match(app, /city:\s*"cidade"/);
+});
+
+test("usar endereço assistido nos cadastros centrais", () => {
+  assert.match(html, /address-assistant\.js/);
+  ["client-form", "person-form", "team-form"].forEach((id) => {
+    const start = html.indexOf(`id="${id}"`);
+    const end = html.indexOf("</form>", start);
+    const form = html.slice(start, end);
+    assert.match(form, /name="zip"/);
+    assert.match(form, /<select name="state"/);
+    assert.match(form, /<select name="city"/);
+    assert.match(form, /data-address-status/);
+  });
+  assert.match(app, /OfficeJurAddressAssistant/);
+  assert.match(app, /addressAssistant\?\.setup/);
 });
 
 test("separar número, quadra e lote do logradouro do cliente", () => {
