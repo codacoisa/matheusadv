@@ -28,7 +28,7 @@
   let step = 1;
   let pendingPdf = false;
   const newRecord = () => ({
-    id: uuid(), code: code(), type: 'labor', calculationVersion: labor.VERSION, status: 'draft', name: 'Cálculo trabalhista sem título', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    id: uuid(), code: code(), type: 'labor', calculationVersion: labor.VERSION, status: 'draft', name: `Cálculo trabalhista — ${today.split('-').reverse().join('/')}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     input: { clientId: '', client: '', clientName: '', caseId: '', caseName: '', caseNumber: '', clientParty: null, opposingParty: null, additionalParties: [], clientRole: 'Reclamada', partyType: 'Reclamada', partySource: 'manual', admissionDate: today, terminationDate: '', prescriptionStart: '', startDate: today, endDate: today, calculationDate: today, baseSalary: 0, divisor: 220, salaryRows: [], claims: [], settings: { correctionType: 'none', interestType: 'none', fixedMonthlyRate: 0, preLegalMonthlyRate: 0, penaltyRate: 0, feeRate: 0 } },
   });
   let record = newRecord();
