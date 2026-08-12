@@ -5,7 +5,6 @@
 .card-title{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .card-title{margin-bottom:18px}.card-title h2{margin:0}.button-row{display:flex;flex-wrap:wrap;gap:8px}
 .link-button{min-height:auto;padding:0;color:var(--green);border:0;background:none}
-.party-list{display:grid;gap:10px}.party-row{display:grid;grid-template-columns:1fr 180px auto;gap:8px}
 .generalista-items{margin-top:0}.item-header,.item-row{display:grid;align-items:center;gap:10px;min-width:850px}
 .item-header{padding:0 8px 10px;color:var(--muted);font-size:12px;font-weight:800}
 .item-row{padding:12px 8px;border-top:1px solid var(--line)}

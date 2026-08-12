@@ -95,19 +95,21 @@
   const field = (label, name, value, type = "text", cls = "") => `<div class="field ${cls}"><label class="required" for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${escape(value)}" required></div>`;
 
   function additionalPartyOptions(selected) { const context = caseContextApi?.partyContext(financeData, current.input, financeApi) || {}; return `<option value="manual" ${selected === "manual" ? "selected" : ""}>Preencher manualmente</option>${(context.caseParties || []).map((party) => `<option value="case:${escape(party.id)}" ${selected === `case:${party.id}` ? "selected" : ""}>Importar: ${escape(party.name)} — ${escape(party.role)}</option>`).join("")}`; }
-  function additionalPartiesHtml() { return `<section class="field full"><label>Partes adicionais</label><p class="hint">Opcional. Importe cada parte do processo ou preencha manualmente.</p>${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}<button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte adicional</button></section>`; }
+  function additionalPartiesHtml() { return `<section class="party-manager" aria-labelledby="additional-parties-title"><div class="party-manager-head"><div><h3 id="additional-parties-title">Partes adicionais</h3><p class="hint">Importe do processo ou inclua manualmente quando necessário.</p></div><button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte</button></div><div class="party-list">${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}</div></section>`; }
 
   function stepOne() {
     const i = current.input;
-    return `<div class="form-grid">
+    return `${financeNotice()}<section class="form-section"><div class="section-heading"><div><h2>Identificação</h2><p class="hint">Nomeie o cálculo e vincule o cliente e o caso, se houver.</p></div></div><div class="form-grid">
       ${field("Nome do cálculo", "name", current.name, "text", "full")}
       <div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" name="clientId" required>${clientOptions(i.clientId)}</select></div>
       <div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId" name="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>
+      ${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}
+    </div></section><section class="form-section"><div class="section-heading"><div><h2>Partes</h2><p class="hint">Defina o polo do cliente, a parte contrária e eventuais terceiros.</p></div></div><div class="form-grid">
       <div class="field"><label>Parte principal — cliente<input id="clientPartyName" value="${escape(i.clientParty?.name || i.clientName || "")}" readonly></label></div>
       <div class="field"><label class="required" for="clientPartyRole">Polo do cliente</label><select id="clientPartyRole" name="clientPartyRole" required><option ${i.clientRole === "Exequente / Credor" || i.clientPartyRole === "Exequente / Credor" ? "selected" : ""}>Exequente / Credor</option><option ${i.clientRole === "Executado / Devedor" || i.clientPartyRole === "Executado / Devedor" ? "selected" : ""}>Executado / Devedor</option></select></div>
-      ${field(`Parte contrária — ${caseContextApi?.oppositeRole(i.clientRole || i.clientPartyRole) || "oposto"}`, "opposingPartyName", i.opposingParty?.name || "")}
-      ${additionalPartiesHtml()}
-      ${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}
+      ${field(`Parte contrária — ${caseContextApi?.oppositeRole(i.clientRole || i.clientPartyRole) || "oposto"}`, "opposingPartyName", i.opposingParty?.name || "", "text", "full")}
+      <div class="field full">${additionalPartiesHtml()}</div>
+    </div></section><section class="form-section"><div class="section-heading"><div><h2>Dados da pensão</h2><p class="hint">Informe o período, a forma estipulada e as observações do título.</p></div></div><div class="form-grid">
       ${field("Início das parcelas", "startDate", i.startDate, "date", "third")}
       ${field("Fim das parcelas", "endDate", i.endDate, "date", "third")}
       ${field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "third")}
@@ -121,8 +123,7 @@
       ${i.basisType === "income" ? field("Base mensal informada (R$)", "referenceIncome", i.referenceIncome, "number", "full") : ""}
       <label class="check field full"><input name="includeThirteenth" type="checkbox" ${i.includeThirteenth ? "checked" : ""}><span>Incluir parcela anual de 13º em dezembro, quando prevista no título.</span></label>
       <div class="field full"><label for="notes">Observações do título ou decisão</label><textarea id="notes" name="notes">${escape(i.notes)}</textarea></div>
-      ${financeNotice()}
-    </div>`;
+    </div></section>`;
   }
 
   function paymentHtml(item, payment, index) {
