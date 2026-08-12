@@ -6,13 +6,15 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../../../../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('Central sincroniza sua configuração sem alterar o Gist global', () => {
+test('Central sincroniza sua configuração sem alterar a nuvem global', () => {
   const index = read('apps/lab/tools/central-guias/index.html');
   const app = read('apps/lab/tools/central-guias/assets/app.js');
 
-  assert.match(index, /ID ou endereço do Gist/);
+  assert.match(index, /ID ou endereço da fonte remota/);
   assert.match(index, /Configuração do módulo/);
   assert.match(index, /gist-access-lease/);
+  assert.match(index, /office-cloud-status id="cloud-status"/);
+  assert.match(index, /cloud-status\.js/);
   assert.match(app, /central-guias::config/);
   assert.match(app, /persistConfig/);
   assert.match(app, /officejur-central-guias\.json/);
@@ -20,7 +22,9 @@ test('Central sincroniza sua configuração sem alterar o Gist global', () => {
   assert.match(app, /syncClient\.patch/);
   assert.match(app, /targetGistClient\.gist/);
   assert.match(app, /OfficeJurGistSettings\?\.load/);
+  assert.match(app, /OfficeJurCloudStatus/);
   assert.doesNotMatch(app, /OfficeJurGistSettings\?\.save/);
+  assert.doesNotMatch(index, />[^<]*Gist[^<]*</);
 });
 
 test('Central oferece uma fila de trabalho orientada a vencimentos', () => {

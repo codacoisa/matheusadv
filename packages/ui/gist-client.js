@@ -40,7 +40,7 @@
         const body = await response.json().catch(() => ({}));
         if (response.status === 412)
           throw Object.assign(new Error(
-            "O Gist foi alterado em outro navegador. Sincronize novamente para mesclar as versões.",
+            "Os dados na nuvem foram alterados em outro navegador. Sincronize novamente para mesclar as versões.",
           ), { status: 412, category: "conflict" });
         const message = String(body.message || "");
         const rateLimited = response.status === 429
@@ -81,7 +81,7 @@
 
   function revisionConflict() {
     return Object.assign(new Error(
-      "O Gist foi alterado em outro navegador. Sincronize novamente para mesclar as versões.",
+      "Os dados na nuvem foram alterados em outro navegador. Sincronize novamente para mesclar as versões.",
     ), { status: 412, category: "conflict" });
   }
 
@@ -117,10 +117,10 @@
   }
 
   async function text(file, options = {}) {
-    if (!file) throw new Error("Arquivo não encontrado no Gist.");
+    if (!file) throw new Error("Arquivo não encontrado na nuvem.");
     const maxBytes = Number(options.maxBytes || DEFAULT_MAX_BYTES);
     if (Number(file.size || 0) > maxBytes)
-      throw new Error("O arquivo do Gist excede o limite permitido.");
+      throw new Error("O arquivo na nuvem excede o limite permitido.");
     if (!file.truncated && typeof file.content === "string") return file.content;
     if (!file.raw_url) throw new Error("O GitHub não retornou o conteúdo completo do arquivo.");
     let rawUrl;
@@ -139,14 +139,14 @@
         cache: "no-store",
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error("Não foi possível baixar o conteúdo completo do Gist.");
+      if (!response.ok) throw new Error("Não foi possível baixar o conteúdo completo da nuvem.");
       const content = await response.text();
       if (new TextEncoder().encode(content).byteLength > maxBytes)
-        throw new Error("O arquivo do Gist excede o limite permitido.");
+        throw new Error("O arquivo na nuvem excede o limite permitido.");
       return content;
     } catch (error) {
       if (error?.name === "AbortError")
-        throw new Error("O download do Gist excedeu o tempo limite.");
+        throw new Error("O download da nuvem excedeu o tempo limite.");
       throw error;
     } finally {
       clearTimeout(timeout);

@@ -115,7 +115,7 @@
     try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     render();
   }
-  const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { window.OfficeJurCloudStatus?.fromMessage(syncStatus, message); }, notify });
   access?.subscribe((lease) => {
     if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlocked();
   });

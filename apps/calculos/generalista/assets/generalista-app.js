@@ -184,12 +184,12 @@
     if (!indices?.snapshot) throw new Error("O módulo de índices oficiais não foi carregado.");
     const dates = [...current.input.items.map((item) => item.date), ...current.input.costs.map((item) => item.date)].filter(Boolean).sort();
     const start = dates[0] || current.input.calculationDate, end = current.input.calculationDate;
-    busy = true; syncStatus.textContent = "Consultando índices oficiais…";
+    busy = true;
     try {
       const snapshots = await Promise.all(types.map((type) => indices.snapshot({ correctionType: type, interestType: "none", start, end })));
       current.indexSnapshot = { fetchedAt: new Date().toISOString(), start, end, ratesByType: Object.fromEntries(types.map((type, index) => [type, snapshots[index].correctionRates || {}])), sources: snapshots.flatMap((item) => item.sources || []) };
       persist("draft"); notify("Índices oficiais carregados e congelados neste rascunho.");
-    } finally { busy = false; syncStatus.textContent = "Dados locais"; }
+    } finally { busy = false; syncStatus.refresh?.(); }
     render();
   }
   function calculate() {
@@ -199,7 +199,7 @@
     persist("final"); step = complete ? 4 : 2; notify("Cálculo concluído.");
   }
   function addExtra(kind) { captureVisible(); const list = kind === "penalty" ? current.input.penalties : kind === "fee" ? current.input.fees : current.input.costs; list.push(kind === "cost" ? { id: uid(), amount: 0, date: today(), description: "Custas processuais", correctionType: "none" } : { id: uid(), rate: 0, description: kind === "fee" ? "Honorários" : "Multa", type: "percent", onInterest: false }); render(); }
-  const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { syncStatus.textContent = message; }, notify });
+  const sync = syncFactory.create({ storage, gistSettings, gistClient, access, getData: () => data, setData: (value) => { data = value; }, setStatus: (message) => { window.OfficeJurCloudStatus?.fromMessage(syncStatus, message); }, notify });
   function showBlocked() {
     localAccessAllowed = false;
     data = storage.normalize({});

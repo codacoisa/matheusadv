@@ -15,11 +15,12 @@
   <script src="../../assets/office-context.js" defer></script>
   <script src="./assets/fontawesome-7.3.0.min.js" data-auto-replace-svg="nest" data-observe-mutations="true" defer></script>
   <link rel="stylesheet" href="./assets/styles.css?v=1">
-  <link rel="stylesheet" href="./assets/site-header.css?v=1">
+  <link rel="stylesheet" href="./assets/site-header.css?v=2">
   <script src="./assets/app-switcher.js?v=5" defer></script>
   <script src="./assets/gist-settings.js?v=1" defer></script>
-  <script src="./assets/gist-client.js?v=2" defer></script>
-  <script src="./assets/gist-access-lease.js?v=1" defer></script>
+  <script src="./assets/gist-client.js?v=3" defer></script>
+  <script src="./assets/gist-access-lease.js?v=5" defer></script>
+  <script src="./assets/cloud-status.js?v=1" defer></script>
   <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
   <script src="./assets/site-footer.js?v=5" defer></script>
 </head>
@@ -30,6 +31,7 @@
       <span><strong>Central de Guias</strong><small data-officejur-field="office.name">Escritório</small></span>
     </a>
     <nav class="top-actions" aria-label="Navegação">
+      <office-cloud-status id="cloud-status"></office-cloud-status>
       <office-app-switcher current="lab"></office-app-switcher>
     </nav>
   </header>
@@ -50,7 +52,7 @@
         </div>
         <div class="hero-focus">
           <span class="hero-focus-label">Próxima ação</span>
-          <strong id="attention-summary">Configure o Gist para começar.</strong>
+          <strong id="attention-summary">Configure a fonte remota para começar.</strong>
         </div>
       </article>
       <article class="hero-card hero-card--config">
@@ -59,14 +61,14 @@
           <div>
             <p class="eyebrow eyebrow--muted">Configuração do módulo</p>
             <h2>Fonte da Central</h2>
-            <p>Este endereço é uma configuração da Central. Ele é sincronizado como dado do módulo, sem alterar o Gist usado pelo OfficeJur.</p>
+            <p>Este endereço é exclusivo da Central e é sincronizado como dado do módulo, sem alterar a nuvem usada pelo OfficeJur.</p>
           </div>
         </div>
         <div class="config-grid">
           <div>
             <div class="field-row">
               <div class="field">
-                <label for="gist-id">ID ou endereço do Gist</label>
+                <label for="gist-id">ID ou endereço da fonte remota</label>
                 <input id="gist-id" type="text" autocomplete="off" placeholder="Cole o ID ou o endereço compartilhado">
               </div>
             </div>
@@ -156,6 +158,6 @@
   </main>
   <office-site-footer repository="officejur"></office-site-footer>
 
-  <script src="./assets/app.js?v=1" defer></script>
+  <script src="./assets/app.js?v=2" defer></script>
 </body>
 </html>

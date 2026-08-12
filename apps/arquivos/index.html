@@ -16,16 +16,17 @@
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
     <link rel="stylesheet" href="./assets/styles.css?v=1">
-    <link rel="stylesheet" href="./assets/site-header.css?v=1">
+    <link rel="stylesheet" href="./assets/site-header.css?v=2">
     <script src="../financeiro/assets/storage.js?v=1" defer></script>
     <script src="../financeiro/assets/data-store.js?v=1" defer></script>
     <script src="./assets/storage.js?v=2" defer></script>
     <script src="./assets/files.js?v=1" defer></script>
     <script src="./assets/gist-settings.js?v=1" defer></script>
-    <script src="./assets/gist-client.js?v=1" defer></script>
-    <script src="./assets/gist-access-lease.js?v=1" defer></script>
+    <script src="./assets/gist-client.js?v=3" defer></script>
+    <script src="./assets/gist-access-lease.js?v=5" defer></script>
+    <script src="./assets/cloud-status.js?v=1" defer></script>
     <script src="./assets/office-templates.js?v=1" defer></script>
-    <script src="./assets/app.js?v=4" defer></script>
+    <script src="./assets/app.js?v=5" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -37,6 +38,7 @@
         <span><strong>Arquivos</strong><small data-officejur-field="office.shortName">Escritório</small></span>
       </a>
       <div class="top-actions">
+        <office-cloud-status id="cloud-status"></office-cloud-status>
         <office-app-switcher current="arquivos"></office-app-switcher>
       </div>
     </header>
@@ -78,7 +80,7 @@
         <div id="client-folders" class="client-folders"></div>
 
         <footer class="library-footer">
-          <p>Os arquivos ficam em Base64 neste navegador e podem ser sincronizados pelo Gist do OfficeJur.</p>
+          <p>Os arquivos ficam em Base64 neste navegador e, quando a nuvem está configurada, são sincronizados automaticamente.</p>
           <button id="clear-library" class="danger-link" type="button" disabled>Limpar biblioteca</button>
         </footer>
       </section>

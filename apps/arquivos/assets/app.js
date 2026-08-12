@@ -9,6 +9,7 @@
   const gistSettings = window.OfficeJurGistSettings;
   const access = window.OfficeJurGistAccessLease?.create();
   const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
+  const cloudStatus = document.querySelector('#cloud-status');
   const institutionalTemplateConfig = window.OFFICEJUR_CONFIG?.documents?.institutionalDocxTemplate || null;
   const $ = (selector) => document.querySelector(selector);
   const AUTO_SAVE_INTERVAL = 10000;
@@ -209,20 +210,20 @@
   }
 
   async function readGistText(file, message) {
-    if (!file) throw new Error(message || 'Arquivo não encontrado no Gist.');
+    if (!file) throw new Error(message || 'Arquivo não encontrado na nuvem.');
     return gistClient.text(file, { maxBytes: documentFiles.MAX_PAYLOAD_BYTES });
   }
 
   async function readGistIndex(gist) {
     const file = gist?.files?.[documentFiles.INDEX_FILE];
     if (!file) return documentFiles.emptyData();
-    return documentFiles.normalizeData(JSON.parse(await readGistText(file, 'Não foi possível ler o índice de documentos do Gist.')));
+    return documentFiles.normalizeData(JSON.parse(await readGistText(file, 'Não foi possível ler o índice de documentos da nuvem.')));
   }
 
   async function readRemotePayload(gist, metadata, original = false) {
     const fileName = original ? metadata.originalPayloadFile : metadata.payloadFile;
     const file = gist?.files?.[fileName];
-    if (!file) throw new Error(`O conteúdo Base64 de “${metadata.name}” não foi encontrado no Gist.`);
+    if (!file) throw new Error(`O conteúdo Base64 de “${metadata.name}” não foi encontrado na nuvem.`);
     const encoded = (await readGistText(file, `Não foi possível ler o conteúdo de “${metadata.name}”.`)).replace(/\s+/g, '');
     const bytes = documentFiles.fromBase64(encoded);
     const expected = original ? metadata.originalSha256 : metadata.sha256;
@@ -238,9 +239,10 @@
     }
     syncInFlight = (async () => {
       const settings = currentSyncSettings();
-      if (!settings.gistId) throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+      if (!settings.gistId) throw new Error('Configure a nuvem nas Configurações do OfficeJur.');
       access?.canSync(settings.gistId);
-      setStatus('Sincronizando documentos com o Gist…');
+      window.OfficeJurCloudStatus?.set(cloudStatus, 'syncing');
+      setStatus('Sincronizando documentos com a nuvem…');
       const snapshot = await gistClient.gistSnapshot(settings.gistId, settings.token);
       const localRecords = await storage.list();
       const localData = await localSyncData(localRecords);
@@ -295,10 +297,12 @@
       if (Object.keys(changedFiles).length) await gistClient.patch(settings.gistId, settings.token, changedFiles, { etag: revision });
       state.deletedDocuments = mergedData.deletedDocuments;
       saveSyncState(mergedData);
-      setStatus('Documentos sincronizados com o Gist.');
+      window.OfficeJurCloudStatus?.set(cloudStatus, 'synced');
+      setStatus('Documentos sincronizados com a nuvem.');
     })();
     try { await syncInFlight; }
     catch (error) {
+      window.OfficeJurCloudStatus?.set(cloudStatus, 'error', error.message);
       setStatus(error.message || 'Não foi possível sincronizar os documentos.', true);
       throw error;
     }
@@ -576,7 +580,7 @@
       state.deletedDocuments = [];
     }) : true;
     if (!allowed) {
-      setStatus('O acesso local aos documentos sincronizados está bloqueado. Revise o Gist nas Configurações.', true);
+      setStatus('O acesso local aos documentos sincronizados está bloqueado. Revise a nuvem nas Configurações.', true);
       return;
     }
     try {

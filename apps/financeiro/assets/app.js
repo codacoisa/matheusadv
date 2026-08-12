@@ -1680,10 +1680,10 @@
     const { gist } = await fetchGistFiles(),
       payload = gist.files?.[item.payloadFile];
     if (!payload)
-      throw new Error("O conteúdo deste PDF ainda não está disponível neste navegador ou no Gist.");
+      throw new Error("O conteúdo deste PDF ainda não está disponível neste navegador ou na nuvem.");
     const encoded = await readGistText(
       payload,
-      "Não foi possível baixar o PDF armazenado no Gist.",
+      "Não foi possível baixar o PDF armazenado na nuvem.",
     );
     const blob = new Blob([financeFiles.fromBase64(encoded)], {
       type: "application/pdf",
@@ -1821,7 +1821,7 @@
         title: "Excluir PDF?",
         message: `Você está prestes a excluir “${item.name}”.`,
         impact:
-          "O conteúdo será removido deste navegador, do índice sincronizado e do Gist. O histórico de versões do Gist continuará disponível.",
+          "O conteúdo será removido deste navegador e da nuvem. O histórico remoto de versões continuará disponível.",
       }))
     )
       return;
@@ -3119,7 +3119,7 @@
   async function fetchGistFiles() {
     refreshGistCredentials();
     if (!settings.gistId || !settings.token)
-      throw new Error("Configure o Gist nas Configurações do OfficeJur.");
+      throw new Error("Configure a nuvem nas Configurações do OfficeJur.");
     const snapshot = await gistClient.gistSnapshot(
         settings.gistId,
         settings.token,
@@ -3183,7 +3183,8 @@
     }
     refreshGistCredentials();
     if (!settings.gistId || !settings.token)
-      throw new Error("Configure o Gist nas Configurações do OfficeJur.");
+      throw new Error("Configure a nuvem nas Configurações do OfficeJur.");
+    window.OfficeJurCloudStatus?.set("#sync-label", "syncing");
     syncInFlight = (async () => {
       await dataReady;
       await dataSaveInFlight;
@@ -3210,7 +3211,7 @@
           JSON.parse(
             await readGistText(
               filesFile,
-              "Não foi possível ler o índice de arquivos do Gist.",
+              "Não foi possível ler o índice de arquivos da nuvem.",
             ),
           ),
         );
@@ -3244,7 +3245,8 @@
             financeFiles.signature(remoteFiles);
       if (!changedDomains.length && !filesChanged) {
         saveSyncState();
-        toast("Dados e arquivos já estavam atualizados no Gist.");
+        window.OfficeJurCloudStatus?.set("#sync-label", "synced");
+        toast("Dados e arquivos já estavam atualizados na nuvem.");
         return;
       }
       const changedFiles = {};
@@ -3290,10 +3292,13 @@
         );
       saveSyncState();
       toast("Dados e arquivos sincronizados.");
-      renderGistStatus();
+      window.OfficeJurCloudStatus?.set("#sync-label", "synced");
     })();
     try {
       await syncInFlight;
+    } catch (error) {
+      window.OfficeJurCloudStatus?.set("#sync-label", "error", error.message);
+      throw error;
     } finally {
       syncInFlight = null;
       if (syncPending) {
@@ -3310,12 +3315,13 @@
     refreshGistCredentials();
     const warning = access?.warning?.();
     if (warning) {
-      $("#sync-label").innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${escapeHtml(warning)}`;
+      window.OfficeJurCloudStatus?.set("#sync-label", "blocked", warning);
       return;
     }
-    $("#sync-label").innerHTML = settings.gistId
-      ? '<i class="fa-solid fa-cloud"></i> Gist configurado'
-      : '<i class="fa-solid fa-hard-drive"></i> Neste navegador';
+    window.OfficeJurCloudStatus?.set(
+      "#sync-label",
+      settings.gistId && settings.token ? "configured" : "local",
+    );
   }
   function exportCsv() {
     const q = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;

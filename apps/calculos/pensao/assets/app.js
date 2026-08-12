@@ -27,7 +27,7 @@
     access,
     getData: () => data,
     setData: (value) => { data = value; },
-    setStatus: (message) => { syncStatus.textContent = message; },
+    setStatus: (message) => { window.OfficeJurCloudStatus?.fromMessage(syncStatus, message); },
     notify,
   });
 
@@ -38,7 +38,6 @@
   function setBusy(value, label = "Processando…") {
     busy = value;
     document.querySelectorAll("button").forEach((button) => { button.disabled = value; });
-    if (value) syncStatus.textContent = label;
   }
   function clientName(clientId) {
     return financeApi?.clientLabel(financeApi.findClient(financeData, clientId)) || "Cliente não vinculado";

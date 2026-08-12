@@ -25,7 +25,7 @@
     <script src="../assets/office-context.js" defer></script>
     <link rel="stylesheet" href="./assets/styles.css?v=30" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
-    <link rel="stylesheet" href="./assets/site-header.css?v=1" />
+    <link rel="stylesheet" href="./assets/site-header.css?v=2" />
     <link rel="stylesheet" href="./assets/local-access-blocked.css?v=1" />
     <script
       src="./assets/fontawesome-7.3.0.min.js"
@@ -43,10 +43,11 @@
     <script src="./assets/storage.js?v=2" defer></script>
     <script src="./assets/data-store.js?v=2" defer></script>
     <script src="./assets/gist-settings.js?v=3" defer></script>
-    <script src="./assets/gist-client.js?v=1" defer></script>
-    <script src="./assets/gist-access-lease.js?v=4" defer></script>
-    <script src="./assets/local-access-blocked.js?v=2" defer></script>
-    <script src="./assets/app.js?v=37" defer></script>
+    <script src="./assets/gist-client.js?v=3" defer></script>
+    <script src="./assets/gist-access-lease.js?v=5" defer></script>
+    <script src="./assets/cloud-status.js?v=1" defer></script>
+    <script src="./assets/local-access-blocked.js?v=3" defer></script>
+    <script src="./assets/app.js?v=38" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -60,9 +61,7 @@
         ></a
       >
       <div class="top-actions">
-        <span id="sync-label"
-          ><i class="fa-solid fa-hard-drive"></i> Neste navegador</span
-        ><button
+        <office-cloud-status id="sync-label"></office-cloud-status><button
           class="icon-btn mobile-menu-btn"
           id="mobile-menu-btn"
           type="button"

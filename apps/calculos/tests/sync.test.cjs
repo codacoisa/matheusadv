@@ -42,14 +42,14 @@ test("carrega e mescla o mesmo arquivo compartilhado de cálculos", async () => 
   const { sync, getData, statuses } = fixture();
   await sync.fromGist();
   assert.deepEqual(getData().records.map(item => item.id), ["local", "remote"]);
-  assert.deepEqual(statuses, ["Sincronizando…", "Gist sincronizado"]);
+  assert.deepEqual(statuses, ["Sincronizando…", "Nuvem sincronizada"]);
 });
 
 test("salva no Gist somente quando a sincronização automática está ativa", async () => {
   const active = fixture();
   await active.sync.toGist();
   assert.equal(active.patches.length, 1);
-  assert.equal(active.statuses.at(-1), "Gist sincronizado");
+  assert.equal(active.statuses.at(-1), "Nuvem sincronizada");
 
   const inactive = fixture({
     gistSettings: { load: () => ({ gistId: "gist-1", token: "token", autoSync: false }) },

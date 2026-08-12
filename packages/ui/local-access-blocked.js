@@ -3,7 +3,7 @@
 
   const TITLE = "Acesso local bloqueado";
   const DESCRIPTION = "Os dados sincronizados deste navegador foram removidos porque a autorização expirou ou foi revogada. Atualize a credencial nas Configurações e sincronize novamente.";
-  const PENDING_DESCRIPTION = "Os dados sincronizados estão protegidos e aguardam a revalidação autenticada do Gist. Eles não serão exibidos até a confirmação do acesso.";
+  const PENDING_DESCRIPTION = "Os dados sincronizados estão protegidos e aguardam a revalidação autenticada da nuvem. Eles não serão exibidos até a confirmação do acesso.";
 
   function descriptionForLease() {
     try {
@@ -14,10 +14,14 @@
 
   function setStatus(statusElement) {
     if (!statusElement) return;
-    statusElement.textContent = TITLE;
     statusElement.setAttribute("role", "status");
     statusElement.setAttribute("aria-live", "polite");
     statusElement.classList.add("local-access-status");
+    if (typeof statusElement.setState === "function") {
+      statusElement.setState("blocked", TITLE);
+      return;
+    }
+    statusElement.textContent = TITLE;
   }
 
   function prepareRetry(retryButton) {

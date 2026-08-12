@@ -143,6 +143,7 @@ inject_shared_ui() {
   local assets="$1"
   cp "$ROOT_DIR/packages/ui/app-switcher.js" "$assets/app-switcher.js"
   cp "$ROOT_DIR/packages/ui/site-header.css" "$assets/site-header.css"
+  cp "$ROOT_DIR/packages/ui/cloud-status.js" "$assets/cloud-status.js"
   cp "$ROOT_DIR/packages/ui/gist-settings.js" "$assets/gist-settings.js"
   cp "$ROOT_DIR/packages/ui/gist-client.js" "$assets/gist-client.js"
   cp "$ROOT_DIR/packages/ui/gist-access-lease.js" "$assets/gist-access-lease.js"

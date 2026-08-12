@@ -29,6 +29,7 @@
 
     const nodes = {
       gistId: document.getElementById('gist-id'),
+      cloudStatus: document.getElementById('cloud-status'),
       loadButton: document.getElementById('load-button'),
       resetButton: document.getElementById('reset-button'),
       loadStatus: document.getElementById('load-status'),
@@ -188,12 +189,14 @@
     async function initializeConfigSync() {
       const settings = gistSettings?.load?.() || {};
       if (!settings.gistId || !settings.token) {
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'local');
         if (state.gistId) await loadBackup();
-        else setStatus('Informe o ID ou endereço do Gist para acompanhar as guias.');
+        else setStatus('Informe o ID ou endereço da fonte remota para acompanhar as guias.');
         return;
       }
 
       try {
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'syncing');
         access?.canSync(settings.gistId);
         const snapshot = await syncClient.gistSnapshot(settings.gistId, settings.token);
         const file = snapshot.gist?.files?.[CONFIG_FILE_NAME];
@@ -207,9 +210,11 @@
         }
         syncInputs();
         render();
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'synced');
         if (state.gistId) await loadBackup();
-        else setStatus('Informe o ID ou endereço do Gist para acompanhar as guias.');
+        else setStatus('Informe o ID ou endereço da fonte remota para acompanhar as guias.');
       } catch (error) {
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'error', error.message);
         setStatus(`Configuração local mantida. Não foi possível sincronizar: ${error.message}`, true);
         if (state.gistId) await loadBackup();
       }
@@ -217,10 +222,21 @@
 
     async function syncConfig() {
       const settings = gistSettings?.load?.() || {};
-      if (!settings.gistId || !settings.token) return false;
-      access?.canSync(settings.gistId);
-      const snapshot = await syncClient.gistSnapshot(settings.gistId, settings.token);
-      return writeSharedConfig(settings, snapshot);
+      if (!settings.gistId || !settings.token) {
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'local');
+        return false;
+      }
+      window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'syncing');
+      try {
+        access?.canSync(settings.gistId);
+        const snapshot = await syncClient.gistSnapshot(settings.gistId, settings.token);
+        const result = await writeSharedConfig(settings, snapshot);
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'synced');
+        return result;
+      } catch (error) {
+        window.OfficeJurCloudStatus?.set(nodes.cloudStatus, 'error', error.message);
+        throw error;
+      }
     }
 
     async function writeSharedConfig(settings, snapshot) {
@@ -247,21 +263,21 @@
     async function loadBackup() {
       const gistId = normalizeGistId(state.gistId);
       if (!gistId) {
-        setStatus('Informe um Gist válido.', true);
+        setStatus('Informe uma fonte remota válida.', true);
         return;
       }
       setLoading(true);
       setStatus('Carregando backup...');
 
       try {
-        if (!targetGistClient) throw new Error('Cliente do Gist indisponível.');
+        if (!targetGistClient) throw new Error('Leitor da fonte remota indisponível.');
         const token = window.OfficeJurGistSettings?.load?.().token || '';
         const gist = await targetGistClient.gist(gistId, token);
         const gistFiles = gist && gist.files ? Object.values(gist.files) : [];
         const selectedFile = gist?.files?.[DEFAULT_FILE_NAME]
           || gistFiles.find((file) => String(file?.filename || '').toLowerCase().endsWith('.json'));
         if (!selectedFile) {
-          throw new Error('Arquivo de backup não encontrado neste Gist.');
+          throw new Error('Arquivo de backup não encontrado na fonte remota.');
         }
 
         const rawContent = await targetGistClient.text(selectedFile, { maxBytes: MAX_BACKUP_BYTES });
@@ -661,8 +677,8 @@
 
       if (!state.db) {
         nodes.attentionSummary.textContent = state.gistId
-          ? 'Sincronize o Gist para atualizar as pendências.'
-          : 'Configure o Gist para começar.';
+          ? 'Atualize a fonte remota para revisar as pendências.'
+          : 'Configure a fonte remota para começar.';
         renderBackupMeta(null);
         renderStatsEmpty();
         renderFocusActions(null);

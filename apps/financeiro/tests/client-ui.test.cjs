@@ -11,6 +11,13 @@ const styles = fs.readFileSync(
 );
 const app = fs.readFileSync(path.join(root, "assets", "app.js"), "utf8");
 
+test("padronizar o estado da nuvem no cabeçalho", () => {
+  assert.match(html, /office-cloud-status id="sync-label"/);
+  assert.match(html, /cloud-status\.js/);
+  assert.doesNotMatch(html, />[^<]*Gist[^<]*</);
+  assert.match(app, /OfficeJurCloudStatus/);
+});
+
 test("manter a visualização do PDF em diálogo próprio", () => {
   const filesDialogStart = html.indexOf('id="client-files-dialog"');
   const filesDialogEnd = html.indexOf("</dialog>", filesDialogStart);

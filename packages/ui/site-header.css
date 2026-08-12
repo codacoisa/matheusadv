@@ -88,6 +88,38 @@ office-document-header {
   flex: 0 0 auto;
 }
 
+.topbar office-cloud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: var(--officejur-header-muted);
+  background: rgba(255, 255, 255, .06);
+  font: 700 11px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  white-space: nowrap;
+}
+
+.topbar office-cloud-status svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar office-cloud-status[state="synced"] { color: #d3f8e6; }
+.topbar office-cloud-status[state="syncing"] svg { animation: officejur-cloud-spin .9s linear infinite; }
+.topbar office-cloud-status[state="pending"] { color: #fbe9ad; }
+.topbar office-cloud-status[state="error"],
+.topbar office-cloud-status[state="blocked"] { color: #ffd2cc; }
+
+@keyframes officejur-cloud-spin { to { transform: rotate(360deg); } }
+
 .topbar .action-icon {
   display: none;
   width: 18px;
@@ -147,4 +179,15 @@ office-document-header {
   office-document-header .topbar .action-icon {
     display: block;
   }
+
+  .topbar office-cloud-status {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .topbar office-cloud-status span { display: none; }
 }

@@ -18,12 +18,13 @@
   <script src="../../assets/office-context.js" defer></script>
   <script src="../assets/app-switcher.js?v=6" defer></script>
   <script src="../assets/gist-settings.js?v=2" defer></script>
-  <script src="../assets/gist-client.js?v=2" defer></script>
-  <script src="../assets/gist-access-lease.js?v=4" defer></script>
-  <script src="../assets/sync.js?v=1" defer></script>
+  <script src="../assets/gist-client.js?v=3" defer></script>
+  <script src="../assets/gist-access-lease.js?v=5" defer></script>
+  <script src="../assets/cloud-status.js?v=1" defer></script>
+  <script src="../assets/sync.js?v=2" defer></script>
   <script src="../assets/modal-scroll-lock.js?v=1" defer></script>
   <script src="../assets/site-footer.js?v=5" defer></script>
-  <script src="../assets/local-access-blocked.js?v=2" defer></script>
+  <script src="../assets/local-access-blocked.js?v=3" defer></script>
   <script src="../../financeiro/assets/storage.js?v=2" defer></script>
   <script src="../../financeiro/assets/data-store.js?v=2" defer></script>
   <script src="../../documentos/assets/jspdf.umd.min.js" defer></script>
@@ -33,15 +34,15 @@
   <script src="../assets/core.js?v=1" defer></script>
   <script src="./assets/labor-core.js" defer></script>
   <script src="./assets/labor-pdf.js" defer></script>
-  <script src="./assets/labor-app.js" defer></script>
+  <script src="./assets/labor-app.js?v=2" defer></script>
   <link rel="stylesheet" href="../assets/styles.css?v=3">
-  <link rel="stylesheet" href="../assets/site-header.css?v=1">
+  <link rel="stylesheet" href="../assets/site-header.css?v=2">
   <link rel="stylesheet" href="../assets/local-access-blocked.css?v=1">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="../" aria-label="Voltar aos cálculos jurídicos"><img src="../../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt=""><span><strong>OfficeJur</strong><small>Cálculo trabalhista</small></span></a>
-    <div class="top-actions"><span id="sync-status" class="sync-status">Dados locais</span><office-app-switcher current="calculos"></office-app-switcher></div>
+    <div class="top-actions"><office-cloud-status id="sync-status"></office-cloud-status><office-app-switcher current="calculos"></office-app-switcher></div>
   </header>
   <main id="labor-app" tabindex="-1"><section class="loading" aria-live="polite"><span class="spinner"></span> Preparando o cálculo trabalhista…</section></main>
   <div id="labor-toast" class="toast" role="status" aria-live="polite" hidden></div>

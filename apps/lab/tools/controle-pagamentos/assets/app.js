@@ -33,6 +33,7 @@
   let syncPending = false;
 
   const els = {
+    cloudStatus: $('#cloud-status'),
     storageStatus: $('#storage-status'),
     personForm: $('#person-form'),
     personName: $('#person-name'),
@@ -434,14 +435,26 @@
     if (message) {
       els.storageStatus.textContent = message;
       els.storageStatus.style.color = tone === 'err' ? 'var(--danger)' : tone === 'ok' ? 'var(--ok)' : '';
+      window.OfficeJurCloudStatus?.set(
+        els.cloudStatus,
+        tone === 'err' ? 'error' : tone === 'ok' ? 'synced' : 'syncing',
+        message
+      );
       return;
     }
     const warning = access?.warning?.();
-    if (warning) { els.storageStatus.textContent = warning; els.storageStatus.style.color = 'var(--danger)'; return; }
-    const mode = settings.gistId ? 'Gist configurado' : 'Salvo neste navegador';
+    if (warning) {
+      els.storageStatus.textContent = warning;
+      els.storageStatus.style.color = 'var(--danger)';
+      window.OfficeJurCloudStatus?.set(els.cloudStatus, 'blocked', warning);
+      return;
+    }
+    const configured = Boolean(settings.gistId && settings.token);
+    const mode = configured ? 'Nuvem configurada' : 'Salvo neste navegador';
     const last = settings.lastSyncAt ? ` - última sincronização: ${new Date(settings.lastSyncAt).toLocaleString('pt-BR')}` : '';
     els.storageStatus.textContent = `${mode}${last}.`;
     els.storageStatus.style.color = '';
+    window.OfficeJurCloudStatus?.set(els.cloudStatus, configured ? 'configured' : 'local');
   }
 
   function renderPeople() {
@@ -873,7 +886,7 @@
   async function fetchGistFile() {
     refreshGistCredentials();
     if (!state.settings.gistId || !state.settings.token) {
-      throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+      throw new Error('Configure a nuvem nas Configurações do OfficeJur.');
     }
     const snapshot = await gistClient.gistSnapshot(
       state.settings.gistId,
@@ -885,7 +898,7 @@
   }
 
   async function readGistFilePayload(file) {
-    if (!file) throw new Error('Arquivo não encontrado no Gist.');
+    if (!file) throw new Error('Arquivo não encontrado na nuvem.');
     return JSON.parse(await gistClient.text(file));
   }
 
@@ -907,10 +920,11 @@
     }
     refreshGistCredentials();
     if (!state.settings.gistId || !state.settings.token) {
-      throw new Error('Configure o Gist nas Configurações do OfficeJur.');
+      throw new Error('Configure a nuvem nas Configurações do OfficeJur.');
     }
 
     syncInFlight = (async () => {
+      window.OfficeJurCloudStatus?.set(els.cloudStatus, 'syncing');
       const { file, revision } = await fetchGistFile();
       let remoteData = normalizeData({});
       let remoteSignature = '';
@@ -930,7 +944,7 @@
         state.settings.lastSyncAt = nowISO();
         state.settings.lastSyncSignature = mergedSignature;
         saveSyncState();
-        setSyncStatus('Dados já estavam atualizados no Gist.', 'ok');
+        setSyncStatus('Dados já estavam atualizados na nuvem.', 'ok');
         return;
       }
 
@@ -947,7 +961,7 @@
       state.settings.lastSyncAt = nowISO();
       state.settings.lastSyncSignature = mergedSignature;
       saveSyncState();
-      setSyncStatus('Dados sincronizados com o Gist.', 'ok');
+      setSyncStatus('Dados sincronizados com a nuvem.', 'ok');
     })();
 
     try {
@@ -1054,7 +1068,7 @@
     window.OfficeJurLocalAccessBlocked?.render({
       container: document.querySelector('main'),
       settingsHref: '../../configuracoes/',
-      statusElement: els.storageStatus,
+      statusElement: els.cloudStatus,
       footer: document.querySelector('office-site-footer'),
     });
   }
@@ -1065,7 +1079,7 @@
       await action();
       render();
     } catch (error) {
-      setSyncStatus(access?.warning?.() || (error && error.message ? error.message : 'Falha ao acessar o Gist.'), 'err');
+      setSyncStatus(access?.warning?.() || (error && error.message ? error.message : 'Falha ao acessar a nuvem.'), 'err');
     }
   }
 

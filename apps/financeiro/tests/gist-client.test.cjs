@@ -141,7 +141,7 @@ test("recusa atualização quando a revisão remota mudou", async (context) => {
       { "dados.json": { content: "{}" } },
       { etag: snapshot.etag },
     ),
-    (error) => error.status === 412 && error.category === "conflict" && /alterado em outro navegador/.test(error.message),
+    (error) => error.status === 412 && error.category === "conflict" && /alterados? em outro navegador/.test(error.message),
   );
   assert.equal(call, 2);
 });

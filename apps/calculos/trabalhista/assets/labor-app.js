@@ -38,7 +38,7 @@
     access,
     getData: () => data,
     setData: value => { data = value; },
-    setStatus: message => { syncStatus.textContent = message; },
+    setStatus: message => { window.OfficeJurCloudStatus?.fromMessage(syncStatus, message); },
     notify,
   });
 

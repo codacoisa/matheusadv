@@ -41,7 +41,7 @@
         const snapshot = await client.gistSnapshot(settings.gistId, settings.token);
         const file = snapshot.gist.files?.[storage.FILE];
         if (file) setData(storage.save(storage.merge(getData(), JSON.parse(await client.text(file)))));
-        status(settings.autoSync ? "Gist sincronizado" : "Gist conectado");
+        status(settings.autoSync ? "Nuvem sincronizada" : "Nuvem configurada");
       } catch (error) {
         status("Falha na sincronização");
         report(lease?.warning?.() || error.message);
@@ -52,7 +52,7 @@
     async function toGist() {
       const settings = gistSettings.load();
       if (!settings.autoSync || !settings.gistId || !settings.token) return getData();
-      status("Salvando no Gist…");
+      status("Sincronizando com a nuvem…");
       try {
         if (lease && !lease.canSync(settings.gistId)) return getData();
         const snapshot = await client.gistSnapshot(settings.gistId, settings.token);
@@ -66,7 +66,7 @@
           { [storage.FILE]: { content: JSON.stringify(getData(), null, 2) } },
           { etag: snapshot.etag },
         );
-        status("Gist sincronizado");
+        status("Nuvem sincronizada");
       } catch (error) {
         status("Pendente de sincronização");
         report(lease?.warning?.() || error.message);

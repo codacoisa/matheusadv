@@ -19,6 +19,9 @@ test('Arquivos integra o editor OnlyOffice sem se misturar aos geradores', () =>
   assert.match(portal, /href="\.\/arquivos\/"/);
   assert.match(switcher, /id: 'arquivos'/);
   assert.match(index, /current="arquivos"/);
+  assert.match(index, /office-cloud-status id="cloud-status"/);
+  assert.match(index, /cloud-status\.js/);
+  assert.doesNotMatch(index, />[^<]*Gist[^<]*</);
   assert.doesNotMatch(index, /documentos\/procuracao|documentos\/honorarios/);
   assert.doesNotMatch(labCatalog, /id: 'documentos'/);
   assert.match(index, /id="office-editor-frame"/);

@@ -216,6 +216,18 @@ const sharedHeaderPages = [
   "apps/documentos/procuracao/index.html",
 ];
 
+const cloudStatusPages = [
+  "apps/financeiro/index.html",
+  "apps/calculos/index.html",
+  "apps/calculos/facil/index.html",
+  "apps/calculos/completo/index.html",
+  "apps/calculos/pensao/index.html",
+  "apps/calculos/trabalhista/index.html",
+  "apps/arquivos/index.html",
+  "apps/lab/tools/controle-pagamentos/index.html",
+  "apps/lab/tools/central-guias/index.html",
+];
+
 const localAccessBlockedPages = [
   "apps/calculos/index.html",
   "apps/calculos/facil/index.html",
@@ -247,6 +259,11 @@ const localAccessBlockedSourceCopies = [
 
 if (!existsSync("packages/ui/site-header.css")) {
   console.error("Base visual compartilhada dos headers ausente.");
+  process.exit(1);
+}
+
+if (!existsSync("packages/ui/cloud-status.js")) {
+  console.error("Indicador compartilhado de nuvem ausente.");
   process.exit(1);
 }
 
@@ -286,6 +303,24 @@ for (const path of localAccessBlockedSourceCopies) {
 for (const path of sharedHeaderPages) {
   if (!readFileSync(path, "utf8").includes("site-header.css")) {
     console.error(`Página sem o header visual compartilhado: ${path}.`);
+    process.exit(1);
+  }
+}
+
+for (const path of cloudStatusPages) {
+  const source = readFileSync(path, "utf8");
+  const publishedRelativePath = path.startsWith("apps/lab/tools/")
+    ? path.replace("apps/lab/tools/", "lab/")
+    : path.replace(/^apps\//, "");
+  const publishedPath = join(root, publishedRelativePath);
+  const published = readFileSync(publishedPath, "utf8");
+  if (
+    !source.includes("cloud-status.js") ||
+    !source.includes("<office-cloud-status") ||
+    !published.includes("cloud-status.js") ||
+    !published.includes("<office-cloud-status")
+  ) {
+    console.error(`Página sincronizável sem o indicador compartilhado de nuvem: ${path}.`);
     process.exit(1);
   }
 }

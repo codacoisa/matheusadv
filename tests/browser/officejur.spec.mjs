@@ -66,6 +66,28 @@ for (const appPath of pages) {
   });
 }
 
+test('módulos sincronizáveis usam o mesmo estado de nuvem no cabeçalho', async ({ page }) => {
+  const routes = [
+    'financeiro/',
+    'calculos/',
+    'calculos/facil/',
+    'calculos/completo/',
+    'calculos/pensao/',
+    'calculos/trabalhista/',
+    'arquivos/',
+    'lab/controle-pagamentos/',
+    'lab/central-guias/',
+  ];
+
+  for (const route of routes) {
+    await page.goto(route, { waitUntil: 'networkidle' });
+    const status = page.locator('header office-cloud-status');
+    await expect(status, `Indicador de nuvem ausente em ${route}`).toBeVisible();
+    await expect(status).toHaveText('Somente neste navegador');
+    await expect(page.locator('body')).not.toContainText(/Gist configurado|Gist sincronizado|sincronizad[oa]s? com o Gist/i);
+  }
+});
+
 test('tema da instalação é aplicado à interface e aos documentos', async ({ page }) => {
   await page.goto('', { waitUntil: 'networkidle' });
   const interfaceTheme = await page.evaluate(() => ({
@@ -135,7 +157,7 @@ const localAccessBlockedRoutes = [
   'financeiro/',
   'lab/controle-pagamentos/',
 ];
-const blockedDescription = 'Os dados sincronizados estão protegidos e aguardam a revalidação autenticada do Gist. Eles não serão exibidos até a confirmação do acesso.';
+const blockedDescription = 'Os dados sincronizados estão protegidos e aguardam a revalidação autenticada da nuvem. Eles não serão exibidos até a confirmação do acesso.';
 
 for (const route of localAccessBlockedRoutes) {
   test(`${route} padroniza o acesso local bloqueado`, async ({ page }) => {
@@ -167,7 +189,7 @@ for (const route of localAccessBlockedRoutes) {
     await expect(page.locator('body')).toHaveClass(/local-access-blocked/);
     await expect(page.locator('.local-access-status')).toHaveAttribute('role', 'status');
     await expect(page.locator('.local-access-status')).toHaveAttribute('aria-live', 'polite');
-    await expect(page.locator('.local-access-status')).toContainText('Acesso local bloqueado');
+    await expect(page.locator('.local-access-status')).toContainText('Acesso à nuvem bloqueado');
     await expect(page.getByRole('button', { name: 'Tentar novamente' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Sincronizar/ })).toHaveCount(0);
     await expect(page.locator('main')).toHaveCount(1);
@@ -1250,7 +1272,7 @@ test('cálculo trabalhista usa a sincronização compartilhada do Gist', async (
   });
 
   await prepareCalculationPage(page, 'calculos/trabalhista/');
-  await expect(page.locator('#sync-status')).toHaveText('Gist sincronizado');
+  await expect(page.locator('#sync-status')).toHaveText('Nuvem sincronizada');
   await page.getByLabel('Nome do cálculo').fill('Rascunho sincronizado');
   await page.getByLabel('Cliente').selectOption('client-test');
   await page.getByLabel(/Empregado ainda ativo/).check();

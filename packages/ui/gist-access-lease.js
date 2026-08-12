@@ -398,7 +398,7 @@
       if (current.phase !== "grace") return "";
       const minutes = Math.max(0, Math.ceil((current.graceExpiresAt - nowMs(clock)) / 60_000));
       const remaining = minutes >= 60 ? `${Math.floor(minutes / 60)} h${minutes % 60 ? ` e ${minutes % 60} min` : ""}` : `${minutes} min`;
-      return `Acesso ao Gist recusado. Nova tentativa disponível; limpeza local em ${remaining} se não houver recuperação.`;
+      return `Acesso à nuvem recusado. Nova tentativa disponível; limpeza local em ${remaining} se não houver recuperação.`;
     }
     function gatedClient(client) {
       const withId = new Set(["gist", "gistSnapshot", "patch"]);
