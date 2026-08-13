@@ -132,6 +132,9 @@ test("alertar CNPJ inválido e manter o status da consulta pública no formulár
   assert.match(html, /id="client-cnpj-status"[^>]*data-cnpj-status[^>]*role="status"/);
   assert.match(app, /CNPJ inválido\. Confira os 14 caracteres/);
   assert.match(app, /scheduleClientCnpjLookup/);
+  assert.match(app, /function setClientCnpjGate/);
+  assert.match(app, /dataset\.cnpjGate/);
+  assert.match(app, /aguarde a consulta antes de salvar/);
   assert.match(cnpjAssistant, /https:\/\/api\.opencnpj\.org/);
 });
 

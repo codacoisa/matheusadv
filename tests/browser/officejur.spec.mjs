@@ -712,6 +712,8 @@ test('Financeiro aceita CNPJ alfanumérico e pré-preenche a pessoa jurídica', 
   await page.locator('#quick-client').click();
   const form = page.locator('#client-form');
   await form.locator('[name="type"]').selectOption('pj');
+  await expect(form.locator('[name="legalName"]')).toBeDisabled();
+  await expect(page.locator('#save-client')).toBeDisabled();
   await form.locator('[name="cnpj"]').fill('12abc34501de35');
 
   await expect(form.locator('[name="cnpj"]')).toHaveValue('12.ABC.345/01DE-35');
@@ -723,6 +725,8 @@ test('Financeiro aceita CNPJ alfanumérico e pré-preenche a pessoa jurídica', 
   await expect(form.locator('[name="city"]')).toHaveValue('Goiânia');
   await expect(form.locator('[data-cnpj-status]')).toContainText('Dados públicos carregados');
   await expect(form.locator('[data-cnpj-status]')).toContainText('Situação cadastral: Ativa');
+  await expect(form.locator('[name="legalName"]')).toBeEnabled();
+  await expect(page.locator('#save-client')).toBeEnabled();
 
   await form.locator('[name="cnpj"]').fill('12ABC34501DE36');
   await expect(form.locator('#client-cnpj-warning')).toHaveText(/CNPJ inválido/);
@@ -772,13 +776,21 @@ test('Financeiro filtra e ordena a carteira de clientes', async ({ page }) => {
 });
 
 test('Financeiro cadastra pessoa jurídica com representante reutilizável', async ({ page }) => {
+  await page.route('https://api.opencnpj.org/04252011000110', route => route.fulfill({
+    status: 404,
+    contentType: 'application/json',
+    body: JSON.stringify({ error: 'not_found' }),
+  }));
   await page.goto('financeiro/', { waitUntil: 'networkidle' });
   await page.locator('#quick-client').click();
   const clientForm = page.locator('#client-form');
   await clientForm.locator('[name="type"]').selectOption('pj');
+  await expect(clientForm.locator('[name="legalName"]')).toBeDisabled();
+  await clientForm.locator('[name="cnpj"]').fill('04.252.011/0001-10');
+  await expect(clientForm.locator('[data-cnpj-status]')).toContainText('campos foram liberados para preenchimento manual');
+  await expect(clientForm.locator('[name="legalName"]')).toBeEnabled();
   await clientForm.locator('[name="legalName"]').fill('Empresa Exemplo Ltda');
   await clientForm.locator('[name="tradeName"]').fill('Empresa Exemplo');
-  await clientForm.locator('[name="cnpj"]').fill('04.252.011/0001-10');
   await clientForm.locator('[name="phoneNational"]').fill('62999999999');
   await clientForm.locator('[name="zip"]').fill('74000123');
   await expect(clientForm.locator('[data-address-status]')).toContainText('Endereço localizado pelo CEP');

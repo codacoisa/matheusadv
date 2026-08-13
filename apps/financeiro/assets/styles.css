@@ -939,7 +939,14 @@ dialog form {
 }
 .form-grid .cnpj-status[data-kind="success"] { color: var(--success); }
 .form-grid .cnpj-status[data-kind="error"] { color: var(--danger); }
+.form-grid .cnpj-status[data-kind="locked"] { color: var(--warn); }
 .form-grid .cnpj-status:empty { min-height: 0; }
+#client-form[data-cnpj-gate="locked"] input:disabled,
+#client-form[data-cnpj-gate="locked"] select:disabled,
+#client-form[data-cnpj-gate="locked"] textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
 .span-2 {
   grid-column: 1/-1;
 }

@@ -2632,6 +2632,19 @@
     $("#person-modal-title").textContent = person ? "Editar pessoa" : "Nova pessoa";
     $("#person-dialog").showModal();
   }
+  function setClientCnpjGate(form, locked) {
+    const keepEnabled = new Set([
+      form.elements.id,
+      form.elements.personId,
+      form.elements.type,
+      form.elements.cnpj,
+    ]);
+    form.querySelectorAll("input, select, textarea, button").forEach((control) => {
+      if (keepEnabled.has(control) || control.matches("#delete-client, [value=cancel]")) return;
+      control.disabled = locked;
+    });
+    form.dataset.cnpjGate = locked ? "locked" : "ready";
+  }
   function syncClientKind() {
     const form = $("#client-form"), type = form.elements.type.value;
     form.querySelectorAll("[data-client-kind]").forEach((section) => {
@@ -2648,7 +2661,17 @@
     if (type !== "pj") {
       clearTimeout(clientCnpjLookupTimer);
       clientCnpjLookupRequest += 1;
+      setClientCnpjGate(form, false);
       setClientCnpjStatus(form);
+      return;
+    }
+    const normalized = normalizeCnpj(form.elements.cnpj.value),
+      valid = normalized.length === 14 && validCnpj(normalized),
+      savedClient = Boolean(form.elements.id.value && valid);
+    setClientCnpjGate(form, !savedClient);
+    if (!savedClient) {
+      if (valid) scheduleClientCnpjLookup(form);
+      else setClientCnpjStatus(form, "Informe um CNPJ válido para liberar os campos do cadastro.", "locked");
     }
   }
   function fillClientFormProfile(form, profile) {
@@ -2704,15 +2727,25 @@
     form.elements.cnpj.value = maskCnpj(profile.cnpj || form.elements.cnpj.value);
     const status = profile.status ? ` Situação cadastral: ${profile.status}.` : "";
     setClientCnpjStatus(form, `Dados públicos carregados. Confira antes de salvar.${status}`, "success");
+    setClientCnpjGate(form, false);
   }
   function scheduleClientCnpjLookup(form) {
     clearTimeout(clientCnpjLookupTimer);
+    const request = ++clientCnpjLookupRequest;
     const normalized = normalizeCnpj(form.elements.cnpj.value);
     if (normalized.length !== 14 || !validCnpj(normalized)) {
-      setClientCnpjStatus(form);
+      setClientCnpjGate(form, true);
+      setClientCnpjStatus(
+        form,
+        normalized
+          ? "Corrija o CNPJ para liberar os campos do cadastro."
+          : "Informe um CNPJ válido para liberar os campos do cadastro.",
+        "locked",
+      );
       return;
     }
-    const request = ++clientCnpjLookupRequest;
+    setClientCnpjGate(form, true);
+    setClientCnpjStatus(form, "Consultando dados públicos…", "loading");
     clientCnpjLookupTimer = setTimeout(async () => {
       if (request !== clientCnpjLookupRequest || normalizeCnpj(form.elements.cnpj.value) !== normalized) return;
       setClientCnpjStatus(form, "Consultando dados públicos…", "loading");
@@ -2722,7 +2755,12 @@
         await fillClientFromCnpj(form, profile);
       } catch (error) {
         if (request !== clientCnpjLookupRequest) return;
-        setClientCnpjStatus(form, error.message || "Não foi possível consultar o CNPJ. Preencha os dados manualmente.", "error");
+        setClientCnpjStatus(
+          form,
+          `${error.message || "Não foi possível consultar o CNPJ."} Os campos foram liberados para preenchimento manual.`,
+          "error",
+        );
+        setClientCnpjGate(form, false);
       }
     }, 450);
   }
@@ -2772,7 +2810,8 @@
       renderRepresentatives();
     }
     syncClientKind();
-    setClientCnpjStatus(f);
+    if (f.elements.type.value !== "pj" || (f.elements.id.value && validCnpj(normalizeCnpj(f.elements.cnpj.value))))
+      setClientCnpjStatus(f);
     void addressAssistant?.refresh(f, selectedCity);
     syncPhoneField();
     clientDocumentAvailability(f);
@@ -3953,8 +3992,10 @@
   $("#client-form").addEventListener("submit", (e) => {
     if (e.submitter?.value === "cancel") return;
     e.preventDefault();
-    const f = e.currentTarget,
-      fd = Object.fromEntries(new FormData(f)),
+    const f = e.currentTarget;
+    if (f.elements.type.value === "pj" && f.dataset.cnpjGate === "locked")
+      return toast("Informe um CNPJ válido e aguarde a consulta antes de salvar.");
+    const fd = Object.fromEntries(new FormData(f)),
       phone = parsePhone(fd.phoneNational, fd.phoneCountry);
     if (!clientDocumentAvailability(f, true)) return;
     if (!phone?.isValid())
