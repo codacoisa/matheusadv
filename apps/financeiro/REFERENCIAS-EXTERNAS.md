@@ -50,6 +50,23 @@ incorporado.
 - **Referências:** [GitHub Pages](https://docs.github.com/pages) e
   [REST API para Gists](https://docs.github.com/en/rest/gists/gists).
 
+### OpenCNPJ
+
+- **Uso:** consulta pública de dados cadastrais para pré-preenchimento do
+  cadastro de clientes pessoa jurídica.
+- **Endpoint:** `https://api.opencnpj.org/{cnpj}`; a consulta é feita somente
+  após a validação local do CNPJ e não exige credencial no navegador.
+- **Dados utilizados:** razão social, nome fantasia, natureza jurídica,
+  contatos e endereço. O retorno não é salvo integralmente; o OfficeJur grava
+  somente os campos próprios do cadastro após a conferência da pessoa usuária.
+- **Formato:** o OfficeJur aceita os 14 caracteres do CNPJ vigente, com as 12
+  primeiras posições alfanuméricas e os dois dígitos verificadores numéricos.
+- **Fonte e projeto:** [OpenCNPJ](https://opencnpj.org/) e
+  [repositório oficial](https://github.com/Hitmasu/opencnpj).
+- **Observação:** os dados são públicos e processados a partir de fontes da
+  Receita Federal; a consulta é auxiliar e não substitui conferência cadastral
+  ou documento oficial.
+
 ### Mercado Pago
 
 - **Checkout Pro:** criação dos links de pagamento exibidos no módulo de

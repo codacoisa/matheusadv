@@ -11,6 +11,7 @@
   const financeStorage = window.FinanceStorage;
   const financeDataStore = window.FinanceDataStore;
   const addressAssistant = window.OfficeJurAddressAssistant;
+  const cnpjAssistant = window.OfficeJurCnpjAssistant;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
     MP_KEY = "officejur::financeiro::mercado-pago::settings",
     MP_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
@@ -53,6 +54,12 @@
     validateAgreement,
   } = globalThis.FinanceContracts;
   const { cashFlowSeries } = globalThis.FinanceMetrics;
+  const {
+    lookupCnpj,
+    maskCnpj,
+    normalizeCnpj,
+    validCnpj,
+  } = cnpjAssistant;
   const {
     hasDuplicateCaseReference,
     hasDuplicateDocument,
@@ -198,8 +205,11 @@
       .trim()
       .replace(/\s+/g, " ")
       .toLocaleLowerCase("pt-BR");
-  const isCompanyDocument = (value) =>
-    String(value || "").replace(/\D/g, "").length > 11;
+  const normalizeDocumentIdentifier = normalizeCnpj;
+  const isCompanyDocument = (value) => {
+    const normalized = normalizeDocumentIdentifier(value);
+    return normalized.length > 11 || /[A-Z]/.test(normalized);
+  };
   const maskCpf = (value) =>
     String(value || "")
       .replace(/\D/g, "")
@@ -207,17 +217,9 @@
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d)/, "$1.$2")
       .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  const maskCnpj = (value) =>
-    String(value || "")
-      .replace(/\D/g, "")
-      .slice(0, 14)
-      .replace(/(\d{2})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1/$2")
-      .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
   const maskDocument = (value) => {
-    const d = String(value || "").replace(/\D/g, "");
-    return d.length > 11 ? maskCnpj(d) : maskCpf(d);
+    const normalized = normalizeDocumentIdentifier(value);
+    return isCompanyDocument(normalized) ? maskCnpj(normalized) : maskCpf(normalized);
   };
   const maskZip = (value) =>
     String(value || "")
@@ -389,23 +391,6 @@
     };
     return digit(9) === Number(d[9]) && digit(10) === Number(d[10]);
   }
-  function validCnpj(value) {
-    const digits = String(value || "").replace(/\D/g, "");
-    if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false;
-    const calculate = (length) => {
-      let sum = 0, weight = length - 7;
-      for (let index = 0; index < length; index += 1) {
-        sum += Number(digits[index]) * weight--;
-        if (weight < 2) weight = 9;
-      }
-      const remainder = sum % 11;
-      return remainder < 2 ? 0 : 11 - remainder;
-    };
-    return calculate(12) === Number(digits[12]) && calculate(13) === Number(digits[13]);
-  }
-  function documentDigits(value) {
-    return String(value || "").replace(/\D/g, "");
-  }
   function setDocumentWarning(field, selector, message = "") {
     const warning = $(selector);
     field.setCustomValidity(message);
@@ -416,10 +401,10 @@
   }
   function personCpfAvailability(form, notify = false) {
     const field = form.elements.cpf,
-      digits = documentDigits(field.value),
+      document = normalizeDocumentIdentifier(field.value),
       currentId = form.elements.id.value,
-      duplicate = digits.length === 11
-        ? data.people.find((person) => person.id !== currentId && documentDigits(person.cpf) === digits)
+      duplicate = document.length === 11
+        ? data.people.find((person) => person.id !== currentId && normalizeDocumentIdentifier(person.cpf) === document)
         : null,
       message = duplicate ? "Já existe uma pessoa cadastrada com este CPF." : "";
     setDocumentWarning(field, "#person-cpf-warning", message);
@@ -432,10 +417,10 @@
     if (type === "pf") {
       setDocumentWarning(form.elements.cnpj, "#client-cnpj-warning");
       const field = form.elements.document,
-        digits = documentDigits(field.value),
+        document = normalizeDocumentIdentifier(field.value),
         currentPersonId = form.elements.personId.value,
-        person = digits.length === 11
-          ? data.people.find((item) => documentDigits(item.cpf) === digits)
+        person = document.length === 11
+          ? data.people.find((item) => normalizeDocumentIdentifier(item.cpf) === document)
           : null,
         registeredClient = person ? clientForPerson(person.id) : null;
       let message = "";
@@ -449,14 +434,31 @@
     }
     setDocumentWarning(form.elements.document, "#client-cpf-warning");
     const field = form.elements.cnpj,
-      digits = documentDigits(field.value),
-      duplicate = digits.length === 14
-        ? data.clients.find((client) => client.id !== currentClientId && client.type === "pj" && documentDigits(client.cnpj) === digits)
+      document = normalizeDocumentIdentifier(field.value),
+      invalid = document.length === 14 && !validCnpj(document),
+      duplicate = !invalid && document.length === 14
+        ? data.clients.find((client) => client.id !== currentClientId && client.type === "pj" && normalizeDocumentIdentifier(client.cnpj) === document)
         : null,
-      message = duplicate ? "Já existe um cliente cadastrado com este CNPJ." : "";
+      message = invalid
+        ? "CNPJ inválido. Confira os 14 caracteres e os dígitos verificadores."
+        : duplicate
+          ? "Já existe um cliente cadastrado com este CNPJ."
+          : "";
     setDocumentWarning(field, "#client-cnpj-warning", message);
     if (message && notify) toast(message);
     return !message;
+  }
+  function teamDocumentAvailability(form, notify = false) {
+    const field = form.elements.document,
+      document = normalizeDocumentIdentifier(field.value);
+    let message = "";
+    if (document.length === 14 && !validCnpj(document))
+      message = "CNPJ inválido. Confira os 14 caracteres e os dígitos verificadores.";
+    else if (notify && field.value && document.length !== 11 && document.length !== 14)
+      message = "Informe um CPF com 11 ou um CNPJ com 14 caracteres.";
+    const available = setDocumentWarning(field, "#team-document-warning", message);
+    if (message && notify) toast(message);
+    return available;
   }
   const date = (v) =>
     v ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR") : "—";
@@ -1012,6 +1014,8 @@
     syncTimer = 0,
     syncInFlight = null,
     syncPending = false,
+    clientCnpjLookupTimer = 0,
+    clientCnpjLookupRequest = 0,
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "",
@@ -1535,8 +1539,8 @@
       if (order === "name-desc") result = -byName(left, right);
       else if (order === "document-asc")
         result = clientCollator.compare(
-          documentDigits(left.client.document),
-          documentDigits(right.client.document),
+          normalizeDocumentIdentifier(left.client.document),
+          normalizeDocumentIdentifier(right.client.document),
         );
       else if (order === "city-asc")
         result = clientCollator.compare(
@@ -2641,6 +2645,11 @@
       form.elements[name].required = type === "pj";
     });
     clientDocumentAvailability(form);
+    if (type !== "pj") {
+      clearTimeout(clientCnpjLookupTimer);
+      clientCnpjLookupRequest += 1;
+      setClientCnpjStatus(form);
+    }
   }
   function fillClientFormProfile(form, profile) {
     Object.entries(profile || {}).forEach(([key, value]) => {
@@ -2650,8 +2659,77 @@
       else field.value = value ?? "";
     });
   }
+  function setClientCnpjStatus(form, message = "", kind = "") {
+    const status = form.querySelector("[data-cnpj-status]");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.kind = kind;
+  }
+  function setClientFieldIfEmpty(form, name, value) {
+    const field = form.elements[name], text = String(value || "").trim();
+    if (!field || !text || String(field.value || "").trim()) return false;
+    field.value = text;
+    return true;
+  }
+  async function fillClientFromCnpj(form, profile) {
+    const hasManualAddress = ["street", "neighborhood", "city", "state", "zip"]
+      .some((name) => String(form.elements[name]?.value || "").trim());
+    if (!hasManualAddress && profile.zip) {
+      form.elements.zip.value = maskZip(profile.zip);
+      await addressAssistant?.fillFromZip(form);
+    }
+    setClientFieldIfEmpty(form, "legalName", profile.legalName);
+    setClientFieldIfEmpty(form, "tradeName", profile.tradeName);
+    setClientFieldIfEmpty(form, "legalNature", profile.legalNature);
+    setClientFieldIfEmpty(form, "email", profile.email);
+    setClientFieldIfEmpty(form, "addressNumber", profile.addressNumber);
+    setClientFieldIfEmpty(form, "complement", profile.complement);
+    setClientFieldIfEmpty(form, "neighborhood", profile.neighborhood);
+    setClientFieldIfEmpty(form, "street", profile.street);
+    setClientFieldIfEmpty(form, "neighborhood", profile.neighborhood);
+    setClientFieldIfEmpty(form, "addressNumber", profile.addressNumber);
+    setClientFieldIfEmpty(form, "complement", profile.complement);
+    if (!String(form.elements.state.value || "").trim()) form.elements.state.value = profile.state || "";
+    await addressAssistant?.refresh(form, form.elements.city.value || profile.city || "");
+    setClientFieldIfEmpty(form, "city", profile.city);
+
+    if (!String(form.elements.phoneNational.value || "").trim() && profile.phone) {
+      const phone = parsePhone(profile.phone, PHONE_DEFAULT_COUNTRY);
+      if (phone?.isValid()) {
+        form.elements.phoneCountry.value = phone.country || PHONE_DEFAULT_COUNTRY;
+        form.elements.phoneNational.value = phone.nationalNumber;
+        syncPhoneField();
+      }
+    }
+    form.elements.cnpj.value = maskCnpj(profile.cnpj || form.elements.cnpj.value);
+    const status = profile.status ? ` Situação cadastral: ${profile.status}.` : "";
+    setClientCnpjStatus(form, `Dados públicos carregados. Confira antes de salvar.${status}`, "success");
+  }
+  function scheduleClientCnpjLookup(form) {
+    clearTimeout(clientCnpjLookupTimer);
+    const normalized = normalizeCnpj(form.elements.cnpj.value);
+    if (normalized.length !== 14 || !validCnpj(normalized)) {
+      setClientCnpjStatus(form);
+      return;
+    }
+    const request = ++clientCnpjLookupRequest;
+    clientCnpjLookupTimer = setTimeout(async () => {
+      if (request !== clientCnpjLookupRequest || normalizeCnpj(form.elements.cnpj.value) !== normalized) return;
+      setClientCnpjStatus(form, "Consultando dados públicos…", "loading");
+      try {
+        const profile = await lookupCnpj(normalized);
+        if (request !== clientCnpjLookupRequest || normalizeCnpj(form.elements.cnpj.value) !== normalized) return;
+        await fillClientFromCnpj(form, profile);
+      } catch (error) {
+        if (request !== clientCnpjLookupRequest) return;
+        setClientCnpjStatus(form, error.message || "Não foi possível consultar o CNPJ. Preencha os dados manualmente.", "error");
+      }
+    }, 450);
+  }
   function openClient(id = "", sourcePersonId = "") {
     const f = $("#client-form");
+    clearTimeout(clientCnpjLookupTimer);
+    clientCnpjLookupRequest += 1;
     f.reset();
     f.elements.id.value = id;
     f.elements.phoneCountry.value = PHONE_DEFAULT_COUNTRY;
@@ -2694,6 +2772,7 @@
       renderRepresentatives();
     }
     syncClientKind();
+    setClientCnpjStatus(f);
     void addressAssistant?.refresh(f, selectedCity);
     syncPhoneField();
     clientDocumentAvailability(f);
@@ -3757,6 +3836,7 @@
     (e) => {
       e.target.value = maskCnpj(e.target.value);
       clientDocumentAvailability(e.target.form);
+      scheduleClientCnpjLookup(e.target.form);
     },
   );
   $("#client-form [name=type]").addEventListener("change", syncClientKind);
@@ -4104,7 +4184,10 @@
   });
   $("#team-form [name=document]").addEventListener(
     "input",
-    (e) => (e.target.value = maskDocument(e.target.value)),
+    (e) => {
+      e.target.value = maskDocument(e.target.value);
+      teamDocumentAvailability(e.target.form);
+    },
   );
   $("#team-form [name=phone]").addEventListener(
     "input",
@@ -4130,6 +4213,7 @@
         company: isCompanyDocument(fd.document),
       });
     if (!name) return toast("Informe o nome da pessoa.");
+    if (!teamDocumentAvailability(f, true)) return;
     if (
       fd.document &&
       hasDuplicateDocument(data.team, fd.document, fd.id)

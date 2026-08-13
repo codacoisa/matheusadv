@@ -16,6 +16,12 @@ test("identificar CPF duplicado independentemente da máscara", () => {
   assert.equal(hasDuplicateDocument(people, "12345678909", "1"), false);
 });
 
+test("identificar CNPJ alfanumérico duplicado independentemente da máscara", () => {
+  const companies = [{ id: "1", document: "12.ABC.345/01DE-35" }];
+  assert.equal(hasDuplicateDocument(companies, "12abc34501de35"), true);
+  assert.equal(hasDuplicateDocument(companies, "12ABC34501DE35", "1"), false);
+});
+
 test("normalizar número CNJ e referências internas", () => {
   assert.equal(
     normalizeCaseReference("0001234-56.2026.8.09.0001"),

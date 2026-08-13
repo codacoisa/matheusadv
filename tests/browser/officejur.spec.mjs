@@ -682,6 +682,53 @@ test('Financeiro avisa ao preencher CPF já cadastrado', async ({ page }) => {
   await expect(personForm.locator('[name="cpf"]')).toHaveAttribute('aria-invalid', 'true');
 });
 
+test('Financeiro aceita CNPJ alfanumérico e pré-preenche a pessoa jurídica', async ({ page }) => {
+  await page.route('https://api.opencnpj.org/12ABC34501DE35', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      cnpj: '12ABC34501DE35',
+      razao_social: 'EMPRESA ALFANUMERICA LTDA',
+      nome_fantasia: 'ALFA NOVA',
+      natureza_juridica: 'Sociedade Empresária Limitada',
+      telefones: [{ ddd: '62', numero: '999999999', is_fax: false }],
+      email: 'contato@alfanova.example',
+      logradouro: 'Avenida Central',
+      numero: '123',
+      complemento: 'Sala 4',
+      bairro: 'Centro',
+      cep: '',
+      uf: 'GO',
+      municipio: 'Goiânia',
+      situacao_cadastral: 'Ativa',
+    }),
+  }));
+  await page.route('https://servicodados.ibge.gov.br/api/v1/localidades/estados/GO/municipios?orderBy=nome', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([{ nome: 'Goiânia' }]),
+  }));
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.locator('#quick-client').click();
+  const form = page.locator('#client-form');
+  await form.locator('[name="type"]').selectOption('pj');
+  await form.locator('[name="cnpj"]').fill('12abc34501de35');
+
+  await expect(form.locator('[name="cnpj"]')).toHaveValue('12.ABC.345/01DE-35');
+  await expect(form.locator('[name="legalName"]')).toHaveValue('EMPRESA ALFANUMERICA LTDA');
+  await expect(form.locator('[name="tradeName"]')).toHaveValue('ALFA NOVA');
+  await expect(form.locator('[name="legalNature"]')).toHaveValue('Sociedade Empresária Limitada');
+  await expect(form.locator('[name="phoneNational"]')).toHaveValue(/9999/);
+  await expect(form.locator('[name="addressNumber"]')).toHaveValue('123');
+  await expect(form.locator('[name="city"]')).toHaveValue('Goiânia');
+  await expect(form.locator('[data-cnpj-status]')).toContainText('Dados públicos carregados');
+  await expect(form.locator('[data-cnpj-status]')).toContainText('Situação cadastral: Ativa');
+
+  await form.locator('[name="cnpj"]').fill('12ABC34501DE36');
+  await expect(form.locator('#client-cnpj-warning')).toHaveText(/CNPJ inválido/);
+  await expect(form.locator('[name="cnpj"]')).toHaveAttribute('aria-invalid', 'true');
+});
+
 test('Financeiro filtra e ordena a carteira de clientes', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
   await page.evaluate(() => new Promise((resolve, reject) => {

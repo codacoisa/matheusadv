@@ -48,7 +48,8 @@
     <script src="./assets/cloud-status.js?v=1" defer></script>
     <script src="./assets/local-access-blocked.js?v=3" defer></script>
     <script src="./assets/address-assistant.js?v=1" defer></script>
-    <script src="./assets/app.js?v=39" defer></script>
+    <script src="./assets/cnpj-assistant.js?v=1" defer></script>
+    <script src="./assets/app.js?v=40" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -666,7 +667,7 @@
           <div class="form-grid span-2 client-kind-fields" data-client-kind="pj" hidden>
             <label class="span-2">Razão social *<input name="legalName" placeholder="Empresa Exemplo Ltda." /></label>
             <label class="span-2">Nome fantasia<input name="tradeName" /></label>
-            <label>CNPJ *<input name="cnpj" inputmode="numeric" aria-describedby="client-cnpj-warning" placeholder="00.000.000/0000-00" /><small id="client-cnpj-warning" class="field-warning" role="alert" hidden></small></label>
+            <label>CNPJ *<input name="cnpj" inputmode="text" autocomplete="off" aria-describedby="client-cnpj-warning client-cnpj-status" placeholder="00.000.000/0000-00" /><small id="client-cnpj-warning" class="field-warning" role="alert" hidden></small><small id="client-cnpj-status" class="cnpj-status" data-cnpj-status role="status"></small></label>
             <label>Natureza jurídica<input name="legalNature" /></label>
             <label>Inscrição estadual<input name="stateRegistration" /></label>
             <label>Inscrição municipal<input name="municipalRegistration" /></label>
@@ -1030,7 +1031,7 @@
             >OAB / registro<input
               name="registration"
               placeholder="OAB/GO 00.000" /></label
-          ><label>CPF/CNPJ<input name="document" /></label
+          ><label>CPF/CNPJ<input name="document" aria-describedby="team-document-warning" /><small id="team-document-warning" class="field-warning" role="alert" hidden></small></label
           ><label>Telefone<input name="phone" /></label
           ><label>E-mail<input name="email" type="email" /></label
           ><label>CEP<input name="zip" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" /></label

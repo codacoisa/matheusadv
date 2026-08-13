@@ -929,6 +929,17 @@ dialog form {
 .form-grid .address-status[data-kind="success"] { color: var(--success); }
 .form-grid .address-status[data-kind="error"] { color: var(--danger); }
 .form-grid .address-status:empty { min-height: 0; }
+.form-grid .cnpj-status {
+  display: block;
+  min-height: 15px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.form-grid .cnpj-status[data-kind="success"] { color: var(--success); }
+.form-grid .cnpj-status[data-kind="error"] { color: var(--danger); }
+.form-grid .cnpj-status:empty { min-height: 0; }
 .span-2 {
   grid-column: 1/-1;
 }

@@ -8,7 +8,9 @@
   const roundMoney = (value) => Number(finiteAmount(value).toFixed(2));
 
   function normalizeDocumentIdentifier(value) {
-    return String(value || "").replace(/\D/g, "");
+    return String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
   }
 
   function normalizeCaseReference(value) {

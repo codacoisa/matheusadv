@@ -14,6 +14,10 @@ const addressAssistant = fs.readFileSync(
   path.join(root, "assets", "address-assistant.js"),
   "utf8",
 );
+const cnpjAssistant = fs.readFileSync(
+  path.join(root, "assets", "cnpj-assistant.js"),
+  "utf8",
+);
 
 test("padronizar o estado da nuvem no cabeçalho", () => {
   assert.match(html, /office-cloud-status id="sync-label"/);
@@ -111,14 +115,24 @@ test("separar número, quadra e lote do logradouro do cliente", () => {
 test("cadastrar pessoa jurídica com representantes reutilizáveis", () => {
   assert.match(html, /value="pj">Pessoa jurídica/);
   assert.match(html, /name="legalName"/);
-  assert.match(html, /name="cnpj"/);
+  assert.match(html, /name="cnpj"[^>]*inputmode="text"/);
+  assert.match(html, /cnpj-assistant\.js/);
   assert.match(html, /id="representatives-editor"/);
   assert.match(html, /id="person-dialog"/);
-  assert.match(app, /function validCnpj/);
+  assert.match(cnpjAssistant, /function validCnpj/);
+  assert.match(cnpjAssistant, /CNPJ_PATTERN/);
   assert.match(app, /signatureRule/);
   assert.match(app, /isPrimary/);
   assert.match(app, /isSigner/);
   assert.match(app, /activeClientRepresentatives/);
+});
+
+test("alertar CNPJ inválido e manter o status da consulta pública no formulário PJ", () => {
+  assert.match(html, /id="client-cnpj-warning"[^>]*role="alert"/);
+  assert.match(html, /id="client-cnpj-status"[^>]*data-cnpj-status[^>]*role="status"/);
+  assert.match(app, /CNPJ inválido\. Confira os 14 caracteres/);
+  assert.match(app, /scheduleClientCnpjLookup/);
+  assert.match(cnpjAssistant, /https:\/\/api\.opencnpj\.org/);
 });
 
 test("listar pessoas como subpágina de clientes e permitir promoção", () => {

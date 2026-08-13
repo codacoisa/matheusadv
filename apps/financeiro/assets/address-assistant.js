@@ -230,7 +230,11 @@
     return controllers.get(form)?.refresh(selectedCity) || Promise.resolve();
   }
 
-  const api = { STATES, citiesFor, lookupZip, maskZip, municipalitiesUrl, refresh, setup, zipUrl };
+  function fillFromZip(form) {
+    return controllers.get(form)?.fillFromZip() || Promise.resolve();
+  }
+
+  const api = { STATES, citiesFor, fillFromZip, lookupZip, maskZip, municipalitiesUrl, refresh, setup, zipUrl };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   globalThis.OfficeJurAddressAssistant = api;
 })();
