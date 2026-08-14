@@ -1,6 +1,9 @@
 .generalista-criteria{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
 .generalista-criteria .field{align-content:start}
 .generalista-criteria .check{align-items:center;min-height:44px;margin:25px 0 0}
+.info-tip{position:relative;display:inline-grid;width:17px;height:17px;place-items:center;margin-left:3px;border:1px solid currentColor;border-radius:50%;color:var(--green);font-size:11px;font-weight:850;line-height:1;cursor:help;vertical-align:-2px}
+.info-tip-bubble{position:absolute;z-index:20;top:calc(100% + 8px);left:0;display:none;width:270px;padding:10px 12px;border:1px solid #c7ddd2;border-radius:9px;color:#344054;background:#fff;box-shadow:0 8px 24px rgba(23,33,58,.16);font-size:12px;font-weight:500;line-height:1.4;text-align:left;opacity:0;transform:translateY(-3px);transition:opacity .15s ease,transform .15s ease;pointer-events:none}
+.info-tip:hover .info-tip-bubble,.info-tip:focus .info-tip-bubble{display:block;opacity:1;transform:translateY(0)}
 .date-range-field{gap:10px;padding:15px;border:1px solid #d8e6df;border-radius:14px;background:#f8fcfa}
 .date-range-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .date-range-part{display:grid;gap:6px;color:#344054;font-size:13px;font-weight:750}

@@ -1323,7 +1323,7 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
   await expect(wizard).toHaveCount(1);
   await expect(wizard.locator('.eyebrow')).toHaveText('Generalista');
   await expect(wizard.getByRole('heading', { name: 'Atualização monetária simples' })).toBeVisible();
-  await expect(wizard.locator('.hint').first()).toContainText(/OJ-GEN-.*• versão generic-1\.0\.0/);
+  await expect(wizard.locator('.hint').first()).toContainText(/OJ-GEN-.*• versão generic-1\.1\.0/);
   await expect(page.getByText('Ajuda e sugestões')).toHaveCount(0);
   await expect(page.locator('.generic-heading, .generic-wizard, .generic-card, .generic-summary')).toHaveCount(0);
   await expect(page.locator('.wizard-step strong').filter({ hasText: /Passo\s+\d/ })).toHaveCount(0);
@@ -1347,7 +1347,7 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await prepareCalculationPage(page);
   await page.locator('.calculator-card').filter({ hasText: 'Atualização monetária completa' }).getByRole('link', { name: 'Iniciar cálculo' }).click();
   await expect(page.locator('.panel.wizard-head .eyebrow')).toHaveText('Generalista');
-  await expect(page.locator('.panel.wizard-head .hint').first()).toContainText(/OJ-GEN-.*• versão generic-1\.0\.0/);
+  await expect(page.locator('.panel.wizard-head .hint').first()).toContainText(/OJ-GEN-.*• versão generic-1\.1\.0/);
   await expect(page.locator('.wizard-step').nth(2).locator('strong')).toHaveText('Encargos');
   await expect(page.locator('.wizard-step').nth(2).locator('small')).toHaveText('multas, honorários e custas');
   await expect(page.locator('.wizard-steps.steps-4')).toHaveCSS('display', 'grid');
@@ -1391,6 +1391,42 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^OJ-GEN-.*\.pdf$/i);
   await expect(page.locator('#toast')).toHaveText('PDF gerado.');
+});
+
+test('pró-rata explica a regra e altera os juros do cálculo completo', async ({ page }) => {
+  await prepareCalculationPage(page, 'calculos/completo/');
+  await page.getByLabel('Nome do cálculo').fill('Cálculo de pró-rata');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
+  await page.locator('#periodStartDate').fill('2026-01-01');
+  await page.locator('#calculationDate').fill('2026-02-15');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Data do item 1').fill('2026-01-01');
+  await page.getByLabel('Valor do item 1').fill('1000');
+  await page.locator('select[data-item-field="interestType"]').first().selectOption('fixed');
+  await page.locator('[data-item-field="interestRate"]').first().fill('1');
+  await expect(page.locator('.info-tip')).toHaveCount(2);
+  await page.locator('.info-tip').nth(0).hover();
+  await expect(page.locator('.info-tip-bubble').nth(0)).toBeVisible();
+  await expect(page.locator('.info-tip-bubble').nth(0)).toContainText('mês incompleto');
+  await page.locator('.info-tip').nth(1).focus();
+  await expect(page.locator('.info-tip-bubble').nth(1)).toBeVisible();
+  await expect(page.locator('.info-tip-bubble').nth(1)).toContainText('meses completos');
+  const prorata = page.locator('[data-item-field="interestProrata"]').first();
+  await expect(prorata).toBeChecked();
+  await prorata.uncheck();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.locator('.summary')).toBeVisible();
+  await expect(page.locator('.result-ledger-card').first().locator('dd').nth(3)).toHaveText('R$ 10,00');
+  await expect(page.locator('.legal-note')).toContainText('Taxa fixa de 1% ao mês, sem pró-rata');
+  await page.getByRole('button', { name: 'Voltar' }).click();
+  await page.getByRole('button', { name: 'Voltar' }).click();
+  await page.locator('[data-item-field="interestProrata"]').first().check();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.locator('.result-ledger-card').first().locator('dd').nth(3)).toHaveText('R$ 15,00');
+  await expect(page.locator('.legal-note')).toContainText('Taxa fixa de 1% ao mês, com pró-rata');
 });
 
 test('atualização monetária consulta o início da correção informado no lançamento', async ({ page }) => {

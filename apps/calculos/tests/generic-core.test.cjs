@@ -46,6 +46,26 @@ test("aceita juros anuais sem pró-rata", () => {
   assert.equal(result.rate, 24);
 });
 
+test("diferencia juros mensais com e sem pró-rata por competência", () => {
+  const prorata = core.interestRate("2021-06-25", "2021-08-14", 1, "monthly", true);
+  const fullPeriods = core.interestRate("2021-06-25", "2021-08-14", 1, "monthly", false);
+  assert.equal(prorata.rate, 1.6193548387);
+  assert.equal(fullPeriods.rate, 1);
+  assert.equal(prorata.applied[0].month, "2021-06");
+  assert.equal(prorata.applied.at(-1).month, "2021-08");
+});
+
+test("descreve no resultado a taxa configurada no lançamento completo", () => {
+  const result = core.calculateGeneric({
+    calculationDate: "2026-02-15",
+    periodStartDate: "2026-01-01",
+    items: [{ id: "d1", date: "2026-01-01", amount: 1000, description: "Parcela principal", kind: "debit", interestType: "fixed", interestRate: 1, interestPeriodicity: "monthly", interestStart: "2026-01-01", interestEnd: "2026-02-15", interestProrata: true }],
+    settings: { correctionType: "none" },
+  });
+  assert.match(result.methodology.interest, /Taxa fixa de 1% ao mês/);
+  assert.doesNotMatch(result.methodology.interest, /0%/);
+});
+
 test("aplica Taxa Legal por lançamento a partir de 30/08/2024", () => {
   const result = core.calculateGeneric({
     calculationDate: "2024-09-30",

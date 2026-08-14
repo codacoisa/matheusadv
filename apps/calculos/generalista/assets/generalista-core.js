@@ -6,7 +6,7 @@
   "use strict";
 
   const DAY = 86_400_000;
-  const VERSION = "generic-1.0.0";
+  const VERSION = "generic-1.1.0";
   const round = (value, digits = 2) => {
     const factor = 10 ** digits;
     return Math.round((Number(value || 0) + Number.EPSILON) * factor) / factor;
@@ -50,13 +50,25 @@
     const days = daysBetween(start, end);
     if (days <= 0 || !Number(rate)) return { rate: 0, applied: [] };
     const value = Number(rate);
-    if (prorata) {
-      const result = periodicity === "annual" ? value * days / 365 : value * days / daysInMonth(start);
-      return { rate: round(result, 10), applied: [{ days, periodicity, rate: round(result, 10) }] };
+    if (periodicity === "annual") {
+      const periods = Math.floor(days / 365);
+      const result = prorata ? value * days / 365 : value * periods;
+      return { rate: round(result, 10), applied: [{ days, periods, periodicity, prorata, rate: round(result, 10) }] };
     }
-    const periods = periodicity === "annual" ? Math.floor(days / 365) : Math.floor(days / daysInMonth(start));
-    const result = value * periods;
-    return { rate: round(result, 10), applied: [{ periods, periodicity, rate: round(result, 10) }] };
+    let cursor = new Date(start), total = 0;
+    const applied = [];
+    while (cursor < end) {
+      const monthEndExclusive = new Date(endOfMonth(cursor).getTime() + DAY);
+      const segmentEnd = end < monthEndExclusive ? end : monthEndExclusive;
+      const month = monthKey(cursor);
+      const segmentDays = daysBetween(cursor, segmentEnd);
+      const fullMonth = cursor.getUTCDate() === 1 && segmentEnd >= monthEndExclusive;
+      const eligible = prorata || fullMonth ? value * segmentDays / daysInMonth(cursor) : 0;
+      total += eligible;
+      applied.push({ month, monthlyRate: value, days: segmentDays, daysInMonth: daysInMonth(cursor), fullPeriod: fullMonth, prorata, rate: round(eligible, 10) });
+      cursor = segmentEnd;
+    }
+    return { rate: round(total, 10), applied };
   }
 
   function legalInterestRate(startValue, endValue, monthlyRates = {}) {
@@ -81,6 +93,34 @@
     return { rate: round(total, 10), applied };
   }
 
+  function interestSettings(item = {}, settings = {}) {
+    const configuredRate = item.interestRate ?? settings.interestRate ?? 0;
+    return {
+      type: item.interestType || settings.interestType || (Number(configuredRate) ? "fixed" : "none"),
+      rate: Number(configuredRate || 0),
+      periodicity: item.interestPeriodicity || settings.interestPeriodicity || "monthly",
+      prorata: item.interestProrata ?? settings.interestProrata ?? true,
+    };
+  }
+
+  function interestMethodology(items, settings) {
+    const configured = (items || []).map((item, index) => ({
+      ...interestSettings(item, settings),
+      label: item.description || `item ${index + 1}`,
+    })).filter((item) => item.type !== "none");
+    if (!configured.length) return "não aplicados";
+    const details = [];
+    const legal = configured.filter((item) => item.type === "legal");
+    if (legal.length) details.push("Taxa Legal (Lei 14.905/2024 e Resolução CMN 5.171/2024), mensal e proporcional aos dias corridos");
+    configured.filter((item) => item.type === "fixed").forEach((item) => {
+      const periodicity = item.periodicity === "annual" ? "ao ano" : "ao mês";
+      const convention = item.prorata ? "com pró-rata por dias corridos" : "sem pró-rata, somente períodos completos";
+      const scope = configured.length > 1 ? ` no lançamento “${item.label}”` : "";
+      details.push(`Taxa fixa de ${item.rate}% ${periodicity}, ${convention}${scope}`);
+    });
+    return details.join("; ");
+  }
+
   function updateItem(item, input, calculationDate, sign) {
     const settings = input.settings || {};
     const correctionType = item.correctionType || settings.correctionType || "none";
@@ -94,7 +134,8 @@
     );
     const principal = money(Math.abs(Number(item.amount || 0)));
     const corrected = money(principal * correction.factor);
-    const interestType = item.interestType || settings.interestType || (Number(item.interestRate ?? settings.interestRate) ? "fixed" : "none");
+    const configuredInterest = interestSettings(item, settings);
+    const interestType = configuredInterest.type;
     const interestStart = item.interestStart || input.periodStartDate || input.judgmentDate || item.date;
     const interestEnd = item.interestEnd || calculationDate;
     const interest = interestType === "legal"
@@ -102,9 +143,9 @@
       : interestType === "none" ? { rate: 0, applied: [] } : interestRate(
         interestStart,
         interestEnd,
-        item.interestRate ?? settings.interestRate ?? 0,
-        item.interestPeriodicity || settings.interestPeriodicity || "monthly",
-        item.interestProrata ?? settings.interestProrata ?? true,
+        configuredInterest.rate,
+        configuredInterest.periodicity,
+        configuredInterest.prorata,
       );
     const interestAmount = money(corrected * interest.rate / 100);
     return {
@@ -177,9 +218,9 @@
       },
       methodology: {
         correction: settings.correctionType || "none",
-        interest: settings.interestType === "legal" || items.some((item) => item.interestType === "legal") ? "Taxa Legal (Lei 14.905/2024 e Resolução CMN 5.171/2024)" : `${settings.interestRate || 0}% ${settings.interestPeriodicity === "annual" ? "ao ano" : "ao mês"}`,
-        correctionConvention: "Índices mensais aplicados no intervalo de cada lançamento, com pró-rata opcional.",
-        interestConvention: "Juros simples, proporcionais aos dias ou períodos completos conforme a opção escolhida.",
+        interest: interestMethodology(items, settings),
+        correctionConvention: "Índices mensais aplicados no intervalo de cada lançamento; com pró-rata, o mês incompleto é proporcional aos dias, e sem pró-rata somente competências completas são consideradas.",
+        interestConvention: "Juros simples; taxas mensais são apuradas competência a competência. Com pró-rata, cada fração mensal é proporcional aos dias; sem pró-rata, somente meses completos entram no cálculo. Para taxas anuais, a fração usa dias corridos sobre 365.",
         rounding: "Valores monetários arredondados para centavos em cada rubrica.",
       },
     };
