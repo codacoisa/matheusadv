@@ -89,13 +89,13 @@ const {
   arrayBufferToBinaryString,
   clean,
   decodePdfDraft,
+  formatCPF,
   formatLongDate,
   formatShortDate,
   formatTime,
   joinParts,
   todayISO,
 } = window.OfficeJurDocumentUtils;
-const formatCPF = window.OfficeJurDocumentUtils.formatCPF;
 const normalizeFilename = value => window.OfficeJurDocumentUtils.normalizeFilename(value, 'ciencia-audiencia');
 
 function getDraft() {
@@ -197,7 +197,7 @@ function drawHeader(doc, title = TEMPLATE_CONFIG.headerTitle) {
   doc.text(lines, 105, 61.5, { align: 'center', lineHeightFactor: 1.2 });
 }
 
-function drawFooter(doc, pageInfo) {
+function drawFooter(doc) {
   window.OfficeJurPdfTemplate.drawFooter(doc, drawIcon);
 }
 
