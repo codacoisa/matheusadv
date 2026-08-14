@@ -38,6 +38,7 @@
   let step = 1;
   let current = blank();
   let busy = false;
+  let indexLoadPromise = null;
 
   function notify(message, error = false) {
     toast.textContent = message;
@@ -270,18 +271,25 @@
     if (legalRatesRequired() && !Object.keys(snapshot.legalRates || {}).length) return false;
     return true;
   }
+  function indexRequestRange() {
+    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
+    const starts = [
+      ...current.input.items.flatMap((item) => [item.date, item.correctionStart || periodStart, item.interestStart || periodStart]),
+      ...current.input.costs.map((item) => item.date),
+    ].filter(Boolean).sort();
+    const ends = [
+      current.input.calculationDate,
+      ...current.input.items.flatMap((item) => [item.correctionEnd, item.interestEnd]),
+    ].filter(Boolean).sort();
+    return { start: starts[0] || current.input.calculationDate, end: ends.at(-1) || current.input.calculationDate };
+  }
   async function loadIndices() {
     captureVisible();
     const types = indexTypes();
     const legalSelected = legalInterestSelected();
     if (!types.length && !legalSelected) { current.indexSnapshot = null; notify("Nenhum índice externo foi selecionado."); return; }
     if (!indices?.snapshot) throw new Error("O módulo de índices oficiais não foi carregado.");
-    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
-    const dates = [
-      ...current.input.items.flatMap((item) => [item.date, item.correctionStart || periodStart, item.interestStart || periodStart]),
-      ...current.input.costs.map((item) => item.date),
-    ].filter(Boolean).sort();
-    const start = dates[0] || current.input.calculationDate, end = current.input.calculationDate;
+    const { start, end } = indexRequestRange();
     const criteriaKey = indexCriteriaKey();
     busy = true;
     try {
@@ -295,7 +303,8 @@
   }
   async function ensureIndices() {
     if (!officialIndicesRequired() || indexSnapshotMatchesCurrent()) return;
-    await loadIndices();
+    indexLoadPromise ||= loadIndices().finally(() => { indexLoadPromise = null; });
+    await indexLoadPromise;
     if (!indexSnapshotMatchesCurrent()) throw new Error("Os índices oficiais necessários não foram carregados para o período informado.");
   }
   async function calculate() {
@@ -367,6 +376,7 @@
     if (event.target.dataset.itemField === "interestType") {
       try { captureVisible(); } catch (_) { /* preserva a edição enquanto a linha muda de campos */ }
       render();
+      if (event.target.value === "legal") void ensureIndices().catch((error) => notify(error.message || "Não foi possível carregar os índices oficiais.", true));
       return;
     }
     if (event.target.id !== "feeType") return;

@@ -549,7 +549,7 @@ test('Documentos cria DOCX com o modelo institucional da implantação', async (
   await expect(page.locator('#office-status')).toContainText('Documento aberto para edição', { timeout: 30_000 });
   const office = page.frameLocator('#office-editor-frame').frameLocator('iframe');
   const printButton = office.locator('button:has(> i.icon--inverse.btn-print)');
-  await expect(printButton).toBeEnabled();
+  await expect(printButton).toBeEnabled({ timeout: 30_000 });
   await printButton.click();
   await expect(page.locator('#office-status')).toContainText(/Impressão aberta pelo OnlyOffice|Documento enviado para impressão/, { timeout: 60_000 });
   await expect(page.locator('#office-status')).not.toHaveClass(/error/);
@@ -981,7 +981,7 @@ test('Documentos abre o OnlyOffice em modal amplo e permite renomear durante a e
   await nativeButton('undo').click();
   await expect(nativeButton('redo')).toBeEnabled();
   await nativeButton('redo').click();
-  await expect(nativeButton('print')).toBeEnabled();
+  await expect(nativeButton('print')).toBeEnabled({ timeout: 30_000 });
   await nativeButton('print').click();
   await expect(page.locator('#office-status')).toContainText(/Impressão aberta pelo OnlyOffice|Documento enviado para impressão/, { timeout: 60_000 });
   await office.locator('a[data-tab="file"]').click();
@@ -1418,10 +1418,13 @@ test('Taxa Legal carrega automaticamente as fontes oficiais antes do cálculo', 
   await page.getByLabel('Nome do cálculo').fill('Cálculo com Taxa Legal');
   await page.locator('#clientId').selectOption('client-test');
   await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
+  await page.locator('#periodStartDate').fill('2021-07-01');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await page.getByLabel('Descrição do item 1').fill('Parcela com Taxa Legal');
   await page.getByLabel('Valor do item 1').fill('100');
   await page.locator('select[data-item-field="interestType"]').first().selectOption('legal');
+  await expect.poll(() => requests.some(({ seriesId, start }) => seriesId === '11' && start === '01/07/2024')).toBe(true);
+  await expect(page.locator('#toast')).toHaveText('Índices oficiais carregados e congelados neste rascunho.', { timeout: 30_000 });
   await page.getByLabel('Início dos juros do item 1').fill('2021-07-01');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await page.getByRole('button', { name: 'Calcular' }).click();
