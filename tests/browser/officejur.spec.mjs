@@ -1334,6 +1334,13 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
   await expect(page.locator('.wizard-steps.steps-2')).toHaveCSS('display', 'grid');
   await expect(page.locator('.wizard-step.active')).toHaveCount(1);
   await expect(page.locator('#generalista-form .wizard-actions > div')).toHaveCSS('gap', '10px');
+  await expect(page.locator('.simple-criteria')).toBeVisible();
+  await expect(page.locator('.criteria-card')).toHaveCount(3);
+  for (const width of [1280, 900, 620, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByLabel('Nome do cálculo').fill('Cálculo fácil de teste');
   await page.locator('#clientId').selectOption('client-test');
   await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
