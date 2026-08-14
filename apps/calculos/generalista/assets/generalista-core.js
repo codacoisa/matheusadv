@@ -54,7 +54,7 @@
       const result = periodicity === "annual" ? value * days / 365 : value * days / daysInMonth(start);
       return { rate: round(result, 10), applied: [{ days, periodicity, rate: round(result, 10) }] };
     }
-    const periods = periodicity === "annual" ? Math.floor(days / 365) : Math.floor(days / 30);
+    const periods = periodicity === "annual" ? Math.floor(days / 365) : Math.floor(days / daysInMonth(start));
     const result = value * periods;
     return { rate: round(result, 10), applied: [{ periods, periodicity, rate: round(result, 10) }] };
   }

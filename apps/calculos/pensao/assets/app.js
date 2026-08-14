@@ -149,6 +149,8 @@
       <div class="field"><label class="required" for="correctionType">Correção monetária</label><select id="correctionType">
         <option value="INPC" ${s.correctionType === "INPC" ? "selected" : ""}>INPC (IBGE)</option>
         <option value="IPCA" ${s.correctionType === "IPCA" ? "selected" : ""}>IPCA (IBGE)</option>
+        <option value="IPCA-E" ${s.correctionType === "IPCA-E" ? "selected" : ""}>IPCA-E (IBGE)</option>
+        <option value="IPCA15" ${s.correctionType === "IPCA15" ? "selected" : ""}>IPCA-15 (IBGE)</option>
         <option value="none" ${s.correctionType === "none" ? "selected" : ""}>Sem correção</option></select></div>
       <div class="field"><label class="required" for="interestType">Juros</label><select id="interestType">
         <option value="legal" ${s.interestType === "legal" ? "selected" : ""}>Taxa Legal — Lei 14.905/2024</option>
