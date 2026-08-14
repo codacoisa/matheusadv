@@ -45,6 +45,34 @@ async function prepareCalculationPage(page, path = 'calculos/') {
   await page.goto(path, { waitUntil: 'networkidle' });
 }
 
+async function stubBcbIndices(page) {
+  const requests = [];
+  await page.route('https://api.bcb.gov.br/dados/serie/**', async route => {
+    const url = new URL(route.request().url());
+    const seriesId = url.pathname.match(/bcdata\.sgs\.(\d+)\/dados$/)?.[1];
+    const initial = url.searchParams.get('dataInicial');
+    const final = url.searchParams.get('dataFinal');
+    requests.push({ seriesId, start: initial, end: final });
+    const parseBcbDate = value => {
+      const [, day, month, year] = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    };
+    const cursor = parseBcbDate(initial);
+    cursor.setUTCDate(1);
+    const end = parseBcbDate(final);
+    const rows = [];
+    while (cursor <= end) {
+      rows.push({
+        data: `01/${String(cursor.getUTCMonth() + 1).padStart(2, '0')}/${cursor.getUTCFullYear()}`,
+        valor: seriesId === '11' ? '0,20' : '0,10',
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(rows) });
+  });
+  return requests;
+}
+
 test('cálculos usam cliente, caso e partes do mesmo contexto', async ({ page }) => {
   await prepareCalculationPage(page, 'calculos/trabalhista/');
   await page.locator('#clientId').selectOption('client-test');
@@ -1328,6 +1356,12 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.locator('.wizard-steps.steps-4 .wizard-step.done')).toHaveCount(1);
+  await expect(page.locator('.item-detailed .item-subsection')).toHaveCount(2);
+  await expect(page.getByRole('heading', { name: 'Correção monetária' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Juros' })).toBeVisible();
+  for (const field of ['correctionStart', 'correctionEnd', 'interestStart', 'interestEnd']) {
+    expect(await page.locator(`[data-item-field="${field}"]`).evaluate(element => element.parentElement.getBoundingClientRect().width)).toBeGreaterThan(100);
+  }
   for (const width of [1280, 1000, 800, 600, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => page.locator('.generalista-items.detailed').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
@@ -1355,6 +1389,46 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^OJ-GEN-.*\.pdf$/i);
   await expect(page.locator('#toast')).toHaveText('PDF gerado.');
+});
+
+test('atualização monetária consulta o início da correção informado no lançamento', async ({ page }) => {
+  const requests = await stubBcbIndices(page);
+  await prepareCalculationPage(page, 'calculos/completo/');
+  await page.getByLabel('Nome do cálculo').fill('Cálculo com índice desde 2021');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Descrição do item 1').fill('Parcela de julho de 2021');
+  await page.getByLabel('Valor do item 1').fill('100');
+  await page.locator('select[data-item-field="correctionType"]').first().selectOption('IPCA15');
+  await page.locator('select[data-item-field="interestType"]').first().selectOption('fixed');
+  await page.locator('[data-item-field="interestRate"]').first().fill('1');
+  await page.getByLabel('Início da correção do item 1').fill('2021-07-01');
+  await page.getByLabel('Início dos juros do item 1').fill('2021-07-01');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.locator('.summary')).toBeVisible();
+  await expect(page.locator('#toast')).toHaveText('Cálculo concluído.');
+  expect(requests).toContainEqual(expect.objectContaining({ seriesId: '7478', start: '01/07/2021' }));
+});
+
+test('Taxa Legal carrega automaticamente as fontes oficiais antes do cálculo', async ({ page }) => {
+  const requests = await stubBcbIndices(page);
+  await prepareCalculationPage(page, 'calculos/completo/');
+  await page.getByLabel('Nome do cálculo').fill('Cálculo com Taxa Legal');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Descrição do item 1').fill('Parcela com Taxa Legal');
+  await page.getByLabel('Valor do item 1').fill('100');
+  await page.locator('select[data-item-field="interestType"]').first().selectOption('legal');
+  await page.getByLabel('Início dos juros do item 1').fill('2021-07-01');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.locator('.summary')).toBeVisible();
+  await expect(page.locator('#toast')).toHaveText('Cálculo concluído.');
+  expect(requests).toContainEqual(expect.objectContaining({ seriesId: '7478', start: '01/07/2024' }));
+  expect(requests).toContainEqual(expect.objectContaining({ seriesId: '11', start: '01/07/2024' }));
 });
 
 test('calculadoras usam o mesmo componente de passos em todas as larguras', async ({ page }) => {

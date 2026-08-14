@@ -106,11 +106,18 @@
   function itemStatic(label, content, cls = "") {
     return `<div class="item-cell item-static ${cls}"><span>${label}</span><strong>${content}</strong></div>`;
   }
+  function itemIndex(index) {
+    return `<div class="item-index"><span>${index + 1}</span>${index ? `<button class="danger small" type="button" data-action="remove-item" data-index="${index}" aria-label="Remover item">×</button>` : ""}</div>`;
+  }
   function itemFields(item, index, detailed) {
     const interestType = item.interestType || (Number(item.interestRate) ? "fixed" : "none");
     const periodStart = current.input.periodStartDate || current.input.judgmentDate || item.date;
     const periodEnd = current.input.calculationDate || today();
-    return `<article class="item-row ${detailed ? "item-detailed" : ""}" data-item-index="${index}"><div class="item-index"><span>${index + 1}</span>${index ? `<button class="danger small" type="button" data-action="remove-item" data-index="${index}" aria-label="Remover item">×</button>` : ""}</div>${itemCell("Descrição", `<input data-item-field="description" aria-label="Descrição do item ${index + 1}" value="${escape(item.description)}" placeholder="Descrição do item">`, "item-description")}${itemCell("Data", `<input data-item-field="date" aria-label="Data do item ${index + 1}" type="date" value="${escape(item.date)}" required>`)}${itemCell("Valor (R$)", `<input data-item-field="amount" aria-label="Valor do item ${index + 1}" type="number" min="0" step="0.01" value="${escape(item.amount)}" placeholder="0,00" required>`)}${itemCell("Tipo", `<select data-item-field="kind" aria-label="Tipo do item ${index + 1}">${typeOptions(item.kind)}</select>`)}${detailed ? `${itemCell("Índice", `<select data-item-field="correctionType" aria-label="Índice do item ${index + 1}">${indexOptions(item.correctionType)}</select>`, "item-index-choice")}${itemCell("Início da correção", `<input data-item-field="correctionStart" aria-label="Início da correção do item ${index + 1}" type="date" value="${escape(item.correctionStart || periodStart)}">`)}${itemCell("Fim da correção", `<input data-item-field="correctionEnd" aria-label="Fim da correção do item ${index + 1}" type="date" value="${escape(item.correctionEnd || periodEnd)}">`)}<label class="check compact item-cell"><input data-item-field="correctionProrata" type="checkbox" ${item.correctionProrata ? "checked" : ""}><span>Correção pró-rata</span></label>${itemCell("Juros", `<select data-item-field="interestType" aria-label="Tipo de juros do item ${index + 1}">${interestTypeOptions(interestType)}</select>`, "item-interest-choice")}${interestType === "fixed" ? itemCell("Taxa de juros (%)", `<input data-item-field="interestRate" aria-label="Juros do item ${index + 1}" type="number" min="0" step="0.0001" value="${escape(item.interestRate)}" placeholder="0,0000">`) : interestType === "legal" ? itemStatic("Taxa aplicada", "Lei 14.905/2024", "item-legal-rate") : itemStatic("Taxa aplicada", "Não aplicada", "item-no-rate")}${interestType === "fixed" ? itemCell("Periodicidade", `<select data-item-field="interestPeriodicity" aria-label="Periodicidade do item ${index + 1}">${periodicityOptions(item.interestPeriodicity)}</select>`) : itemStatic("Periodicidade", interestType === "legal" ? "Mensal" : "—")}${itemCell("Início dos juros", `<input data-item-field="interestStart" aria-label="Início dos juros do item ${index + 1}" type="date" value="${escape(item.interestStart || periodStart)}">`)}${itemCell("Fim dos juros", `<input data-item-field="interestEnd" aria-label="Fim dos juros do item ${index + 1}" type="date" value="${escape(item.interestEnd || periodEnd)}">`)}${interestType === "legal" ? itemStatic("Pró-rata", "Dias corridos", "item-legal-rate") : `<label class="check compact item-cell"><input data-item-field="interestProrata" type="checkbox" ${item.interestProrata ? "checked" : ""}><span>Juros pró-rata</span></label>`}` : ""}</article>`;
+    const mainFields = `${itemIndex(index)}${itemCell("Descrição", `<input data-item-field="description" aria-label="Descrição do item ${index + 1}" value="${escape(item.description)}" placeholder="Descrição do item">`)}${itemCell("Data", `<input data-item-field="date" aria-label="Data do item ${index + 1}" type="date" value="${escape(item.date)}" required>`)}${itemCell("Valor (R$)", `<input data-item-field="amount" aria-label="Valor do item ${index + 1}" type="number" min="0" step="0.01" value="${escape(item.amount)}" placeholder="0,00" required>`)}${itemCell("Tipo", `<select data-item-field="kind" aria-label="Tipo do item ${index + 1}">${typeOptions(item.kind)}</select>`)}`;
+    if (!detailed) return `<article class="item-row" data-item-index="${index}"><div class="item-main-grid item-main-grid-simple">${mainFields}</div></article>`;
+    const correctionFields = `${itemCell("Início da correção", `<input data-item-field="correctionStart" aria-label="Início da correção do item ${index + 1}" type="date" value="${escape(item.correctionStart || periodStart)}">`)}${itemCell("Fim da correção", `<input data-item-field="correctionEnd" aria-label="Fim da correção do item ${index + 1}" type="date" value="${escape(item.correctionEnd || periodEnd)}">`)}<label class="check compact item-check"><input data-item-field="correctionProrata" type="checkbox" ${item.correctionProrata ? "checked" : ""}><span>Correção pró-rata</span></label>`;
+    const interestFields = `${itemCell("Juros", `<select data-item-field="interestType" aria-label="Tipo de juros do item ${index + 1}">${interestTypeOptions(interestType)}</select>`, "item-interest-choice")}${interestType === "fixed" ? itemCell("Taxa de juros (%)", `<input data-item-field="interestRate" aria-label="Juros do item ${index + 1}" type="number" min="0" step="0.0001" value="${escape(item.interestRate)}" placeholder="0,0000">`) : interestType === "legal" ? itemStatic("Taxa aplicada", "Lei 14.905/2024", "item-legal-rate") : itemStatic("Taxa aplicada", "Não aplicada", "item-no-rate")}${interestType === "fixed" ? itemCell("Periodicidade", `<select data-item-field="interestPeriodicity" aria-label="Periodicidade do item ${index + 1}">${periodicityOptions(item.interestPeriodicity)}</select>`) : itemStatic("Periodicidade", interestType === "legal" ? "Mensal" : "—")}${itemCell("Início dos juros", `<input data-item-field="interestStart" aria-label="Início dos juros do item ${index + 1}" type="date" value="${escape(item.interestStart || periodStart)}">`)}${itemCell("Fim dos juros", `<input data-item-field="interestEnd" aria-label="Fim dos juros do item ${index + 1}" type="date" value="${escape(item.interestEnd || periodEnd)}">`)}${interestType === "legal" ? itemStatic("Pró-rata", "Dias corridos", "item-legal-rate") : `<label class="check compact item-check"><input data-item-field="interestProrata" type="checkbox" ${item.interestProrata ? "checked" : ""}><span>Juros pró-rata</span></label>`}`;
+    return `<article class="item-row item-detailed" data-item-index="${index}"><div class="item-main-grid">${mainFields}${itemCell("Índice de correção", `<select data-item-field="correctionType" aria-label="Índice do item ${index + 1}">${indexOptions(item.correctionType)}</select>`, "item-index-choice")}</div><section class="item-subsection" aria-labelledby="item-${index}-correction-title"><div class="item-subsection-head"><h3 id="item-${index}-correction-title">Correção monetária</h3><span>Período e pró-rata</span></div><div class="item-subgrid correction-grid">${correctionFields}</div></section><section class="item-subsection" aria-labelledby="item-${index}-interest-title"><div class="item-subsection-head"><h3 id="item-${index}-interest-title">Juros</h3><span>Taxa e período de incidência</span></div><div class="item-subgrid interest-grid">${interestFields}</div></section></article>`;
   }
   function itemsTable(detailed) {
     return `<div class="generalista-items ${detailed ? "detailed" : ""}">${current.input.items.map((item, index) => itemFields(item, index, detailed)).join("")}</div>`;
@@ -223,8 +230,45 @@
     if (!complete && current.input.settings.correctionType !== "none") types.add(current.input.settings.correctionType);
     return [...types];
   }
+  function itemInterestType(item) {
+    return item.interestType || (Number(item.interestRate) ? "fixed" : "none");
+  }
   function legalInterestSelected() {
-    return current.input.items.some((item) => (item.interestType || (Number(item.interestRate) ? "fixed" : "none")) === "legal");
+    return current.input.items.some((item) => itemInterestType(item) === "legal");
+  }
+  function indexCriteriaKey() {
+    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
+    return JSON.stringify({
+      calculationDate: current.input.calculationDate || "",
+      periodStart,
+      items: current.input.items.map((item) => ({
+        date: item.date || "",
+        correctionType: item.correctionType || "none",
+        correctionStart: item.correctionStart || "",
+        correctionEnd: item.correctionEnd || "",
+        interestType: itemInterestType(item),
+        interestStart: item.interestStart || "",
+        interestEnd: item.interestEnd || "",
+      })),
+      costs: current.input.costs.map((item) => ({
+        date: item.date || "",
+        correctionType: item.correctionType || "none",
+      })),
+    });
+  }
+  function officialIndicesRequired() {
+    return indexTypes().length > 0 || legalInterestSelected();
+  }
+  function legalRatesRequired() {
+    const legalStart = indices?.LEGAL_RATE_START_MONTH || "2024-08";
+    return legalInterestSelected() && String(current.input.calculationDate || "").slice(0, 7) >= legalStart;
+  }
+  function indexSnapshotMatchesCurrent() {
+    const snapshot = current.indexSnapshot;
+    if (!snapshot || snapshot.criteriaKey !== indexCriteriaKey()) return false;
+    if (indexTypes().some((type) => !Object.keys(snapshot.ratesByType?.[type] || {}).length)) return false;
+    if (legalRatesRequired() && !Object.keys(snapshot.legalRates || {}).length) return false;
+    return true;
   }
   async function loadIndices() {
     captureVisible();
@@ -232,22 +276,31 @@
     const legalSelected = legalInterestSelected();
     if (!types.length && !legalSelected) { current.indexSnapshot = null; notify("Nenhum índice externo foi selecionado."); return; }
     if (!indices?.snapshot) throw new Error("O módulo de índices oficiais não foi carregado.");
-    const dates = [...current.input.items.map((item) => item.date), ...current.input.costs.map((item) => item.date)].filter(Boolean).sort();
+    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
+    const dates = [
+      ...current.input.items.flatMap((item) => [item.date, item.correctionStart || periodStart, item.interestStart || periodStart]),
+      ...current.input.costs.map((item) => item.date),
+    ].filter(Boolean).sort();
     const start = dates[0] || current.input.calculationDate, end = current.input.calculationDate;
+    const criteriaKey = indexCriteriaKey();
     busy = true;
     try {
       const correctionSnapshots = await Promise.all(types.map((type) => indices.snapshot({ correctionType: type, interestType: "none", start, end })));
       const legalSnapshot = legalSelected ? await indices.snapshot({ correctionType: "none", interestType: "legal", start, end }) : null;
       const snapshots = [...correctionSnapshots, ...(legalSnapshot ? [legalSnapshot] : [])];
-      current.indexSnapshot = { fetchedAt: new Date().toISOString(), start, end, ratesByType: Object.fromEntries(types.map((type, index) => [type, correctionSnapshots[index]?.correctionRates || {}])), legalRates: legalSnapshot?.legalRates || {}, sources: snapshots.flatMap((item) => item.sources || []) };
+      current.indexSnapshot = { criteriaKey, fetchedAt: new Date().toISOString(), start, end, ratesByType: Object.fromEntries(types.map((type, index) => [type, correctionSnapshots[index]?.correctionRates || {}])), legalRates: legalSnapshot?.legalRates || {}, sources: snapshots.flatMap((item) => item.sources || []) };
       persist("draft"); notify("Índices oficiais carregados e congelados neste rascunho.");
     } finally { busy = false; syncStatus.refresh?.(); }
     render();
   }
-  function calculate() {
+  async function ensureIndices() {
+    if (!officialIndicesRequired() || indexSnapshotMatchesCurrent()) return;
+    await loadIndices();
+    if (!indexSnapshotMatchesCurrent()) throw new Error("Os índices oficiais necessários não foram carregados para o período informado.");
+  }
+  async function calculate() {
     captureVisible();
-    if (indexTypes().length && !current.indexSnapshot?.ratesByType) throw new Error("Carregue os índices oficiais antes de calcular.");
-    if (legalInterestSelected() && !Object.keys(current.indexSnapshot?.legalRates || {}).length) throw new Error("Carregue a Taxa Legal oficial antes de calcular.");
+    await ensureIndices();
     current.result = core.calculateGeneric({ ...current.input, ratesByType: current.indexSnapshot?.ratesByType || {}, legalRates: current.indexSnapshot?.legalRates || {} });
     persist("final"); step = complete ? 4 : 2; notify("Cálculo concluído.");
   }
@@ -339,10 +392,15 @@
       if (action === "remove-extra") { captureVisible(); const list = target.dataset.kind === "penalty" ? current.input.penalties : target.dataset.kind === "fee" ? current.input.fees : current.input.costs; list.splice(Number(target.dataset.index), 1); render(); }
     } catch (error) { notify(error.message || "Não foi possível atualizar o cálculo.", true); }
   });
-  app.addEventListener("submit", (event) => {
+  app.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (busy) return;
-    try { const last = complete ? 4 : 2; if (step < last - 1) { captureVisible(); step += 1; render(); } else if (step === last - 1) calculate(); render(); } catch (error) { notify(error.message || "Não foi possível concluir o cálculo.", true); }
+    try {
+      const last = complete ? 4 : 2;
+      if (step < last - 1) { captureVisible(); step += 1; render(); }
+      else if (step === last - 1) await calculate();
+      render();
+    } catch (error) { notify(error.message || "Não foi possível concluir o cálculo.", true); }
   });
   function loadRequestedRecord() {
     const requested = new URLSearchParams(window.location.search).get("id");
