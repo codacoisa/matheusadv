@@ -31,14 +31,24 @@
     return (input) => core?.currency ? core.currency(number(input)) : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(number(input));
   }
 
+  const itemInterestType = (item = {}, settings = {}) => item.interestType || settings.interestType || (Number(item.interestRate) ? "fixed" : "none");
+  const legalInterestSelected = (input = {}) => (input.items || []).some((item) => itemInterestType(item, input.settings) === "legal");
+  const legalSource = (source) => /bcdata\.sgs\.11\/dados|l14905|Resolu%C3%A7%C3%A3o5171|d12797|Taxa Legal:/i.test(String(source));
+  const withPeriod = (input, fallback) => {
+    const text = String(input || fallback || "").trim();
+    return /[.!?]$/.test(text) ? text : `${text}.`;
+  };
+
   function sourceList(record, input) {
     const sources = new Set(record.indexSnapshot?.sources || input.sources || []);
+    const legalSelected = legalInterestSelected(input);
+    if (!legalSelected) [...sources].filter(legalSource).forEach((source) => sources.delete(source));
     const correctionTypes = new Set([
       ...(input.items || []).map((item) => item.correctionType),
       ...(input.costs || []).map((item) => item.correctionType),
     ].filter((type) => type && type !== "none"));
     correctionTypes.forEach((type) => sources.add(`Índice de correção selecionado: ${type}.`));
-    if ((input.items || []).some((item) => item.interestType === "legal")) sources.add("Taxa Legal: Lei 14.905/2024 e Resolução CMN 5.171/2024.");
+    if (legalSelected) sources.add("Taxa Legal: Lei 14.905/2024 e Resolução CMN 5.171/2024.");
     return [...sources];
   }
 
@@ -79,18 +89,20 @@
       const size = options.size || 8.8;
       const lines = textLines(content, options.width || width, size);
       ensure(lines.length * lineHeight(size) + (options.after ?? 4));
-      doc.setTextColor(...(options.color || COLORS.ink)); doc.setFont("helvetica", options.bold ? "bold" : "normal"); doc.setFontSize(size); doc.text(lines, options.x || margin, y);
+      doc.setTextColor(...(options.color || COLORS.ink)); doc.setFont("helvetica", options.bold ? "bold" : "normal"); doc.setFontSize(size);
+      doc.text(lines, options.x || margin, y, options.align ? { align: options.align, maxWidth: options.width || width } : undefined);
       y += lines.length * lineHeight(size) + (options.after ?? 4);
     };
-    const rowHeight = (cells, widths, size = 7.5, paddingY = 3.2) => {
-      const lines = cells.map((cell, index) => textLines(cell, widths[index] - 5, size));
+    const cellLines = (cell, maxWidth, size, preserveEmpty = false) => preserveEmpty && !String(cell ?? "").trim() ? [""] : textLines(cell, maxWidth, size);
+    const rowHeight = (cells, widths, size = 7.5, paddingY = 3.2, preserveEmpty = false) => {
+      const lines = cells.map((cell, index) => cellLines(cell, widths[index] - 5, size, preserveEmpty));
       return Math.max(...lines.map((item) => item.length)) * 3.45 + paddingY * 2;
     };
     const row = (cells, widths, options = {}) => {
       const size = options.fontSize || 7.5;
       const paddingX = 2.5;
       const paddingY = 3.2;
-      const lines = cells.map((cell, index) => textLines(cell, widths[index] - paddingX * 2, size));
+      const lines = cells.map((cell, index) => cellLines(cell, widths[index] - paddingX * 2, size, options.preserveEmpty));
       const height = Math.max(...lines.map((item) => item.length)) * 3.45 + paddingY * 2;
       if (options.fill) { doc.setFillColor(...options.fill); doc.rect(margin, y, width, height, "F"); }
       doc.setDrawColor(...COLORS.line); doc.line(margin, y + height, margin + width, y + height);
@@ -98,11 +110,11 @@
       lines.forEach((linesForCell, index) => { doc.setTextColor(...(options.color || COLORS.ink)); doc.setFont("helvetica", options.bold ? "bold" : "normal"); doc.setFontSize(size); doc.text(linesForCell, x + paddingX, y + paddingY + 2.15); x += widths[index]; });
       y += height;
     };
-    const table = (headers, widths, rows, total = null) => {
+    const table = (headers, widths, rows, total = null, options = {}) => {
       const header = () => row(headers, widths, { bold: true, fill: COLORS.navy, color: COLORS.white, fontSize: 7.1 });
       ensure(13); header();
-      rows.forEach((cells, index) => { const height = rowHeight(cells, widths); if (ensure(height)) header(); row(cells, widths, { fill: index % 2 ? COLORS.soft : COLORS.white }); });
-      if (total) { const height = rowHeight(total, widths); if (ensure(height)) header(); row(total, widths, { bold: true, fill: COLORS.mint, color: COLORS.navy }); }
+      rows.forEach((cells, index) => { const height = rowHeight(cells, widths, options.fontSize || 7.5, 3.2, true); if (ensure(height)) header(); row(cells, widths, { fill: index % 2 ? COLORS.soft : COLORS.white, fontSize: options.fontSize, preserveEmpty: true }); });
+      if (total) { const height = rowHeight(total, widths, options.fontSize || 7.5, 3.2, true); if (ensure(height)) header(); row(total, widths, { bold: true, fill: COLORS.mint, color: COLORS.navy, fontSize: options.fontSize, preserveEmpty: true }); }
       y += 2;
     };
     const infoGrid = (items) => {
@@ -130,25 +142,25 @@
 
     section("Identificação do cálculo");
     infoGrid([
-      ["Nome", record.name], ["Trânsito em Julgado ou Data-base do Cálculo", date(input.calculationDate)],
-      ["Cliente", input.clientName || input.clientId], ["Caso", value(input.caseName || input.caseId, "Não vinculado")],
-      ["Processo", input.caseNumber], ["Partes", `${input.parties?.length || 0} cadastrada(s)`],
-      ["Parte contrária", input.opposingParty?.name], ["Polo do cliente", input.clientRole || input.clientPartyRole],
+      ["Nome", record.name], ["Data-base", date(input.calculationDate)],
+      ["Polo do cliente", input.clientRole || input.clientPartyRole], ["Cliente", input.clientName || input.clientId],
+      ["Caso", value(input.caseName || input.caseId, "Não vinculado")], ["Processo", input.caseNumber],
+      ["Partes", `${input.parties?.length || 0} cadastrada(s)`], ["Parte contrária", input.opposingParty?.name],
     ]);
     section("Resumo financeiro", "Consolidação em reais na data-base informada.");
     summary();
     section("Parâmetros e metodologia");
     const corrections = [...new Set([...(input.items || []), ...(input.costs || [])].map((item) => item.correctionType).filter((type) => type && type !== "none"))];
-    paragraph(`Índices de correção: ${corrections.length ? corrections.join(", ") : "não aplicados"}. ${result.methodology?.correctionConvention || "Índices aplicados conforme os lançamentos."}`);
-    paragraph(`Juros: ${result.methodology?.interest || "não aplicados"}. ${result.methodology?.interestConvention || "Juros conforme os parâmetros informados."}`);
+    paragraph(`Índices de correção: ${corrections.length ? corrections.join(", ") : "não aplicados"}. ${withPeriod(result.methodology?.correctionConvention, "Índices aplicados conforme os lançamentos.")}`, { align: "justify" });
+    paragraph(`Juros: ${withPeriod(result.methodology?.interest, "não aplicados")} ${withPeriod(result.methodology?.interestConvention, "Juros conforme os parâmetros informados.")}`, { align: "justify" });
     const unavailableMonths = Object.entries(record.indexSnapshot?.unavailableMonthsByType || {}).flatMap(([type, months]) => (months || []).map((key) => `${type}: ${key}`));
-    if (unavailableMonths.length) paragraph(`Competência(s) ainda sem publicação oficial no BACEN: ${unavailableMonths.join(", ")}. A fração corrente foi mantida sem correção até a divulgação do índice.`, { color: COLORS.gold, bold: true });
-    paragraph("Os termos iniciais, índices, encargos e demais premissas devem ser conferidos com o título e pelo profissional responsável antes do uso judicial.", { color: COLORS.ink });
+    if (unavailableMonths.length) paragraph(`Competência(s) ainda sem publicação oficial no BACEN: ${unavailableMonths.join(", ")}. A fração corrente foi mantida sem correção até a divulgação do índice.`, { color: COLORS.gold, bold: true, align: "justify" });
+    paragraph("Os termos iniciais, índices, encargos e demais premissas devem ser conferidos com o título e pelo profissional responsável antes do uso judicial.", { color: COLORS.ink, align: "justify" });
 
     addPage();
     section("Memória por lançamento", "Valores negativos representam pagamentos ou abatimentos.");
     const ledger = result.ledger || [];
-    table(["Data", "Lançamento", "Tipo", "Original", "Corrigido", "Juros", "Total"], [20, 43, 22, 25, 25, 20, 23], ledger.map((item) => [date(item.date), value(item.description), item.sign < 0 ? "Abatimento" : item.kind === "cost" ? "Custa" : "Débito", currency(item.original), currency(item.corrected), currency(item.interest), currency(item.total)]), ["", "TOTAL", "", currency(result.totals?.original), currency(result.totals?.corrected), currency(result.totals?.interest), currency(result.totals?.total)]);
+    table(["Data", "Lançamento", "Tipo", "Original", "Corrigido", "Juros", "Total"], [20, 40, 22, 24, 24, 25, 23], ledger.map((item) => [date(item.date), value(item.description), item.sign < 0 ? "Abatimento" : item.kind === "cost" ? "Custas" : "Débito", currency(item.original), currency(item.corrected), currency(item.interest), currency(item.total)]), ["", "TOTAL", "", currency(result.totals?.original), currency(result.totals?.corrected), currency(result.totals?.interest), currency(result.totals?.total)], { fontSize: 7.1 });
     if ((result.penaltyRows || []).length || (result.feeRows || []).length) {
       section("Encargos adicionais");
       table(["Descrição", "Tipo", "Valor"], [90, 43, 45], [...(result.penaltyRows || []).map((item) => [item.description, "Multa", currency(item.amount)]), ...(result.feeRows || []).map((item) => [item.description, "Honorários", currency(item.amount)])]);
@@ -160,8 +172,14 @@
     paragraph(`Séries capturadas em ${snapshot.fetchedAt ? new Date(snapshot.fetchedAt).toLocaleString("pt-BR") : "data não registrada"}.`, { size: 8.4 });
     const rates = new Map();
     Object.entries(snapshot.ratesByType || {}).forEach(([type, values]) => Object.entries(values || {}).forEach(([month, rate]) => rates.set(month, { ...(rates.get(month) || {}), correction: `${type}: ${rate}` })));
-    Object.entries(snapshot.legalRates || {}).forEach(([month, rate]) => rates.set(month, { ...(rates.get(month) || {}), legal: rate }));
-    if (rates.size) table(["Competência", "Correção (%)", "Taxa Legal (% a.m.)"], [50, 64, 64], [...rates].sort().map(([month, values]) => [month, values.correction ?? "—", values.legal ?? "—"]));
+    const legalSelected = legalInterestSelected(input);
+    const legalRates = legalSelected ? snapshot.legalRates || {} : {};
+    Object.entries(legalRates).forEach(([month, rate]) => rates.set(month, { ...(rates.get(month) || {}), legal: rate }));
+    const hasCorrectionSeries = [...rates.values()].some((item) => item.correction !== undefined);
+    const hasLegalSeries = Object.keys(legalRates).length > 0;
+    if (rates.size && hasCorrectionSeries && hasLegalSeries) table(["Competência", "Correção (%)", "Taxa Legal (% a.m.)"], [50, 64, 64], [...rates].sort().map(([month, values]) => [month, values.correction ?? "—", values.legal ?? "—"]));
+    else if (rates.size && hasCorrectionSeries) table(["Competência", "Correção (%)"], [55, 123], [...rates].sort().map(([month, values]) => [month, values.correction ?? "—"]));
+    else if (rates.size && hasLegalSeries) table(["Competência", "Taxa Legal (% a.m.)"], [55, 123], [...rates].sort().map(([month, values]) => [month, values.legal ?? "—"]));
     else paragraph("Nenhuma série econômica externa foi aplicada neste cálculo.", { size: 8.4 });
     section("Fontes declaradas");
     const sources = sourceList(record, input);

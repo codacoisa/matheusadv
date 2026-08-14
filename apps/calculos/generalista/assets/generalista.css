@@ -2,7 +2,7 @@
 .generalista-criteria .field{align-content:start}
 .generalista-criteria .check{align-items:center;min-height:44px;margin:25px 0 0}
 .info-tip{position:relative;display:inline-grid;flex:0 0 auto;width:17px;height:17px;place-items:center;margin-left:3px;border:1px solid currentColor;border-radius:50%;color:var(--green);font-size:11px;font-weight:850;line-height:1;cursor:help;vertical-align:-2px}
-.info-tip-bubble{position:absolute;z-index:20;top:calc(100% + 8px);right:0;left:auto;display:none;width:min(270px,calc(100vw - 24px));max-width:calc(100vw - 24px);box-sizing:border-box;padding:10px 12px;border:1px solid #c7ddd2;border-radius:9px;color:#344054;background:#fff;box-shadow:0 8px 24px rgba(23,33,58,.16);font-size:12px;font-weight:500;line-height:1.4;text-align:left;overflow-wrap:anywhere;opacity:0;transform:translateY(-3px);transition:opacity .15s ease,transform .15s ease;pointer-events:none}
+.info-tip-bubble{position:fixed;z-index:20;top:var(--info-tip-top,-9999px);left:var(--info-tip-left,-9999px);display:none;width:min(270px,calc(100vw - 24px));max-width:calc(100vw - 24px);box-sizing:border-box;padding:10px 12px;border:1px solid #c7ddd2;border-radius:9px;color:#344054;background:#fff;box-shadow:0 8px 24px rgba(23,33,58,.16);font-size:12px;font-weight:500;line-height:1.4;text-align:left;overflow-wrap:anywhere;opacity:0;transform:translateY(-3px);transition:opacity .15s ease,transform .15s ease;pointer-events:none}
 .info-tip:hover .info-tip-bubble,.info-tip:focus .info-tip-bubble{display:block;opacity:1;transform:translateY(0)}
 .items-section{margin-top:28px}
 .card-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}

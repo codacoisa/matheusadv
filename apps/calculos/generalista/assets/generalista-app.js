@@ -43,6 +43,7 @@
   let current = blank();
   let busy = false;
   let indexLoadPromise = null;
+  let activeInfoTip = null;
 
   function notify(message, error = false) {
     toast.textContent = message;
@@ -156,7 +157,31 @@
     const availabilityNote = unavailable.length ? `<p class="legal-note">Competência(s) ainda sem publicação oficial no BACEN: ${escape(unavailable.join(", "))}. A fração corrente foi mantida sem correção até a divulgação do índice.</p>` : "";
     return `<p class="hint">Data-base: ${formatDate(r.calculationDate)}</p><div class="summary">${totals.map(([label, value], index) => `<div class="metric ${index === totals.length - 1 ? "total" : ""}"><span>${label}</span><strong>${formatMoney(value)}</strong></div>`).join("")}</div><h2>Memória por lançamento</h2><div class="result-ledger" role="list">${r.ledger.map(ledgerCard).join("")}</div>${charges.length ? `<h2>Encargos adicionais</h2><div class="result-charges" role="list">${charges.map((item) => chargeCard(item, item.type)).join("")}</div>` : ""}${availabilityNote}<p class="legal-note"><strong>Juros:</strong> ${escape(r.methodology.interest)}<br>${escape(r.methodology.correctionConvention)} ${escape(r.methodology.interestConvention)} Confirme o título judicial, os termos iniciais e o índice aplicável ao caso concreto.</p>`;
   }
+  function positionInfoTip(tip) {
+    const bubble = tip?.querySelector(".info-tip-bubble");
+    if (!bubble) return;
+    activeInfoTip = tip;
+    const margin = 12;
+    const width = Math.min(270, Math.max(0, window.innerWidth - margin * 2));
+    const anchor = tip.getBoundingClientRect();
+    bubble.style.width = `${width}px`;
+    bubble.style.left = `${margin}px`;
+    bubble.style.top = `${margin}px`;
+    bubble.style.display = "block";
+    bubble.style.visibility = "hidden";
+    const height = bubble.getBoundingClientRect().height;
+    const left = Math.min(Math.max(margin, anchor.right - width), Math.max(margin, window.innerWidth - width - margin));
+    const below = anchor.bottom + 8;
+    const top = below + height <= window.innerHeight - margin || anchor.top < height + margin * 2
+      ? below
+      : anchor.top - height - 8;
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${Math.max(margin, top)}px`;
+    bubble.style.removeProperty("visibility");
+    bubble.style.removeProperty("display");
+  }
   function render() {
+    activeInfoTip = null;
     const content = complete ? [completeStepOne, completeStepTwo, completeStepThree, resultStep][step - 1]() : [easyStep, resultStep][step - 1]();
     const last = complete ? 4 : 2;
     app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Generalista</p><h1>Atualização monetária ${complete ? "completa" : "simples"}</h1><p class="hint">${escape(current.code)} • versão ${escape(current.calculationVersion)}</p>${steps()}<form id="generalista-form">${content}<div class="wizard-actions"><button class="secondary" type="button" data-action="${step === 1 ? "cancel" : "back"}">${step === 1 ? "Cancelar" : "Voltar"}</button><div>${step < last ? `<button class="secondary" type="button" data-action="save">Salvar rascunho</button><button class="primary" type="submit">${step === last - 1 ? "Calcular" : "Próximo"}</button>` : `<button class="secondary" type="button" data-action="save">Salvar</button><button class="primary" type="button" data-action="pdf">Gerar PDF</button>`}</div></div></form></section>`;
@@ -320,7 +345,8 @@
     render();
   }
   async function ensureIndices() {
-    if (!officialIndicesRequired() || indexSnapshotMatchesCurrent()) return;
+    if (!officialIndicesRequired()) { current.indexSnapshot = null; return; }
+    if (indexSnapshotMatchesCurrent()) return;
     indexLoadPromise ||= loadIndices().finally(() => { indexLoadPromise = null; });
     await indexLoadPromise;
     if (!indexSnapshotMatchesCurrent()) throw new Error("Os índices oficiais necessários não foram carregados para o período informado.");
@@ -355,6 +381,16 @@
   access?.subscribe((lease) => {
     if (["stale", "unverified", "purging", "purged"].includes(lease.phase)) showBlocked();
   });
+  app.addEventListener("pointerover", (event) => {
+    const tip = event.target.closest(".info-tip");
+    if (tip && app.contains(tip)) positionInfoTip(tip);
+  });
+  app.addEventListener("focusin", (event) => {
+    const tip = event.target.closest(".info-tip");
+    if (tip && app.contains(tip)) positionInfoTip(tip);
+  });
+  window.addEventListener("resize", () => { if (activeInfoTip) positionInfoTip(activeInfoTip); });
+  window.addEventListener("scroll", () => { if (activeInfoTip) positionInfoTip(activeInfoTip); }, true);
   app.addEventListener("change", (event) => {
     if (event.target.id === "clientId") {
       try { captureAdditionalParties(); captureBasic(); } catch (_) { current.name = document.querySelector("#name")?.value || current.name; }

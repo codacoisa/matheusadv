@@ -1423,6 +1423,12 @@ test('pró-rata explica a regra e altera os juros do cálculo completo', async (
   for (const width of [1280, 800, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    const bounds = await interestHelp.locator('.info-tip-bubble').evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    });
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(width);
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   const prorata = page.locator('[data-item-field="interestProrata"]').first();
