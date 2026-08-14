@@ -32,7 +32,29 @@ test("aplica honorários percentuais, multa e custas separadamente", () => {
   assert.equal(result.totals.total, 1172);
 });
 
+test("não trata série de correção vazia como atualização sem índice", () => {
+  assert.throws(() => core.calculateGeneric({
+    calculationDate: "2026-03-01",
+    items: [{ id: "d1", date: "2026-01-01", amount: 1000, kind: "debit", correctionType: "IPCA" }],
+    settings: { correctionType: "none" },
+    ratesByType: { IPCA: {} },
+  }), /Índice de correção ausente/);
+});
+
 test("aceita juros anuais sem pró-rata", () => {
   const result = core.interestRate("2025-01-01", "2027-01-01", 12, "annual", false);
   assert.equal(result.rate, 24);
+});
+
+test("aplica Taxa Legal por lançamento a partir de 30/08/2024", () => {
+  const result = core.calculateGeneric({
+    calculationDate: "2024-09-30",
+    periodStartDate: "2024-08-30",
+    items: [{ id: "d1", date: "2024-08-01", amount: 1000, kind: "debit", interestType: "legal" }],
+    settings: { correctionType: "none" },
+    legalRates: { "2024-08": 0.2, "2024-09": 0.3 },
+  });
+  assert.equal(result.ledger[0].interestType, "legal");
+  assert.equal(result.ledger[0].interestRate, 0.3029032258);
+  assert.equal(result.totals.interest, 3.03);
 });

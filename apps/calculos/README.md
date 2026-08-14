@@ -18,12 +18,19 @@ Módulo permanente do OfficeJur para memórias de cálculo reproduzíveis.
 - verbas trabalhistas, com assistente em cinco etapas inspirado no fluxo de
   conferência por competências;
 - parcelas e abatimentos editáveis;
-- INPC, IPCA e IPCA-E (IPCA-15 mensal) consultados no SIDRA/IBGE;
+- INPC, IPCA, IPCA-15 e IPCA-E consultados diretamente no SGS do BACEN, com validação de todas as competências solicitadas;
 - Taxa Legal reproduzida a partir da Selic diária e do IPCA-15, conforme a Resolução CMN 5.171/2024;
+- API `assets/bcb-api.js` para consulta direta ao SGS do Banco Central, usada pelas séries 11 (Selic diária), 188 (INPC), 433 (IPCA), 7478 (IPCA-15) e 10764 (IPCA-E);
 - registros versionados em `officejur-calculos-juridicos.json`, usando a configuração global do Gist;
 - PDF detalhado com parâmetros, memória por lançamento, séries e fontes.
 
 O demonstrativo não substitui a conferência do título judicial, dos termos iniciais e dos critérios definidos no caso concreto.
+
+## Fontes de índices
+
+O cálculo usa fontes oficiais sem chave: SGS/BCB para as séries econômicas e Planalto/BCB para a legislação e metodologia. O endpoint do BCB segue o formato `https://api.bcb.gov.br/dados/serie/bcdata.sgs.{código}/dados?formato=json`, com filtros `dataInicial` e `dataFinal`. O Gist de referência documenta os códigos SGS mais usados, mas não é tratado como fonte de dados.
+
+Foram avaliadas APIs agregadoras gratuitas, mas as opções encontradas exigem chave/token ou possuem plano sujeito a alteração. Por isso, nenhuma dependência de terceiro foi adicionada ao cálculo: a fonte oficial permanece auditável e o adaptador do BCB pode ser substituído ou ampliado sem alterar o motor.
 
 ## Contrato obrigatório de identificação
 

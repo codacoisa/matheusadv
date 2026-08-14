@@ -34,7 +34,8 @@
       const monthEndExclusive = new Date(endOfMonth(cursor).getTime() + DAY);
       const segmentEnd = end < monthEndExclusive ? end : monthEndExclusive;
       const key = monthKey(cursor);
-      const rate = Number(rates[key] || 0);
+      if (!(key in rates)) throw new Error(`Índice de correção ausente para ${key}.`);
+      const rate = Number(rates[key]);
       const days = daysBetween(cursor, segmentEnd);
       const eligible = prorata ? rate * days / daysInMonth(cursor) : (cursor.getUTCDate() === 1 && segmentEnd >= monthEndExclusive ? rate : 0);
       if (eligible) factor *= 1 + eligible / 100;
@@ -58,10 +59,32 @@
     return { rate: round(result, 10), applied: [{ periods, periodicity, rate: round(result, 10) }] };
   }
 
+  function legalInterestRate(startValue, endValue, monthlyRates = {}) {
+    const start = toDate(startValue), end = toDate(endValue);
+    const effectiveDate = toDate("2024-08-30");
+    if (end <= effectiveDate || end <= start) return { rate: 0, applied: [] };
+    let cursor = start < effectiveDate ? effectiveDate : start;
+    let total = 0;
+    const applied = [];
+    while (cursor < end) {
+      const monthEndExclusive = new Date(endOfMonth(cursor).getTime() + DAY);
+      const segmentEnd = end < monthEndExclusive ? end : monthEndExclusive;
+      const key = monthKey(cursor);
+      if (!(key in monthlyRates)) throw new Error(`Taxa Legal ausente para ${key}.`);
+      const monthly = Number(monthlyRates[key]);
+      const days = daysBetween(cursor, segmentEnd);
+      const rate = monthly * days / daysInMonth(cursor);
+      total += rate;
+      applied.push({ month: key, monthlyRate: monthly, days, daysInMonth: daysInMonth(cursor), rate: round(rate, 10) });
+      cursor = segmentEnd;
+    }
+    return { rate: round(total, 10), applied };
+  }
+
   function updateItem(item, input, calculationDate, sign) {
     const settings = input.settings || {};
     const correctionType = item.correctionType || settings.correctionType || "none";
-    const correctionStart = item.correctionStart || item.date;
+    const correctionStart = item.correctionStart || input.periodStartDate || input.judgmentDate || item.date;
     const correctionEnd = item.correctionEnd || calculationDate;
     const correction = correctionType === "none" ? { factor: 1, rate: 0, applied: [] } : correctionFactor(
       correctionStart,
@@ -71,13 +94,18 @@
     );
     const principal = money(Math.abs(Number(item.amount || 0)));
     const corrected = money(principal * correction.factor);
-    const interest = interestRate(
-      item.interestStart || item.date,
-      item.interestEnd || calculationDate,
-      item.interestRate ?? settings.interestRate ?? 0,
-      item.interestPeriodicity || settings.interestPeriodicity || "monthly",
-      item.interestProrata ?? settings.interestProrata ?? true,
-    );
+    const interestType = item.interestType || settings.interestType || (Number(item.interestRate ?? settings.interestRate) ? "fixed" : "none");
+    const interestStart = item.interestStart || input.periodStartDate || input.judgmentDate || item.date;
+    const interestEnd = item.interestEnd || calculationDate;
+    const interest = interestType === "legal"
+      ? legalInterestRate(interestStart, interestEnd, input.legalRates || settings.legalRates || {})
+      : interestType === "none" ? { rate: 0, applied: [] } : interestRate(
+        interestStart,
+        interestEnd,
+        item.interestRate ?? settings.interestRate ?? 0,
+        item.interestPeriodicity || settings.interestPeriodicity || "monthly",
+        item.interestProrata ?? settings.interestProrata ?? true,
+      );
     const interestAmount = money(corrected * interest.rate / 100);
     return {
       id: item.id,
@@ -91,6 +119,7 @@
       correctionRate: correction.rate,
       interest: money(interestAmount * sign),
       interestRate: interest.rate,
+      interestType,
       total: money((corrected + interestAmount) * sign),
       correctionTrail: correction.applied,
       interestTrail: interest.applied,
@@ -148,7 +177,7 @@
       },
       methodology: {
         correction: settings.correctionType || "none",
-        interest: `${settings.interestRate || 0}% ${settings.interestPeriodicity === "annual" ? "ao ano" : "ao mês"}`,
+        interest: settings.interestType === "legal" || items.some((item) => item.interestType === "legal") ? "Taxa Legal (Lei 14.905/2024 e Resolução CMN 5.171/2024)" : `${settings.interestRate || 0}% ${settings.interestPeriodicity === "annual" ? "ao ano" : "ao mês"}`,
         correctionConvention: "Índices mensais aplicados no intervalo de cada lançamento, com pró-rata opcional.",
         interestConvention: "Juros simples, proporcionais aos dias ou períodos completos conforme a opção escolhida.",
         rounding: "Valores monetários arredondados para centavos em cada rubrica.",
@@ -156,5 +185,5 @@
     };
   }
 
-  return { VERSION, calculateGeneric, correctionFactor, currency, interestRate, money, round };
+  return { VERSION, calculateGeneric, correctionFactor, currency, interestRate, legalInterestRate, money, round };
 });

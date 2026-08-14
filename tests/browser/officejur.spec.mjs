@@ -1328,7 +1328,12 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
   await page.getByRole('button', { name: 'Próximo' }).click();
   await expect(page.locator('.wizard-steps.steps-4 .wizard-step.done')).toHaveCount(1);
-  await expect(page.locator('.generalista-items.detailed')).toHaveCSS('overflow-x', 'auto');
+  for (const width of [1280, 1000, 800, 600, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => page.locator('.generalista-items.detailed').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+  await expect(page.locator('select[data-item-field="correctionType"]').first().locator('option[value="none"]')).toHaveText('Nenhum');
+  await expect(page.locator('select[data-item-field="interestType"]').first()).toContainText('Taxa Legal — Lei 14.905/2024');
   await page.getByLabel('Descrição do item 1').fill('Parcela principal');
   await page.getByLabel('Valor do item 1').fill('100');
   await page.getByRole('button', { name: 'Próximo' }).click();
@@ -1339,6 +1344,17 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await page.getByRole('button', { name: 'Calcular' }).click();
   await expect(page.locator('.summary')).toBeVisible();
   await expect(page.getByText('R$ 112,20', { exact: true }).last()).toBeVisible();
+  for (const width of [1280, 1000, 800, 600, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => page.locator('.result-ledger').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect.poll(() => page.locator('.result-charges').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Gerar PDF' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^OJ-GEN-.*\.pdf$/i);
+  await expect(page.locator('#toast')).toHaveText('PDF gerado.');
 });
 
 test('calculadoras usam o mesmo componente de passos em todas as larguras', async ({ page }) => {
