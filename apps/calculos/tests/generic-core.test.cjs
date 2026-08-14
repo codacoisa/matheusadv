@@ -58,7 +58,6 @@ test("diferencia juros mensais com e sem pró-rata por competência", () => {
 test("descreve no resultado a taxa configurada no lançamento completo", () => {
   const result = core.calculateGeneric({
     calculationDate: "2026-02-15",
-    periodStartDate: "2026-01-01",
     items: [{ id: "d1", date: "2026-01-01", amount: 1000, description: "Parcela principal", kind: "debit", interestType: "fixed", interestRate: 1, interestPeriodicity: "monthly", interestStart: "2026-01-01", interestEnd: "2026-02-15", interestProrata: true }],
     settings: { correctionType: "none" },
   });
@@ -69,12 +68,30 @@ test("descreve no resultado a taxa configurada no lançamento completo", () => {
 test("aplica Taxa Legal por lançamento a partir de 30/08/2024", () => {
   const result = core.calculateGeneric({
     calculationDate: "2024-09-30",
-    periodStartDate: "2024-08-30",
-    items: [{ id: "d1", date: "2024-08-01", amount: 1000, kind: "debit", interestType: "legal" }],
+    items: [{ id: "d1", date: "2024-08-01", amount: 1000, kind: "debit", interestType: "legal", interestStart: "2024-08-30", interestEnd: "2024-09-30" }],
     settings: { correctionType: "none" },
     legalRates: { "2024-08": 0.2, "2024-09": 0.3 },
   });
   assert.equal(result.ledger[0].interestType, "legal");
   assert.equal(result.ledger[0].interestRate, 0.3029032258);
   assert.equal(result.totals.interest, 3.03);
+});
+
+test("aplica as faixas históricas dos juros legais antes da Taxa Legal", () => {
+  const result = core.legalInterestRate("2003-02-01", "2003-02-20");
+  assert.deepEqual(result.applied.map((item) => item.regime), ["CC/1916", "CC/2002 + CTN"]);
+  assert.equal(result.applied[0].days, 11);
+  assert.equal(result.applied[1].days, 8);
+  assert.equal(result.rate, 0.4438356164);
+});
+
+test("declara no resultado o calendário histórico da Taxa Legal", () => {
+  const result = core.calculateGeneric({
+    calculationDate: "2003-02-20",
+    items: [{ id: "d1", date: "2003-02-01", amount: 1000, kind: "debit", interestType: "legal", interestStart: "2003-02-01", interestEnd: "2003-02-20" }],
+    settings: { correctionType: "none" },
+  });
+  assert.match(result.methodology.interest, /6% ao ano até 11\/02\/2003/);
+  assert.match(result.methodology.interest, /12% ao ano de 12\/02\/2003 a 29\/08\/2024/);
+  assert.equal(result.ledger[0].interestRate, 0.4438356164);
 });

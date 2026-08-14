@@ -125,14 +125,14 @@
 
     doc.setFillColor(...COLORS.navy); doc.rect(0, 0, 210, 52, "F"); doc.setFillColor(...COLORS.gold); doc.rect(0, 0, 5, 52, "F");
     doc.setTextColor(...COLORS.white); doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text("OFFICEJUR", margin, 16); doc.setFontSize(20); doc.text(input.type === "easy" ? "Atualização monetária simples" : "Atualização monetária completa", margin, 29);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8.4); doc.text(`Código ${value(record.code, "sem código")} | versão ${value(result.calculationVersion || record.calculationVersion, "generic-1.1.0")}`, margin, 39); doc.text(`Emitido em ${instant(record.updatedAt)}`, margin, 45);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.4); doc.text(`Código ${value(record.code, "sem código")} | versão ${value(result.calculationVersion || record.calculationVersion, "generic-1.2.0")}`, margin, 39); doc.text(`Emitido em ${instant(record.updatedAt)}`, margin, 45);
     y = 62;
 
     section("Identificação do cálculo");
     infoGrid([
-      ["Nome", record.name], ["Data-base", date(input.calculationDate)],
+      ["Nome", record.name], ["Trânsito em Julgado ou Data-base do Cálculo", date(input.calculationDate)],
       ["Cliente", input.clientName || input.clientId], ["Caso", value(input.caseName || input.caseId, "Não vinculado")],
-      ["Processo", input.caseNumber], ["Início do período", input.periodStartDate || input.judgmentDate],
+      ["Processo", input.caseNumber], ["Partes", `${input.parties?.length || 0} cadastrada(s)`],
       ["Parte contrária", input.opposingParty?.name], ["Polo do cliente", input.clientRole || input.clientPartyRole],
     ]);
     section("Resumo financeiro", "Consolidação em reais na data-base informada.");
@@ -169,7 +169,7 @@
     else paragraph("Nenhuma fonte externa foi necessária para os parâmetros informados.", { size: 8.4 });
 
     const pages = doc.getNumberOfPages();
-    for (let page = 1; page <= pages; page += 1) { doc.setPage(page); doc.setDrawColor(...COLORS.line); doc.line(margin, 286, margin + width, 286); doc.setTextColor(...COLORS.gray); doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.text(`OfficeJur | ${value(record.code, "sem código")} | versão ${value(result.calculationVersion || record.calculationVersion, "generic-1.1.0")}`, margin, 291); doc.text(`Página ${page} de ${pages}`, 194, 291, { align: "right" }); }
+    for (let page = 1; page <= pages; page += 1) { doc.setPage(page); doc.setDrawColor(...COLORS.line); doc.line(margin, 286, margin + width, 286); doc.setTextColor(...COLORS.gray); doc.setFont("helvetica", "normal"); doc.setFontSize(6.8); doc.text(`OfficeJur | ${value(record.code, "sem código")} | versão ${value(result.calculationVersion || record.calculationVersion, "generic-1.2.0")}`, margin, 291); doc.text(`Página ${page} de ${pages}`, 194, 291, { align: "right" }); }
     doc.setProperties({ title: `Atualização monetária - ${value(record.name, "OfficeJur")}`, subject: `OfficeJur ${value(record.code, "cálculo")}`, author: "OfficeJur", creator: "OfficeJur Cálculos Jurídicos", keywords: "atualização monetária, cálculo jurídico, memória de cálculo" });
     return { blob: doc.output("blob"), filename: `${value(record.code, "calculo")}-${safeName(record.name)}.pdf` };
   }

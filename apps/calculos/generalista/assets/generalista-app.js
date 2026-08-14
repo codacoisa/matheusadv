@@ -17,9 +17,10 @@
   const gistClient = window.OfficeJurGistClient;
   const access = window.OfficeJurGistAccessLease?.create();
   const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
-  const infoTip = (text) => `<span class="info-tip" tabindex="0" role="img" aria-label="${escape(text)}" title="${escape(text)}"><span aria-hidden="true">i</span><span class="info-tip-bubble" role="tooltip">${escape(text)}</span></span>`;
+  const infoTip = (text) => `<span class="info-tip" tabindex="0" role="img" aria-label="${escape(text)}"><span aria-hidden="true">i</span><span class="info-tip-bubble" role="tooltip">${escape(text)}</span></span>`;
   const correctionProrataHelp = "Com pró-rata, o índice do mês incompleto é aplicado proporcionalmente aos dias corridos. Sem pró-rata, somente competências mensais completas entram na correção.";
   const interestProrataHelp = "Com pró-rata, a taxa é aplicada proporcionalmente aos dias corridos de cada mês incompleto. Sem pró-rata, somente meses completos entram nos juros; taxas anuais usam períodos de 365 dias.";
+  const legalRateHelp = core.LEGAL_RATE_SCHEDULE || "Taxa Legal histórica e atualizada conforme o art. 406 do Código Civil e a Lei 14.905/2024. Confira o título judicial e o termo inicial aplicável.";
   const today = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
   const uid = () => crypto.randomUUID();
   const number = (value) => Number(value || 0);
@@ -68,7 +69,7 @@
       id: uid(), code: `OJ-GEN-${now.slice(0, 4)}-${uid().slice(0, 6).toUpperCase()}`, type: mode, name: complete ? `Cálculo completo — ${now.split("-").reverse().join("/")}` : `Cálculo fácil — ${now.split("-").reverse().join("/")}`,
       status: "draft", calculationVersion: core.VERSION, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       input: {
-        clientId: "", clientName: "", caseId: "", caseName: "", caseNumber: "", judgmentDate: "", periodStartDate: "", clientParty: null, opposingParty: null, additionalParties: [], clientRole: "Autor", clientPartyRole: "Autor", parties: [], calculationDate: now,
+        clientId: "", clientName: "", caseId: "", caseName: "", caseNumber: "", clientParty: null, opposingParty: null, additionalParties: [], clientRole: "Autor", clientPartyRole: "Autor", parties: [], calculationDate: now,
         items: [blankItem()], settings: { correctionType: "none", correctionProrata: true, interestRate: 0, interestPeriodicity: "monthly", interestProrata: true, penaltyRate: 0, feeRate: 0, feeType: "percent", feeAmount: 0 },
         penalties: [], fees: [], costs: [], notes: "",
       }, indexSnapshot: null, result: null,
@@ -93,14 +94,10 @@
   function additionalPartyOptions(selected) { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; const clientName = context.clientParty?.name || ""; return `<option value="manual" ${selected === "manual" ? "selected" : ""}>Preencher manualmente</option>${(context.caseParties || []).filter((party) => party.name !== clientName).map((party) => `<option value="case:${escape(party.id)}" ${selected === `case:${party.id}` ? "selected" : ""}>Importar: ${escape(party.name)} — ${escape(party.role)}</option>`).join("")}`; }
   function removeImportedAdditionalParties() { current.input.additionalParties = (current.input.additionalParties || []).filter((party) => party.source !== "case"); }
   function additionalPartiesHtml() { return `<section class="party-manager" aria-labelledby="additional-parties-title"><div class="party-manager-head"><div><h3 id="additional-parties-title">Partes adicionais</h3><p class="hint">Importe do processo ou inclua manualmente quando necessário.</p></div><button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte adicional</button></div><div class="party-list">${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}</div></section>`; }
-  function periodFields() {
-    const i = current.input;
-    return `<div class="field full date-range-field"><span>Período do cálculo</span><div class="date-range-grid"><label class="date-range-part" for="periodStartDate"><span>Data do trânsito em julgado ou início do período</span><input id="periodStartDate" name="periodStartDate" type="date" value="${escape(i.periodStartDate || i.judgmentDate)}"></label><label class="date-range-part" for="calculationDate"><span>Data-base do cálculo</span><input id="calculationDate" name="calculationDate" type="date" value="${escape(i.calculationDate)}" required></label></div><p class="hint">Use o início também em execução de título extrajudicial, quando não houver trânsito em julgado. O início pode ser ajustado em cada lançamento.</p></div>`;
-  }
   function basicFields() {
     const i = current.input, role = i.clientRole || i.clientPartyRole || "Autor", opposingRole = caseContextApi?.oppositeRole(role) || "Réu";
-    const calculationField = complete ? periodFields() : field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true);
-    return `${financeNotice()}<section class="form-section"><div class="section-heading"><div><h2>Identificação</h2><p class="hint">Nomeie o cálculo e vincule-o ao cliente e ao caso, se houver.</p></div></div><div class="form-grid">${field("Nome do cálculo", "name", current.name, "text", "full", true)}<div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" required>${clientOptions(i.clientId)}</select></div><div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}</div></section><section class="form-section"><div class="section-heading"><div><h2>Partes</h2><p class="hint">Defina o polo do cliente e a parte contrária antes de incluir terceiros.</p></div></div><div class="form-grid"><div class="field"><label>Parte principal — cliente<input id="clientPartyName" value="${escape(i.clientParty?.name || i.clientName || "")}" readonly></label></div><div class="field"><label class="required" for="clientPartyRole">Polo do cliente</label><select id="clientPartyRole" required>${["Autor", "Réu", "Credor", "Devedor"].map((item) => `<option ${role === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>${field(`Parte contrária — ${opposingRole}`, "opposingPartyName", i.opposingParty?.name || "", "text", "full", true)}<div class="field full">${additionalPartiesHtml()}</div></div></section><section class="form-section"><div class="section-heading"><div><h2>Referência do cálculo</h2><p class="hint">Informe a data que será usada como referência nesta memória.</p></div></div><div class="form-grid">${calculationField}</div></section>`;
+    const calculationField = field("Trânsito em Julgado ou Data-base do Cálculo", "calculationDate", i.calculationDate, "date", "", true);
+    return `${financeNotice()}<section class="form-section"><div class="section-heading"><div><h2>Identificação</h2><p class="hint">Nomeie o cálculo e vincule-o ao cliente e ao caso, se houver.</p></div></div><div class="form-grid">${field("Nome do cálculo", "name", current.name, "text", "full", true)}<div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" required>${clientOptions(i.clientId)}</select></div><div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}</div></section><section class="form-section"><div class="section-heading"><div><h2>Partes</h2><p class="hint">Defina o polo do cliente e a parte contrária antes de incluir terceiros.</p></div></div><div class="form-grid"><div class="field"><label>Parte principal — cliente<input id="clientPartyName" value="${escape(i.clientParty?.name || i.clientName || "")}" readonly></label></div><div class="field"><label class="required" for="clientPartyRole">Polo do cliente</label><select id="clientPartyRole" required>${["Autor", "Réu", "Credor", "Devedor"].map((item) => `<option ${role === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>${field(`Parte contrária — ${opposingRole}`, "opposingPartyName", i.opposingParty?.name || "", "text", "full", true)}<div class="field full">${additionalPartiesHtml()}</div></div></section><section class="form-section"><div class="section-heading"><div><h2>Data de referência</h2><p class="hint">Use o trânsito em julgado ou a data-base do cálculo. Os termos iniciais específicos podem ser ajustados em cada lançamento.</p></div></div><div class="form-grid">${calculationField}</div></section>`;
   }
   function easyStep() {
     const i = current.input, s = i.settings;
@@ -117,12 +114,12 @@
   }
   function itemFields(item, index, detailed) {
     const interestType = item.interestType || (Number(item.interestRate) ? "fixed" : "none");
-    const periodStart = current.input.periodStartDate || current.input.judgmentDate || item.date;
+    const periodStart = item.date;
     const periodEnd = current.input.calculationDate || today();
     const mainFields = `${itemIndex(index)}${itemCell("Descrição", `<input data-item-field="description" aria-label="Descrição do item ${index + 1}" value="${escape(item.description)}" placeholder="Descrição do item">`)}${itemCell("Data", `<input data-item-field="date" aria-label="Data do item ${index + 1}" type="date" value="${escape(item.date)}" required>`)}${itemCell("Valor (R$)", `<input data-item-field="amount" aria-label="Valor do item ${index + 1}" type="number" min="0" step="0.01" value="${escape(item.amount)}" placeholder="0,00" required>`)}${itemCell("Tipo", `<select data-item-field="kind" aria-label="Tipo do item ${index + 1}">${typeOptions(item.kind)}</select>`)}`;
     if (!detailed) return `<article class="item-row" data-item-index="${index}"><div class="item-main-grid item-main-grid-simple">${mainFields}</div></article>`;
     const correctionFields = `${itemCell("Início da correção", `<input data-item-field="correctionStart" aria-label="Início da correção do item ${index + 1}" type="date" value="${escape(item.correctionStart || periodStart)}">`)}${itemCell("Fim da correção", `<input data-item-field="correctionEnd" aria-label="Fim da correção do item ${index + 1}" type="date" value="${escape(item.correctionEnd || periodEnd)}">`)}<label class="check compact item-check"><input data-item-field="correctionProrata" type="checkbox" ${item.correctionProrata ? "checked" : ""}><span>Correção pró-rata ${infoTip(correctionProrataHelp)}</span></label>`;
-    const interestFields = `${itemCell("Juros", `<select data-item-field="interestType" aria-label="Tipo de juros do item ${index + 1}">${interestTypeOptions(interestType)}</select>`, "item-interest-choice")}${interestType === "fixed" ? itemCell("Taxa de juros (%)", `<input data-item-field="interestRate" aria-label="Juros do item ${index + 1}" type="number" min="0" step="0.0001" value="${escape(item.interestRate)}" placeholder="0,0000">`) : interestType === "legal" ? itemStatic("Taxa aplicada", "Lei 14.905/2024", "item-legal-rate") : itemStatic("Taxa aplicada", "Não aplicada", "item-no-rate")}${interestType === "fixed" ? itemCell("Periodicidade", `<select data-item-field="interestPeriodicity" aria-label="Periodicidade do item ${index + 1}">${periodicityOptions(item.interestPeriodicity)}</select>`) : itemStatic("Periodicidade", interestType === "legal" ? "Mensal" : "—")}${itemCell("Início dos juros", `<input data-item-field="interestStart" aria-label="Início dos juros do item ${index + 1}" type="date" value="${escape(item.interestStart || periodStart)}">`)}${itemCell("Fim dos juros", `<input data-item-field="interestEnd" aria-label="Fim dos juros do item ${index + 1}" type="date" value="${escape(item.interestEnd || periodEnd)}">`)}${interestType === "legal" ? itemStatic("Pró-rata", "Dias corridos", "item-legal-rate") : `<label class="check compact item-check"><input data-item-field="interestProrata" type="checkbox" ${item.interestProrata ? "checked" : ""}><span>Juros pró-rata ${infoTip(interestProrataHelp)}</span></label>`}`;
+    const interestFields = `${itemCell(`Juros ${infoTip(legalRateHelp)}`, `<select data-item-field="interestType" aria-label="Tipo de juros do item ${index + 1}">${interestTypeOptions(interestType)}</select>`, "item-interest-choice")}${interestType === "fixed" ? itemCell("Taxa de juros (%)", `<input data-item-field="interestRate" aria-label="Juros do item ${index + 1}" type="number" min="0" step="0.0001" value="${escape(item.interestRate)}" placeholder="0,0000">`) : interestType === "legal" ? itemStatic("Taxa aplicada", "Histórica + Taxa Legal", "item-legal-rate") : itemStatic("Taxa aplicada", "Não aplicada", "item-no-rate")}${interestType === "fixed" ? itemCell("Periodicidade", `<select data-item-field="interestPeriodicity" aria-label="Periodicidade do item ${index + 1}">${periodicityOptions(item.interestPeriodicity)}</select>`) : itemStatic("Periodicidade", interestType === "legal" ? "Mensal" : "—")}${itemCell("Início dos juros", `<input data-item-field="interestStart" aria-label="Início dos juros do item ${index + 1}" type="date" value="${escape(item.interestStart || periodStart)}">`)}${itemCell("Fim dos juros", `<input data-item-field="interestEnd" aria-label="Fim dos juros do item ${index + 1}" type="date" value="${escape(item.interestEnd || periodEnd)}">`)}${interestType === "legal" ? itemStatic("Pró-rata", "Dias corridos", "item-legal-rate") : `<label class="check compact item-check"><input data-item-field="interestProrata" type="checkbox" ${item.interestProrata ? "checked" : ""}><span>Juros pró-rata ${infoTip(interestProrataHelp)}</span></label>`}`;
     return `<article class="item-row item-detailed" data-item-index="${index}"><div class="item-main-grid">${mainFields}${itemCell("Índice de correção", `<select data-item-field="correctionType" aria-label="Índice do item ${index + 1}">${indexOptions(item.correctionType)}</select>`, "item-index-choice")}</div><section class="item-subsection" aria-labelledby="item-${index}-correction-title"><div class="item-subsection-head"><h3 id="item-${index}-correction-title">Correção monetária</h3><span>Período e pró-rata</span></div><div class="item-subgrid correction-grid">${correctionFields}</div></section><section class="item-subsection" aria-labelledby="item-${index}-interest-title"><div class="item-subsection-head"><h3 id="item-${index}-interest-title">Juros</h3><span>Taxa e período de incidência</span></div><div class="item-subgrid interest-grid">${interestFields}</div></section></article>`;
   }
   function itemsTable(detailed) {
@@ -183,24 +180,26 @@
     current.input.parties = [current.input.clientParty, current.input.opposingParty].filter((party) => party?.name).concat(current.input.additionalParties || []);
     if (current.input.caseId && !context.caseId) throw new Error("Selecione um caso pertencente ao cliente escolhido.");
     if (document.querySelector("#caseNumber")) current.input.caseNumber = document.querySelector("#caseNumber").value.trim();
-    if (document.querySelector("#periodStartDate")) {
-      current.input.periodStartDate = document.querySelector("#periodStartDate").value;
-      current.input.judgmentDate = current.input.periodStartDate;
-    } else if (document.querySelector("#judgmentDate")) {
-      current.input.judgmentDate = document.querySelector("#judgmentDate").value;
-      current.input.periodStartDate = current.input.judgmentDate;
-    }
     if (document.querySelector("#calculationDate")) current.input.calculationDate = document.querySelector("#calculationDate").value;
     captureAdditionalParties();
     current.input.parties = [current.input.clientParty, current.input.opposingParty].filter((party) => party?.name).concat(current.input.additionalParties || []);
     if (!current.name || !clientId || !current.input.opposingParty.name) throw new Error("Preencha o nome do cálculo, cliente, polo do cliente e parte contrária.");
     if (!current.input.calculationDate) throw new Error("Informe a data-base do cálculo.");
-    if (current.input.periodStartDate && current.input.periodStartDate > current.input.calculationDate) throw new Error("O início do período não pode ser posterior à data-base.");
   }
   function captureItems() {
     document.querySelectorAll("[data-item-index]").forEach((row) => {
       const item = current.input.items[Number(row.dataset.itemIndex)];
       if (!item) return;
+      const previousDate = item.date;
+      const dateElement = row.querySelector('[data-item-field="date"]');
+      const nextDate = dateElement?.value || previousDate;
+      ["correctionStart", "interestStart"].forEach((fieldName) => {
+        const startElement = row.querySelector(`[data-item-field="${fieldName}"]`);
+        if (!startElement || !nextDate) return;
+        const displayedStart = startElement.value;
+        const followsItemDate = !item[fieldName] || item[fieldName] === previousDate;
+        if (followsItemDate && (!displayedStart || displayedStart === previousDate)) startElement.value = nextDate;
+      });
       row.querySelectorAll("[data-item-field]").forEach((element) => {
         const key = element.dataset.itemField;
         item[key] = element.type === "checkbox" ? element.checked : ["amount", "interestRate"].includes(key) ? number(element.value) : element.value;
@@ -249,10 +248,8 @@
     return current.input.items.some((item) => itemInterestType(item) === "legal");
   }
   function indexCriteriaKey() {
-    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
     return JSON.stringify({
       calculationDate: current.input.calculationDate || "",
-      periodStart,
       items: current.input.items.map((item) => ({
         date: item.date || "",
         correctionType: item.correctionType || "none",
@@ -290,9 +287,8 @@
   }
   function month(value) { return String(value || "").slice(0, 7); }
   function indexRequestRange() {
-    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
     const starts = [
-      ...current.input.items.flatMap((item) => [item.date, item.correctionStart || periodStart, item.interestStart || periodStart]),
+      ...current.input.items.flatMap((item) => [item.date, item.correctionStart, item.interestStart]),
       ...current.input.costs.map((item) => item.date),
     ].filter(Boolean).sort();
     const ends = [
@@ -396,6 +392,11 @@
       render();
       return;
     }
+    if (complete && step === 2 && event.target.dataset.itemField === "date") {
+      try { captureVisible(); } catch (_) { /* preserva a edição enquanto os períodos são recalculados */ }
+      render();
+      return;
+    }
     if (event.target.dataset.itemField === "interestType") {
       try { captureVisible(); } catch (_) { /* preserva a edição enquanto a linha muda de campos */ }
       render();
@@ -441,7 +442,6 @@
     const found = data.records.find((item) => item.id === requested && item.type === mode);
     if (!found) { notify("Cálculo não encontrado.", true); return; }
     current = structuredClone(found);
-    current.input.periodStartDate ||= current.input.judgmentDate || "";
     current.input.items = (current.input.items || []).map((item) => ({ ...item, interestType: item.interestType || (Number(item.interestRate) ? "fixed" : "none") }));
     if (new URLSearchParams(window.location.search).get("pdf") === "1" && current.result) setTimeout(() => void makePdf(), 300);
     step = current.result ? (complete ? 4 : 2) : 1;

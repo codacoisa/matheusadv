@@ -32,7 +32,6 @@ test("PDF recalcula a metodologia e não reaproveita juros 0% obsoletos", async 
       input: {
         type: "complete",
         calculationDate: "2026-02-15",
-        periodStartDate: "2026-01-01",
         items: [{ id: "d1", date: "2026-01-01", amount: 1000, description: "Parcela principal", kind: "debit", correctionType: "none", interestType: "fixed", interestRate: 1, interestPeriodicity: "monthly", interestStart: "2026-01-01", interestEnd: "2026-02-15", interestProrata: true }],
         settings: { correctionType: "none" },
       },

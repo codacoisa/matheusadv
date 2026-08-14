@@ -6,7 +6,10 @@
   "use strict";
 
   const DAY = 86_400_000;
-  const VERSION = "generic-1.1.0";
+  const VERSION = "generic-1.2.0";
+  const LEGAL_RATE_START_DATE = "2024-08-30";
+  const HISTORICAL_LEGAL_RATE_START_DATE = "2003-02-12";
+  const LEGAL_RATE_SCHEDULE = "Juros legais: 6% ao ano até 11/02/2003 (CC/1916); 12% ao ano de 12/02/2003 a 29/08/2024 (CC/2002 e art. 161, § 1º, do CTN); Taxa Legal do art. 406 do CC, conforme Lei 14.905/2024, a partir de 30/08/2024.";
   const round = (value, digits = 2) => {
     const factor = 10 ** digits;
     return Math.round((Number(value || 0) + Number.EPSILON) * factor) / factor;
@@ -73,22 +76,35 @@
 
   function legalInterestRate(startValue, endValue, monthlyRates = {}) {
     const start = toDate(startValue), end = toDate(endValue);
-    const effectiveDate = toDate("2024-08-30");
-    if (end <= effectiveDate || end <= start) return { rate: 0, applied: [] };
-    let cursor = start < effectiveDate ? effectiveDate : start;
+    const legalStart = toDate(LEGAL_RATE_START_DATE);
+    const historicalStart = toDate(HISTORICAL_LEGAL_RATE_START_DATE);
+    if (end <= start) return { rate: 0, applied: [] };
     let total = 0;
     const applied = [];
-    while (cursor < end) {
-      const monthEndExclusive = new Date(endOfMonth(cursor).getTime() + DAY);
-      const segmentEnd = end < monthEndExclusive ? end : monthEndExclusive;
-      const key = monthKey(cursor);
-      if (!(key in monthlyRates)) throw new Error(`Taxa Legal ausente para ${key}.`);
-      const monthly = Number(monthlyRates[key]);
-      const days = daysBetween(cursor, segmentEnd);
-      const rate = monthly * days / daysInMonth(cursor);
+    const addAnnual = (segmentStart, segmentEnd, annualRate, regime) => {
+      if (segmentEnd <= segmentStart) return;
+      const days = daysBetween(segmentStart, segmentEnd);
+      const rate = annualRate * days / 365;
       total += rate;
-      applied.push({ month: key, monthlyRate: monthly, days, daysInMonth: daysInMonth(cursor), rate: round(rate, 10) });
-      cursor = segmentEnd;
+      applied.push({ regime, annualRate, days, denominator: 365, rate: round(rate, 10) });
+    };
+    addAnnual(start, end < historicalStart ? end : historicalStart, 6, "CC/1916");
+    const modernEnd = end < legalStart ? end : legalStart;
+    addAnnual(start > historicalStart ? start : historicalStart, modernEnd, 12, "CC/2002 + CTN");
+    if (end > legalStart) {
+      let cursor = start > legalStart ? start : legalStart;
+      while (cursor < end) {
+        const monthEndExclusive = new Date(endOfMonth(cursor).getTime() + DAY);
+        const segmentEnd = end < monthEndExclusive ? end : monthEndExclusive;
+        const key = monthKey(cursor);
+        if (!(key in monthlyRates)) throw new Error(`Taxa Legal ausente para ${key}.`);
+        const monthly = Number(monthlyRates[key]);
+        const days = daysBetween(cursor, segmentEnd);
+        const rate = monthly * days / daysInMonth(cursor);
+        total += rate;
+        applied.push({ regime: "Taxa Legal — art. 406 do CC", month: key, monthlyRate: monthly, days, daysInMonth: daysInMonth(cursor), rate: round(rate, 10) });
+        cursor = segmentEnd;
+      }
     }
     return { rate: round(total, 10), applied };
   }
@@ -111,7 +127,7 @@
     if (!configured.length) return "não aplicados";
     const details = [];
     const legal = configured.filter((item) => item.type === "legal");
-    if (legal.length) details.push("Taxa Legal (Lei 14.905/2024 e Resolução CMN 5.171/2024), mensal e proporcional aos dias corridos");
+    if (legal.length) details.push(`${LEGAL_RATE_SCHEDULE} A faixa de 2024 em diante é mensal e proporcional aos dias corridos.`);
     configured.filter((item) => item.type === "fixed").forEach((item) => {
       const periodicity = item.periodicity === "annual" ? "ao ano" : "ao mês";
       const convention = item.prorata ? "com pró-rata por dias corridos" : "sem pró-rata, somente períodos completos";
@@ -124,7 +140,7 @@
   function updateItem(item, input, calculationDate, sign) {
     const settings = input.settings || {};
     const correctionType = item.correctionType || settings.correctionType || "none";
-    const correctionStart = item.correctionStart || input.periodStartDate || input.judgmentDate || item.date;
+    const correctionStart = item.correctionStart || item.date;
     const correctionEnd = item.correctionEnd || calculationDate;
     const correction = correctionType === "none" ? { factor: 1, rate: 0, applied: [] } : correctionFactor(
       correctionStart,
@@ -136,7 +152,7 @@
     const corrected = money(principal * correction.factor);
     const configuredInterest = interestSettings(item, settings);
     const interestType = configuredInterest.type;
-    const interestStart = item.interestStart || input.periodStartDate || input.judgmentDate || item.date;
+    const interestStart = item.interestStart || item.date;
     const interestEnd = item.interestEnd || calculationDate;
     const interest = interestType === "legal"
       ? legalInterestRate(interestStart, interestEnd, input.legalRates || settings.legalRates || {})
@@ -226,5 +242,5 @@
     };
   }
 
-  return { VERSION, calculateGeneric, correctionFactor, currency, interestRate, legalInterestRate, money, round };
+  return { HISTORICAL_LEGAL_RATE_START_DATE, LEGAL_RATE_SCHEDULE, LEGAL_RATE_START_DATE, VERSION, calculateGeneric, correctionFactor, currency, interestRate, legalInterestRate, money, round };
 });
