@@ -1311,6 +1311,8 @@ test('cálculo de pensão percorre o fluxo, salva e gera PDF auditável', async 
   expect(download.suggestedFilename()).toMatch(/^oj-cal-.*\.pdf$/i);
   await expect(page.locator('#toast')).toHaveText('PDF gerado com sucesso.');
   await expect(page.locator('#toast')).not.toContainText(/SHA|hash/i);
+  await page.getByRole('button', { name: 'Finalizar' }).click();
+  await expect(page).toHaveURL(/calculos\/$/);
 });
 
 test('atualização monetária simples calcula uma parcela e exibe a memória', async ({ page }) => {
@@ -1341,6 +1343,8 @@ test('atualização monetária simples calcula uma parcela e exibe a memória', 
   await expect(page.locator('.wizard-steps .wizard-step.active')).toContainText('Resultado');
   await expect(page.locator('.summary')).toBeVisible();
   await expect(page.getByText('R$ 150,00', { exact: true }).last()).toBeVisible();
+  await page.getByRole('button', { name: 'Finalizar' }).click();
+  await expect(page).toHaveURL(/calculos\/$/);
 });
 
 test('atualização monetária completa percorre parcelas e encargos adicionais', async ({ page }) => {
@@ -1391,6 +1395,8 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^OJ-GEN-.*\.pdf$/i);
   await expect(page.locator('#toast')).toHaveText('PDF gerado.');
+  await page.getByRole('button', { name: 'Finalizar' }).click();
+  await expect(page).toHaveURL(/calculos\/$/);
 });
 
 test('pró-rata explica a regra e altera os juros do cálculo completo', async ({ page }) => {
@@ -1556,6 +1562,8 @@ test('cálculo trabalhista percorre o fluxo, salva e gera PDF', async ({ page })
   expect(download.suggestedFilename()).toMatch(/^OJ-LAB-.*\.pdf$/i);
   await expect(page.locator('#labor-toast')).toHaveText('PDF gerado.');
   await expect(page.locator('#labor-toast')).not.toContainText(/SHA|hash/i);
+  await page.getByRole('button', { name: 'Finalizar' }).click();
+  await expect(page).toHaveURL(/calculos\/$/);
 });
 
 test('assistentes de cálculo compartilham cancelamento e versões identificáveis', async ({ page }) => {

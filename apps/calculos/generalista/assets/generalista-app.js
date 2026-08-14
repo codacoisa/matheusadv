@@ -184,7 +184,7 @@
     activeInfoTip = null;
     const content = complete ? [completeStepOne, completeStepTwo, completeStepThree, resultStep][step - 1]() : [easyStep, resultStep][step - 1]();
     const last = complete ? 4 : 2;
-    app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Generalista</p><h1>Atualização monetária ${complete ? "completa" : "simples"}</h1><p class="hint">${escape(current.code)} • versão ${escape(current.calculationVersion)}</p>${steps()}<form id="generalista-form">${content}<div class="wizard-actions"><button class="secondary" type="button" data-action="${step === 1 ? "cancel" : "back"}">${step === 1 ? "Cancelar" : "Voltar"}</button><div>${step < last ? `<button class="secondary" type="button" data-action="save">Salvar rascunho</button><button class="primary" type="submit">${step === last - 1 ? "Calcular" : "Próximo"}</button>` : `<button class="secondary" type="button" data-action="save">Salvar</button><button class="primary" type="button" data-action="pdf">Gerar PDF</button>`}</div></div></form></section>`;
+    app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Generalista</p><h1>Atualização monetária ${complete ? "completa" : "simples"}</h1><p class="hint">${escape(current.code)} • versão ${escape(current.calculationVersion)}</p>${steps()}<form id="generalista-form">${content}<div class="wizard-actions"><button class="secondary" type="button" data-action="${step === 1 ? "cancel" : "back"}">${step === 1 ? "Cancelar" : "Voltar"}</button><div>${step < last ? `<button class="secondary" type="button" data-action="save">Salvar rascunho</button><button class="primary" type="submit">${step === last - 1 ? "Calcular" : "Próximo"}</button>` : `<button class="secondary" type="button" data-action="finish">Finalizar</button><button class="primary" type="button" data-action="pdf">Gerar PDF</button>`}</div></div></form></section>`;
     app.focus({ preventScroll: true });
   }
   function captureAdditionalParties() { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; current.input.additionalParties = [...document.querySelectorAll("[data-additional-index]")].map((row) => { const source = row.querySelector('[data-additional-field="source"]')?.value || "manual"; const selected = source.startsWith("case:") ? (context.caseParties || []).find((party) => String(party.id) === source.slice(5)) : null; if (source.startsWith("case:")) return selected ? { ...selected, source: "case", sourceId: selected.sourceId || selected.id } : null; return { id: row.dataset.additionalIndex || uid(), name: row.querySelector('[data-additional-field="name"]')?.value.trim() || "", role: row.querySelector('[data-additional-field="role"]')?.value.trim() || "", source: "manual", sourceId: "" }; }).filter(Boolean); }
@@ -450,6 +450,7 @@
     const action = target.dataset.action;
     try {
       if (action === "cancel") { window.location.href = "../"; return; }
+      if (action === "finish") { window.location.href = "../"; return; }
       if (action === "back") { captureVisible(); step = Math.max(1, step - 1); render(); return; }
       if (action === "save") { captureVisible(); persist("draft"); notify("Rascunho salvo."); return; }
       if (action === "pdf") { await makePdf(); return; }

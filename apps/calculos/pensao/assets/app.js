@@ -183,7 +183,7 @@
     app.innerHTML = `<section class="panel wizard-head"><p class="eyebrow">Família</p><h1>Pensão alimentícia</h1><p class="hint">${escape(current.code)} • versão ${escape(pensionVersion(current.calculationVersion))}</p>
       ${steps()}<form id="wizard-form">${step === 1 ? stepOne() : step === 2 ? stepTwo() : step === 3 ? stepThree() : stepFour()}
       <div class="wizard-actions"><button class="secondary" type="button" data-action="${step === 1 ? "catalog" : "back"}">${step === 1 ? "Cancelar" : "Voltar"}</button>
-      <div>${step < 4 ? '<button class="secondary" type="button" data-action="save-draft">Salvar rascunho</button> ' : ""}
+      <div>${step < 4 ? '<button class="secondary" type="button" data-action="save-draft">Salvar rascunho</button> ' : '<button class="secondary" type="button" data-action="finish">Finalizar</button> '}
       ${step < 3 ? '<button class="primary" type="submit">Próximo</button>' : step === 3 ? '<button class="primary" type="submit">Calcular</button>' : '<button class="primary" type="button" data-action="pdf-current">Gerar PDF detalhado</button>'}</div></div></form></section>`;
   }
 
@@ -345,6 +345,7 @@
     const target = event.target.closest("button"); if (!target || busy) return;
     const action = target.dataset.action;
     if (action === "catalog") { window.location.href = "../"; return; }
+    if (action === "finish") { window.location.href = "../"; return; }
     if (action === "add-additional") { try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { captureAdditionalParties(); } current.input.additionalParties.push({ id: uid(), name: "", role: "", source: "manual", sourceId: "" }); render(); }
     if (action === "remove-additional") { try { captureStepOne(document.querySelector("#wizard-form")); } catch (_) { captureAdditionalParties(); } current.input.additionalParties.splice(Number(target.dataset.index), 1); render(); }
     if (action === "back") {
