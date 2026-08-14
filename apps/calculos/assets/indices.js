@@ -34,6 +34,7 @@
   };
   const legalRateFromFactors = (selicFactor, ipcaFactor) =>
     Math.max(0, Number(((Number(selicFactor) / Number(ipcaFactor) - 1) * 100).toFixed(6)));
+  const currentMonth = () => new Date().toISOString().slice(0, 7);
   const normalizeCorrectionType = (type) => type === "IPCA-15" ? "IPCA15" : type;
   function requireBcb() {
     if (!bcbApi?.monthly || !bcbApi?.series || !bcbApi.SERIES) throw new Error("A fonte BACEN não foi carregada.");
@@ -41,12 +42,23 @@
   }
   function assertCompleteMonths(rates, start, end, label) {
     const missing = months(start, end).filter((key) => !Object.prototype.hasOwnProperty.call(rates, key));
-    if (missing.length) throw new Error(`O BACEN não forneceu ${label} para ${missing.join(", ")}.`);
+    if (!missing.length) return [];
+    const available = Object.keys(rates).filter((key) => /^\d{4}-\d{2}$/.test(key)).sort();
+    const latestAvailable = available.at(-1) || "";
+    const requestedEnd = month(end);
+    const currentTail = missing.length === 1
+      && missing[0] === requestedEnd
+      && requestedEnd === currentMonth()
+      && latestAvailable < requestedEnd;
+    if (!currentTail) throw new Error(`O BACEN não forneceu ${label} para ${missing.join(", ")}.`);
+    rates[missing[0]] = 0;
+    return missing;
   }
   async function monthlySeries(seriesId, start, end, label) {
     const api = requireBcb();
     const rates = await api.monthly(seriesId, { start: `${month(start)}-01`, end: endOfMonth(end) });
-    assertCompleteMonths(rates, start, end, label);
+    const unavailableMonths = assertCompleteMonths(rates, start, end, label);
+    Object.defineProperty(rates, "unavailableMonths", { value: unavailableMonths, enumerable: false });
     return rates;
   }
   async function correction(type, start, end) {
@@ -106,6 +118,7 @@
     return {
       fetchedAt: new Date().toISOString(), start: month(start), end: month(end),
       correctionType: normalizeCorrectionType(correctionType), legalRates,
+      unavailableMonths: correctionRates.unavailableMonths || [],
       correctionRates, sources,
     };
   }

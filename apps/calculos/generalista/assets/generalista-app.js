@@ -90,11 +90,13 @@
   function additionalPartyOptions(selected) { const context = caseContextApi?.partyContext(financeData, current.input, finance) || {}; const clientName = context.clientParty?.name || ""; return `<option value="manual" ${selected === "manual" ? "selected" : ""}>Preencher manualmente</option>${(context.caseParties || []).filter((party) => party.name !== clientName).map((party) => `<option value="case:${escape(party.id)}" ${selected === `case:${party.id}` ? "selected" : ""}>Importar: ${escape(party.name)} — ${escape(party.role)}</option>`).join("")}`; }
   function removeImportedAdditionalParties() { current.input.additionalParties = (current.input.additionalParties || []).filter((party) => party.source !== "case"); }
   function additionalPartiesHtml() { return `<section class="party-manager" aria-labelledby="additional-parties-title"><div class="party-manager-head"><div><h3 id="additional-parties-title">Partes adicionais</h3><p class="hint">Importe do processo ou inclua manualmente quando necessário.</p></div><button class="link-button" type="button" data-action="add-additional">＋ Adicionar parte adicional</button></div><div class="party-list">${(current.input.additionalParties || []).map((party, index) => { const source = party.source === "case" ? `case:${party.sourceId}` : "manual"; const imported = party.source === "case"; return `<div class="party-row" data-additional-index="${index}"><select data-additional-field="source" aria-label="Origem da parte adicional">${additionalPartyOptions(source)}</select><input data-additional-field="name" aria-label="Nome da parte adicional ${index + 1}" value="${escape(party.name)}" placeholder="Nome da parte" ${imported ? "readonly" : ""}><input data-additional-field="role" aria-label="Polo da parte adicional ${index + 1}" value="${escape(party.role)}" placeholder="Polo" ${imported ? "readonly" : ""}><button class="danger small" type="button" data-action="remove-additional" data-index="${index}" aria-label="Remover parte adicional">×</button></div>`; }).join("")}</div></section>`; }
+  function periodFields() {
+    const i = current.input;
+    return `<div class="field full date-range-field"><span>Período do cálculo</span><div class="date-range-grid"><label class="date-range-part" for="periodStartDate"><span>Data do trânsito em julgado ou início do período</span><input id="periodStartDate" name="periodStartDate" type="date" value="${escape(i.periodStartDate || i.judgmentDate)}"></label><label class="date-range-part" for="calculationDate"><span>Data-base do cálculo</span><input id="calculationDate" name="calculationDate" type="date" value="${escape(i.calculationDate)}" required></label></div><p class="hint">Use o início também em execução de título extrajudicial, quando não houver trânsito em julgado. O início pode ser ajustado em cada lançamento.</p></div>`;
+  }
   function basicFields() {
     const i = current.input, role = i.clientRole || i.clientPartyRole || "Autor", opposingRole = caseContextApi?.oppositeRole(role) || "Réu";
-    const calculationField = complete
-      ? `${field("Data do trânsito em julgado ou início do período", "periodStartDate", i.periodStartDate || i.judgmentDate, "date")}<p class="hint field full">Use este campo também em execução de título extrajudicial, quando não houver trânsito em julgado. O início pode ser ajustado em cada lançamento.</p>${field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true)}`
-      : field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true);
+    const calculationField = complete ? periodFields() : field("Data-base do cálculo", "calculationDate", i.calculationDate, "date", "", true);
     return `${financeNotice()}<section class="form-section"><div class="section-heading"><div><h2>Identificação</h2><p class="hint">Nomeie o cálculo e vincule-o ao cliente e ao caso, se houver.</p></div></div><div class="form-grid">${field("Nome do cálculo", "name", current.name, "text", "full", true)}<div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" required>${clientOptions(i.clientId)}</select></div><div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}</div></section><section class="form-section"><div class="section-heading"><div><h2>Partes</h2><p class="hint">Defina o polo do cliente e a parte contrária antes de incluir terceiros.</p></div></div><div class="form-grid"><div class="field"><label>Parte principal — cliente<input id="clientPartyName" value="${escape(i.clientParty?.name || i.clientName || "")}" readonly></label></div><div class="field"><label class="required" for="clientPartyRole">Polo do cliente</label><select id="clientPartyRole" required>${["Autor", "Réu", "Credor", "Devedor"].map((item) => `<option ${role === item ? "selected" : ""}>${item}</option>`).join("")}</select></div>${field(`Parte contrária — ${opposingRole}`, "opposingPartyName", i.opposingParty?.name || "", "text", "full", true)}<div class="field full">${additionalPartiesHtml()}</div></div></section><section class="form-section"><div class="section-heading"><div><h2>Referência do cálculo</h2><p class="hint">Informe a data que será usada como referência nesta memória.</p></div></div><div class="form-grid">${calculationField}</div></section>`;
   }
   function easyStep() {
@@ -141,12 +143,18 @@
   function chargeCard(item, type) {
     return `<article class="result-charge-card" role="listitem"><strong>${escape(item.description)}</strong><span>${type}</span><strong>${formatMoney(item.amount)}</strong></article>`;
   }
+  function unavailableIndexNote() {
+    return Object.entries(current.indexSnapshot?.unavailableMonthsByType || {})
+      .flatMap(([type, months]) => (months || []).map((key) => `${type}: ${key}`));
+  }
   function resultStep() {
     const r = current.result;
     if (!r) return '<div class="empty">Calcule os dados para visualizar o resultado.</div>';
     const totals = [["Valor original", r.totals.original], ["Correção", r.totals.correction], ["Juros", r.totals.interest], ["Multa", r.totals.penalty], ["Honorários", r.totals.fees], ["Custas", r.totals.costs], ["Total atualizado", r.totals.total]];
     const charges = [...r.penaltyRows.map((item) => ({ ...item, type: "Multa" })), ...r.feeRows.map((item) => ({ ...item, type: "Honorários" }))];
-    return `<p class="hint">Data-base: ${formatDate(r.calculationDate)}</p><div class="summary">${totals.map(([label, value], index) => `<div class="metric ${index === totals.length - 1 ? "total" : ""}"><span>${label}</span><strong>${formatMoney(value)}</strong></div>`).join("")}</div><h2>Memória por lançamento</h2><div class="result-ledger" role="list">${r.ledger.map(ledgerCard).join("")}</div>${charges.length ? `<h2>Encargos adicionais</h2><div class="result-charges" role="list">${charges.map((item) => chargeCard(item, item.type)).join("")}</div>` : ""}<p class="legal-note">${escape(r.methodology.correctionConvention)} ${escape(r.methodology.interestConvention)} Confirme o título judicial, os termos iniciais e o índice aplicável ao caso concreto.</p>`;
+    const unavailable = unavailableIndexNote();
+    const availabilityNote = unavailable.length ? `<p class="legal-note">Competência(s) ainda sem publicação oficial no BACEN: ${escape(unavailable.join(", "))}. A fração corrente foi mantida sem correção até a divulgação do índice.</p>` : "";
+    return `<p class="hint">Data-base: ${formatDate(r.calculationDate)}</p><div class="summary">${totals.map(([label, value], index) => `<div class="metric ${index === totals.length - 1 ? "total" : ""}"><span>${label}</span><strong>${formatMoney(value)}</strong></div>`).join("")}</div><h2>Memória por lançamento</h2><div class="result-ledger" role="list">${r.ledger.map(ledgerCard).join("")}</div>${charges.length ? `<h2>Encargos adicionais</h2><div class="result-charges" role="list">${charges.map((item) => chargeCard(item, item.type)).join("")}</div>` : ""}${availabilityNote}<p class="legal-note">${escape(r.methodology.correctionConvention)} ${escape(r.methodology.interestConvention)} Confirme o título judicial, os termos iniciais e o índice aplicável ao caso concreto.</p>`;
   }
   function render() {
     const content = complete ? [completeStepOne, completeStepTwo, completeStepThree, resultStep][step - 1]() : [easyStep, resultStep][step - 1]();
@@ -267,10 +275,17 @@
   function indexSnapshotMatchesCurrent() {
     const snapshot = current.indexSnapshot;
     if (!snapshot || snapshot.criteriaKey !== indexCriteriaKey()) return false;
-    if (indexTypes().some((type) => !Object.keys(snapshot.ratesByType?.[type] || {}).length)) return false;
-    if (legalRatesRequired() && !Object.keys(snapshot.legalRates || {}).length) return false;
+    const { start, end } = indexRequestRange();
+    const requestedMonths = indices?.months?.(start, end) || [];
+    if (indexTypes().some((type) => requestedMonths.some((key) => !Object.prototype.hasOwnProperty.call(snapshot.ratesByType?.[type] || {}, key)))) return false;
+    if (legalRatesRequired()) {
+      const legalStart = month(start) < (indices?.LEGAL_RATE_START_MONTH || "2024-08") ? (indices?.LEGAL_RATE_START_MONTH || "2024-08") : month(start);
+      const legalMonths = indices?.months?.(legalStart, end) || [];
+      if (legalMonths.some((key) => !Object.prototype.hasOwnProperty.call(snapshot.legalRates || {}, key))) return false;
+    }
     return true;
   }
+  function month(value) { return String(value || "").slice(0, 7); }
   function indexRequestRange() {
     const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
     const starts = [
@@ -296,8 +311,12 @@
       const correctionSnapshots = await Promise.all(types.map((type) => indices.snapshot({ correctionType: type, interestType: "none", start, end })));
       const legalSnapshot = legalSelected ? await indices.snapshot({ correctionType: "none", interestType: "legal", start, end }) : null;
       const snapshots = [...correctionSnapshots, ...(legalSnapshot ? [legalSnapshot] : [])];
-      current.indexSnapshot = { criteriaKey, fetchedAt: new Date().toISOString(), start, end, ratesByType: Object.fromEntries(types.map((type, index) => [type, correctionSnapshots[index]?.correctionRates || {}])), legalRates: legalSnapshot?.legalRates || {}, sources: snapshots.flatMap((item) => item.sources || []) };
-      persist("draft"); notify("Índices oficiais carregados e congelados neste rascunho.");
+      current.indexSnapshot = { criteriaKey, fetchedAt: new Date().toISOString(), start, end, ratesByType: Object.fromEntries(types.map((type, index) => [type, correctionSnapshots[index]?.correctionRates || {}])), unavailableMonthsByType: Object.fromEntries(types.map((type, index) => [type, correctionSnapshots[index]?.unavailableMonths || []])), legalRates: legalSnapshot?.legalRates || {}, sources: snapshots.flatMap((item) => item.sources || []) };
+      persist("draft");
+      const unavailable = [...new Set(correctionSnapshots.flatMap((item) => item.unavailableMonths || []))];
+      notify(unavailable.length
+        ? `Índices oficiais carregados. ${unavailable.join(", ")} ainda não foi publicada; a fração corrente ficou sem correção.`
+        : "Índices oficiais carregados e congelados neste rascunho.");
     } finally { busy = false; syncStatus.refresh?.(); }
     render();
   }

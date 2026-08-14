@@ -136,6 +136,8 @@
     const corrections = [...new Set([...(input.items || []), ...(input.costs || [])].map((item) => item.correctionType).filter((type) => type && type !== "none"))];
     paragraph(`Índices de correção: ${corrections.length ? corrections.join(", ") : "não aplicados"}. ${result.methodology?.correctionConvention || "Índices aplicados conforme os lançamentos."}`);
     paragraph(`Juros: ${result.methodology?.interest || "não aplicados"}. ${result.methodology?.interestConvention || "Juros conforme os parâmetros informados."}`);
+    const unavailableMonths = Object.entries(record.indexSnapshot?.unavailableMonthsByType || {}).flatMap(([type, months]) => (months || []).map((key) => `${type}: ${key}`));
+    if (unavailableMonths.length) paragraph(`Competência(s) ainda sem publicação oficial no BACEN: ${unavailableMonths.join(", ")}. A fração corrente foi mantida sem correção até a divulgação do índice.`, { color: COLORS.gold, bold: true });
     paragraph("Os termos iniciais, índices, encargos e demais premissas devem ser conferidos com o título e pelo profissional responsável antes do uso judicial.", { color: COLORS.ink });
 
     addPage();

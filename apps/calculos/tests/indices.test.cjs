@@ -36,3 +36,25 @@ test("consulta cada índice de correção pela série BACEN correspondente", asy
 test("expõe a competência inicial da Taxa Legal como constante", () => {
   assert.equal(indices.LEGAL_RATE_START_MONTH, "2024-08");
 });
+
+test("mantém a competência histórica ausente como erro", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => [] });
+  try {
+    await assert.rejects(indices.correction("INPC", "2021-07", "2021-07"), /INPC para 2021-07/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("não bloqueia o mês corrente ainda sem publicação oficial", async () => {
+  const originalFetch = global.fetch;
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  global.fetch = async () => ({ ok: true, json: async () => [] });
+  try {
+    const rates = await indices.correction("INPC", currentMonth, currentMonth);
+    assert.equal(rates[currentMonth], 0);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

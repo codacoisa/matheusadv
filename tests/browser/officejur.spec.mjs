@@ -1351,6 +1351,8 @@ test('atualização monetária completa percorre parcelas e encargos adicionais'
   await expect(page.locator('.wizard-step').nth(2).locator('strong')).toHaveText('Encargos');
   await expect(page.locator('.wizard-step').nth(2).locator('small')).toHaveText('multas, honorários e custas');
   await expect(page.locator('.wizard-steps.steps-4')).toHaveCSS('display', 'grid');
+  await expect(page.locator('.date-range-field')).toHaveCount(1);
+  await expect(page.locator('.date-range-field')).toContainText('Período do cálculo');
   await page.getByLabel('Nome do cálculo').fill('Cálculo completo de teste');
   await page.locator('#clientId').selectOption('client-test');
   await page.getByLabel(/Parte contrária — Réu/).fill('Réu de teste');
