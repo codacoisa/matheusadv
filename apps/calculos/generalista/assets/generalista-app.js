@@ -272,9 +272,9 @@
     return true;
   }
   function indexRequestRange() {
-const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
-    const dates = [
-      ...current.input.items.flatMap((item) => [item.date, item.correctionStart || periodStart, item.correctionEnd, item.interestStart || periodStart, item.interestEnd]),
+    const periodStart = current.input.periodStartDate || current.input.judgmentDate || "";
+    const starts = [
+      ...current.input.items.flatMap((item) => [item.date, item.correctionStart || periodStart, item.interestStart || periodStart]),
       ...current.input.costs.map((item) => item.date),
     ].filter(Boolean).sort();
     const ends = [
@@ -373,10 +373,10 @@ const periodStart = current.input.periodStartDate || current.input.judgmentDate 
       render();
       return;
     }
-if (event.target.dataset.itemField === "interestType") {
+    if (event.target.dataset.itemField === "interestType") {
       try { captureVisible(); } catch (_) { /* preserva a edição enquanto a linha muda de campos */ }
       render();
-      if (event.target.value === "legal") ensureIndices();
+      if (event.target.value === "legal") void ensureIndices().catch((error) => notify(error.message || "Não foi possível carregar os índices oficiais.", true));
       return;
     }
     if (event.target.id !== "feeType") return;
