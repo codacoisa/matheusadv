@@ -111,9 +111,8 @@
       correctionSource,
       interestType === "legal" ? SOURCES.ipca15 : null,
       interestType === "legal" ? SOURCES.selic : null,
-      SOURCES.law,
-      SOURCES.resolution,
-      SOURCES.minimumWage,
+      interestType === "legal" ? SOURCES.law : null,
+      interestType === "legal" ? SOURCES.resolution : null,
     ].filter(Boolean))];
     return {
       fetchedAt: new Date().toISOString(), start: month(start), end: month(end),

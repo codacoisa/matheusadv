@@ -1504,6 +1504,51 @@ test('Taxa Legal carrega automaticamente as fontes oficiais antes do cálculo', 
   expect(requests).toContainEqual(expect.objectContaining({ seriesId: '11', start: '01/07/2024' }));
 });
 
+test('pensão carrega automaticamente as séries ao trocar o critério de juros', async ({ page }) => {
+  const requests = await stubBcbIndices(page);
+  await prepareCalculationPage(page, 'calculos/pensao/');
+  await page.getByLabel('Nome do cálculo').fill('Pensão com Taxa Legal');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel('Número do processo').fill('0000000-00.2026.8.00.0000');
+  await page.getByLabel(/Parte contrária — Executado \/ Devedor/).fill('Devedor de teste');
+  await page.getByLabel('Início das parcelas').fill('2021-07-01');
+  await page.getByLabel('Fim das parcelas').fill('2021-07-31');
+  await page.getByLabel('Data-base do cálculo').fill('2024-09-30');
+  await page.getByLabel('Forma estipulada').selectOption('fixed');
+  await page.getByLabel('Valor mensal (R$)').fill('1000');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await expect(page.getByText(/Juros legais:.*6% ao ano até 11\/02\/2003/)).toBeVisible();
+  await page.locator('#interestType').selectOption('fixed');
+  await expect(page.locator('#toast')).toHaveText('Séries oficiais carregadas e congeladas no cálculo.', { timeout: 30_000 });
+  await page.locator('#interestType').selectOption('legal');
+  await expect.poll(() => requests.some(({ seriesId, start }) => seriesId === '11' && start === '01/07/2024')).toBe(true);
+  await expect(page.locator('#toast')).toHaveText('Séries oficiais carregadas e congeladas no cálculo.', { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.locator('.summary')).toBeVisible();
+});
+
+test('trabalhista carrega a Taxa Legal antes de calcular', async ({ page }) => {
+  const requests = await stubBcbIndices(page);
+  await prepareCalculationPage(page, 'calculos/trabalhista/');
+  await page.getByLabel('Nome do cálculo').fill('Trabalhista com Taxa Legal');
+  await page.locator('#clientId').selectOption('client-test');
+  await page.getByLabel(/Parte contrária — Reclamante/).fill('Reclamante de teste');
+  await page.getByLabel('Data-base do cálculo').fill('2024-09-30');
+  await page.getByLabel('Data da admissão').fill('2021-07-01');
+  await page.getByLabel(/Empregado ainda ativo/).check();
+  await page.getByLabel('Salário-base inicial (R$)').fill('3000');
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.getByLabel('Saldo salarial').check();
+  await page.getByRole('button', { name: 'Próximo' }).click();
+  await page.locator('#interestType').selectOption('legal');
+  await expect.poll(() => requests.some(({ seriesId, start }) => seriesId === '11' && start === '01/07/2024')).toBe(true);
+  await expect(page.locator('#labor-toast')).toHaveText('Índices oficiais carregados e congelados neste rascunho.', { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Calcular' }).click();
+  await expect(page.getByText('Total atualizado')).toBeVisible();
+});
+
 test('calculadoras usam o mesmo componente de passos em todas as larguras', async ({ page }) => {
   const flows = [
     ['calculos/facil/', 'steps-2', 2],
@@ -1578,18 +1623,18 @@ test('assistentes de cálculo compartilham cancelamento e versões identificáve
   await page.locator('.calculator-card').filter({ hasText: 'Pensão alimentícia' })
     .getByRole('link', { name: 'Iniciar cálculo' }).click();
   await expect(page).toHaveURL(/calculos\/pensao\/$/);
-  await expect.poll(() => page.evaluate(() => window.OfficeJurCalculationPdf?.formatVersion('1.0.0')))
-    .toBe('pension-1.0.0');
-  expect(await page.evaluate(() => window.OfficeJurCalculationPdf.formatVersion('pension-1.0.0')))
-    .toBe('pension-1.0.0');
-  await expect(page.getByText(/versão pension-1\.0\.0/i)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.OfficeJurCalculationPdf?.formatVersion('1.1.0')))
+    .toBe('pension-1.1.0');
+  expect(await page.evaluate(() => window.OfficeJurCalculationPdf.formatVersion('pension-1.1.0')))
+    .toBe('pension-1.1.0');
+  await expect(page.getByText(/versão pension-1\.1\.0/i)).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page).toHaveURL(/calculos\/$/);
 
   await page.locator('.calculator-card').filter({ hasText: 'Verbas trabalhistas' })
     .getByRole('link', { name: 'Iniciar cálculo' }).click();
   await expect(page).toHaveURL(/calculos\/trabalhista\/$/);
-  await expect(page.getByText(/versão labor-1\.0\.0/i)).toBeVisible();
+  await expect(page.getByText(/versão labor-1\.1\.0/i)).toBeVisible();
   await page.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page).toHaveURL(/calculos\/$/);
 });

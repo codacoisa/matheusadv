@@ -10,7 +10,7 @@
 
   if (!core) throw new Error("O núcleo de cálculos do OfficeJur não foi carregado.");
 
-  const VERSION = "labor-1.0.0";
+  const VERSION = "labor-1.1.0";
   const DAY = 86_400_000;
   const SOURCES = Object.freeze([
     "https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452compilado.htm",

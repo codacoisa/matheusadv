@@ -6,7 +6,10 @@
   "use strict";
 
   const DAY = 86_400_000;
-  const CALCULATION_VERSION = "pension-1.0.0";
+  const CALCULATION_VERSION = "pension-1.1.0";
+  const LEGAL_RATE_START_DATE = "2024-08-30";
+  const HISTORICAL_LEGAL_RATE_START_DATE = "2003-02-12";
+  const LEGAL_RATE_SCHEDULE = "Juros legais: 6% ao ano até 11/02/2003 (CC/1916); 12% ao ano de 12/02/2003 a 29/08/2024 (CC/2002 e art. 161, § 1º, do CTN); Taxa Legal do art. 406 do CC, conforme Lei 14.905/2024, a partir de 30/08/2024.";
   const round = (value, digits = 2) => {
     const factor = 10 ** digits;
     return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
@@ -130,6 +133,49 @@
     return { rate: round(total, 10), applied };
   }
 
+  function legalInterestRate(startValue, endValue, monthlyRates = {}) {
+    const start = date(startValue), end = date(endValue);
+    const legalStart = date(LEGAL_RATE_START_DATE);
+    const historicalStart = date(HISTORICAL_LEGAL_RATE_START_DATE);
+    if (end <= start) return { rate: 0, applied: [] };
+
+    let total = 0;
+    const applied = [];
+    const addAnnual = (segmentStart, segmentEnd, annualRate, regime) => {
+      if (segmentEnd <= segmentStart) return;
+      const days = daysBetween(segmentStart, segmentEnd);
+      const rate = annualRate * days / 365;
+      total += rate;
+      applied.push({ regime, annualRate, days, denominator: 365, rate: round(rate, 10) });
+    };
+
+    addAnnual(start, end < historicalStart ? end : historicalStart, 6, "CC/1916");
+    const modernEnd = end < legalStart ? end : legalStart;
+    addAnnual(start > historicalStart ? start : historicalStart, modernEnd, 12, "CC/2002 + CTN");
+    if (end > legalStart) {
+      let cursor = start > legalStart ? start : legalStart;
+      while (cursor < end) {
+        const monthEndExclusive = new Date(endOfMonth(cursor).getTime() + DAY);
+        const segmentEnd = end < monthEndExclusive ? end : monthEndExclusive;
+        const key = monthKey(cursor);
+        if (!(key in monthlyRates)) throw new Error(`Taxa Legal ausente para ${key}.`);
+        const monthly = Number(monthlyRates[key]);
+        const days = daysBetween(cursor, segmentEnd);
+        const rate = monthly * days / daysInMonth(cursor);
+        total += rate;
+        applied.push({ regime: "Taxa Legal — art. 406 do CC", month: key, monthlyRate: monthly, days, daysInMonth: daysInMonth(cursor), rate: round(rate, 10) });
+        cursor = segmentEnd;
+      }
+    }
+    return { rate: round(total, 10), applied };
+  }
+
+  function interestMethodology(settings = {}) {
+    if (settings.interestType === "legal") return `${LEGAL_RATE_SCHEDULE} A faixa de 2024 em diante é mensal e proporcional aos dias corridos.`;
+    if (settings.interestType === "fixed") return `Taxa fixa de ${Number(settings.fixedMonthlyRate || 0)}% ao mês, com juros simples e pró-rata por dias corridos.`;
+    return "não aplicados";
+  }
+
   function updateAmount(item, settings, calculationDate, sign = 1) {
     const startDate = item.date || item.dueDate;
     const principal = money(item.amount ?? item.originalAmount);
@@ -140,18 +186,8 @@
     let interest = { rate: 0, applied: [] };
     if (settings.interestType === "fixed")
       interest = monthlyProrata(startDate, calculationDate, {}, Number(settings.fixedMonthlyRate || 0));
-    if (settings.interestType === "legal") {
-      const legalEffectiveDate = "2024-08-30";
-      const legalProrataStart = "2024-08-29";
-      const priorEnd = calculationDate < legalEffectiveDate ? calculationDate : legalEffectiveDate;
-      const prior = startDate < legalEffectiveDate
-        ? monthlyProrata(startDate, priorEnd, {}, Number(settings.preLegalMonthlyRate || 0))
-        : { rate: 0, applied: [] };
-      const legal = calculationDate >= legalEffectiveDate
-        ? monthlyProrata(startDate > legalProrataStart ? startDate : legalProrataStart, calculationDate, settings.legalRates || {})
-        : { rate: 0, applied: [] };
-      interest = { rate: round(prior.rate + legal.rate, 10), applied: [...prior.applied, ...legal.applied] };
-    }
+    if (settings.interestType === "legal")
+      interest = legalInterestRate(startDate, calculationDate, settings.legalRates || {});
     const interestAmount = money(corrected * interest.rate / 100);
     return {
       id: item.id,
@@ -210,7 +246,10 @@
         correction: input.settings.correctionType,
         interest: input.settings.interestType,
         correctionConvention: "Índices mensais completos posteriores ao mês do vencimento, capitalizados sucessivamente.",
-        interestConvention: "Juros simples, proporcionais aos dias corridos de cada mês, sem capitalização.",
+        interestMethod: interestMethodology(input.settings),
+        interestConvention: input.settings.interestType === "legal"
+          ? "Juros simples; 2024 em diante é apurado por competência mensal e proporcional aos dias corridos."
+          : "Juros simples, proporcionais aos dias corridos de cada mês, sem capitalização.",
         abatements: "Cada abatimento é atualizado, pela mesma regra da dívida, de sua data até a data-base e então deduzido.",
         rounding: "Valores monetários arredondados para centavos em cada rubrica; fatores mantidos com até 10 casas.",
       },
@@ -234,7 +273,8 @@
   }
 
   return {
-    CALCULATION_VERSION, MINIMUM_WAGES, calculatePension, correctionFactor, currency,
-    generateInstallments, hash, minimumWage, monthlyProrata, round, stable,
+    CALCULATION_VERSION, HISTORICAL_LEGAL_RATE_START_DATE, LEGAL_RATE_SCHEDULE, LEGAL_RATE_START_DATE,
+    MINIMUM_WAGES, calculatePension, correctionFactor, currency, generateInstallments, hash,
+    legalInterestRate, minimumWage, monthlyProrata, round, stable,
   };
 });

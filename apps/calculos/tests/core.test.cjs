@@ -51,7 +51,7 @@ test("inclui o décimo terceiro apenas quando solicitado e dentro do período", 
   assert.equal(rows.filter((item) => item.kind === "thirteenth").length, 1);
 });
 
-test("aplica a Taxa Legal aos dias 30 e 31 de agosto de 2024 para dívida anterior", () => {
+test("combina a faixa histórica e a Taxa Legal na mudança de agosto de 2024", () => {
   const result = core.calculatePension({
     calculationDate: "2024-08-31",
     installments: [{ id: "p1", dueDate: "2024-08-01", originalAmount: 1000, payments: [] }],
@@ -60,5 +60,16 @@ test("aplica a Taxa Legal aos dias 30 e 31 de agosto de 2024 para dívida anteri
       legalRates: { "2024-08": 3.1 }, penaltyRate: 0, feeRate: 0,
     },
   });
-  assert.equal(result.ledger[0].interestRate, 0.2);
+  assert.equal(result.ledger[0].interestRate, 1.0534246575);
+  assert.match(result.methodology.interestMethod, /6% ao ano até 11\/02\/2003/);
+});
+
+test("aplica 6% e 12% ao ano nas faixas históricas dos juros legais", () => {
+  const result = core.calculatePension({
+    calculationDate: "2003-02-20",
+    installments: [{ id: "p1", dueDate: "2003-02-01", originalAmount: 1000, payments: [] }],
+    settings: { correctionType: "none", interestType: "legal", legalRates: {}, penaltyRate: 0, feeRate: 0 },
+  });
+  assert.equal(result.ledger[0].interestRate, 0.4438356164);
+  assert.deepEqual(result.ledger[0].interestTrail.map((item) => item.regime), ["CC/1916", "CC/2002 + CTN"]);
 });

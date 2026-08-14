@@ -36,6 +36,7 @@
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
   const number = (input) => Number(input || 0);
+  const legalSource = (source) => /bcdata\.sgs\.11\/dados|l14905|Resolu%C3%A7%C3%A3o5171|Taxa legal:/i.test(String(source));
 
   function createCurrency(core) {
     return (input) => {
@@ -50,6 +51,7 @@
       ...(input.sources || []),
       ...(result?.sources || []),
     ]);
+    if (input.settings?.interestType !== "legal") [...sources].filter(legalSource).forEach((source) => sources.delete(source));
     if (input.settings?.correctionType && input.settings.correctionType !== "none")
       sources.add(`Índice de correção selecionado: ${input.settings.correctionType}.`);
     if (input.settings?.interestType === "legal")
@@ -67,7 +69,7 @@
     if (!labor?.calculateLabor) throw new Error("O motor de cálculos trabalhistas não foi carregado.");
 
     const input = record.input || {};
-    const result = record.result || labor.calculateLabor(input);
+    const result = labor.calculateLabor(input);
     const currency = createCurrency(core);
     const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
     const margin = 16;
@@ -215,7 +217,7 @@
     doc.text("Memória de cálculo trabalhista", margin, 29);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.4);
-    doc.text(`Código ${value(record.code, "sem código")} | versão ${value(record.calculationVersion || result.calculationVersion, "labor-1.0.0")}`, margin, 39);
+      doc.text(`Código ${value(record.code, "sem código")} | versão ${value(record.calculationVersion || result.calculationVersion, "labor-1.1.0")}`, margin, 39);
     doc.text(`Emitido em ${instant(record.updatedAt || new Date().toISOString())}`, margin, 45);
     y = 62;
 
@@ -254,6 +256,10 @@
     }
 
     drawSection("Premissas e metodologia");
+    const correctionSelected = input.settings?.correctionType && input.settings.correctionType !== "none";
+    const correctionLabel = correctionSelected ? input.settings.correctionType : "sem correção";
+    drawParagraph(`Correção monetária: ${correctionLabel}. ${result.methodology?.correctionConvention || "Sem correção monetária externa."}`);
+    drawParagraph(`Juros: ${result.methodology?.interestMethod || (input.settings?.interestType === "fixed" ? `Taxa fixa de ${input.settings.fixedMonthlyRate || 0}% ao mês` : input.settings?.interestType === "legal" ? "Taxa Legal" : "não aplicados")}. ${result.methodology?.interestConvention || "Juros simples, sem capitalização."}`);
     drawParagraph(result.methodology?.labor || "Cada rubrica é registrada na competência de vencimento e atualizada até a data-base selecionada.");
     drawParagraph(result.methodology?.status || "Rubricas pagas ou parcialmente pagas recebem os abatimentos declarados.");
     drawParagraph(result.methodology?.thirteenth || "O 13º salário é calculado pelos avos informados ou pelo período de vínculo.");
@@ -290,11 +296,16 @@
     const rates = new Map();
     Object.entries(snapshot.correctionRates || {}).forEach(([key, amount]) => rates.set(key, { ...(rates.get(key) || {}), correction: amount }));
     Object.entries(snapshot.legalRates || {}).forEach(([key, amount]) => rates.set(key, { ...(rates.get(key) || {}), legal: amount }));
-    if (rates.size) {
-      drawTable(
-        ["Competência", "Correção (%)", "Taxa legal (% a.m.)"], [52, 63, 63],
-        [...rates].sort(([left], [right]) => left.localeCompare(right)).map(([key, ratesForMonth]) => [key, ratesForMonth.correction ?? "-", ratesForMonth.legal ?? "-"]),
-      );
+    const hasCorrectionSeries = [...rates.values()].some((item) => item.correction !== undefined);
+    const legalSelected = input.settings?.interestType === "legal";
+    const legalRates = legalSelected ? snapshot.legalRates || {} : {};
+    const hasLegalSeries = Object.keys(legalRates).length > 0;
+    if (rates.size && hasCorrectionSeries && hasLegalSeries) {
+      drawTable(["Competência", "Correção (%)", "Taxa legal (% a.m.)"], [52, 63, 63], [...rates].sort(([left], [right]) => left.localeCompare(right)).map(([key, ratesForMonth]) => [key, ratesForMonth.correction ?? "-", ratesForMonth.legal ?? "-"]));
+    } else if (rates.size && hasCorrectionSeries) {
+      drawTable(["Competência", "Correção (%)"], [55, 123], [...rates].sort(([left], [right]) => left.localeCompare(right)).map(([key, ratesForMonth]) => [key, ratesForMonth.correction ?? "-"]));
+    } else if (rates.size && hasLegalSeries) {
+      drawTable(["Competência", "Taxa legal (% a.m.)"], [55, 123], [...rates].sort(([left], [right]) => left.localeCompare(right)).map(([key, ratesForMonth]) => [key, ratesForMonth.legal ?? "-"]));
     } else {
       drawParagraph("Nenhuma série econômica externa foi aplicada neste cálculo.", { size: 8.4 });
     }
@@ -311,7 +322,7 @@
       doc.setTextColor(...COLORS.gray);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(6.8);
-      doc.text(`OfficeJur | ${value(record.code, "sem código")} | versão ${value(record.calculationVersion || result.calculationVersion, "labor-1.0.0")}`, margin, 291);
+      doc.text(`OfficeJur | ${value(record.code, "sem código")} | versão ${value(record.calculationVersion || result.calculationVersion, "labor-1.1.0")}`, margin, 291);
       doc.text(`Página ${page} de ${pages}`, 194, 291, { align: "right" });
     }
     doc.setProperties({

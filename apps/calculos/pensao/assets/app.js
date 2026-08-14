@@ -20,7 +20,7 @@
     return /^\d/.test(version) ? `pension-${version}` : version;
   };
   let data = storageApi.normalize({}), financeData = financeApi?.empty() || { clients: [], cases: [], loaded: false },
-    localAccessAllowed = true, step = 1, current = blank(), busy = false;
+    localAccessAllowed = true, step = 1, current = blank(), busy = false, indexLoadPromise = null;
   const sync = syncFactory.create({
     storage: storageApi,
     gistSettings,
@@ -81,7 +81,7 @@
         installments: [], basisLabel: "",
         settings: {
           correctionType: "INPC", correctionRates: {}, interestType: "legal", legalRates: {},
-          fixedMonthlyRate: 1, preLegalMonthlyRate: 1, penaltyRate: 0, feeRate: 0, feeBase: "total",
+          fixedMonthlyRate: 1, penaltyRate: 0, feeRate: 0, feeBase: "total",
         },
       },
       indexSnapshot: null, result: null, dataHash: "",
@@ -104,7 +104,7 @@
       ${field("Nome do cálculo", "name", current.name, "text", "full")}
       <div class="field"><label class="required" for="clientId">Cliente</label><select id="clientId" name="clientId" required>${clientOptions(i.clientId)}</select></div>
       <div class="field"><label for="caseId">Caso / processo (opcional)</label><select id="caseId" name="caseId">${caseOptions(i.clientId, i.caseId)}</select></div>
-      ${field("Número do processo", "caseNumber", i.caseNumber, "text", "full")}
+      <div class="field full"><label for="caseNumber">Número do processo</label><input id="caseNumber" name="caseNumber" type="text" value="${escape(i.caseNumber)}"></div>
     </div></section><section class="form-section"><div class="section-heading"><div><h2>Partes</h2><p class="hint">Defina o polo do cliente, a parte contrária e eventuais terceiros.</p></div></div><div class="form-grid">
       <div class="field"><label>Parte principal — cliente<input id="clientPartyName" value="${escape(i.clientParty?.name || i.clientName || "")}" readonly></label></div>
       <div class="field"><label class="required" for="clientPartyRole">Polo do cliente</label><select id="clientPartyRole" name="clientPartyRole" required><option ${i.clientRole === "Exequente / Credor" || i.clientPartyRole === "Exequente / Credor" ? "selected" : ""}>Exequente / Credor</option><option ${i.clientRole === "Executado / Devedor" || i.clientPartyRole === "Executado / Devedor" ? "selected" : ""}>Executado / Devedor</option></select></div>
@@ -157,11 +157,10 @@
         <option value="fixed" ${s.interestType === "fixed" ? "selected" : ""}>Taxa mensal fixa</option>
         <option value="none" ${s.interestType === "none" ? "selected" : ""}>Sem juros</option></select></div>
       ${s.interestType === "fixed" ? field("Juros simples mensais (%)", "fixedMonthlyRate", s.fixedMonthlyRate, "number") : ""}
-      ${s.interestType === "legal" && current.input.startDate < "2024-08-30" ? field("Taxa simples anterior a 30/08/2024 (% a.m.)", "preLegalMonthlyRate", s.preLegalMonthlyRate, "number") : ""}
       ${field("Multa sobre o débito atualizado (%)", "penaltyRate", s.penaltyRate, "number")}
       ${field("Honorários (%)", "feeRate", s.feeRate, "number")}
       <div class="field"><label for="feeBase">Base dos honorários</label><select id="feeBase"><option value="total" ${s.feeBase === "total" ? "selected" : ""}>Débito + multa</option><option value="corrected" ${s.feeBase === "corrected" ? "selected" : ""}>Principal corrigido</option></select></div>
-      <div class="field full legal-note"><strong>Taxa Legal.</strong> Desde 30/08/2024, é a Selic descontado o IPCA, com piso zero. O OfficeJur reproduz a fórmula da Resolução CMN 5.171/2024 e aplica juros simples com pró-rata por dias corridos. Para período anterior, a taxa acima é uma premissa explícita e deve ser conferida conforme o título e o entendimento aplicável.</div>
+      <div class="field full legal-note"><strong>Juros legais:</strong> 6% ao ano até 11/02/2003 (CC/1916); 12% ao ano de 12/02/2003 a 29/08/2024 (CC/2002 e art. 161, § 1º, do CTN); Taxa Legal do art. 406 do CC, conforme Lei 14.905/2024, a partir de 30/08/2024. A faixa de 2024 em diante é mensal e proporcional aos dias corridos.</div>
       <div class="field full"><button class="secondary" type="button" data-action="indices">${snapshot ? "Atualizar séries oficiais" : "Carregar séries oficiais"}</button>
       <span class="hint">${snapshot ? `Séries congeladas em ${new Date(snapshot.fetchedAt).toLocaleString("pt-BR")} • ${Object.keys(snapshot.correctionRates || {}).length} índices • ${Object.keys(snapshot.legalRates || {}).length} Taxas Legais` : "Obrigatório antes de calcular quando houver correção ou Taxa Legal."}</span></div>
     </div>`;
@@ -235,9 +234,40 @@
   function captureStepThree() {
     const s = current.input.settings;
     ["correctionType", "interestType", "feeBase"].forEach((key) => { s[key] = document.querySelector(`#${key}`).value; });
-    ["fixedMonthlyRate", "preLegalMonthlyRate", "penaltyRate", "feeRate"].forEach((key) => {
+    ["fixedMonthlyRate", "penaltyRate", "feeRate"].forEach((key) => {
       const element = document.querySelector(`#${key}`); if (element) s[key] = Number(element.value || 0);
     });
+  }
+
+  function indexRange() {
+    const dates = [
+      current.input.startDate,
+      ...current.input.installments.flatMap((item) => [item.dueDate, ...(item.payments || []).map((payment) => payment.date)]),
+    ].filter(Boolean).sort();
+    return { start: dates[0] || current.input.startDate, end: current.input.calculationDate };
+  }
+  function indexCriteriaKey() {
+    const { start, end } = indexRange();
+    const { correctionType, interestType } = current.input.settings;
+    return JSON.stringify({ start: start?.slice(0, 7), end: end?.slice(0, 7), correctionType, interestType });
+  }
+
+  function indexSnapshotMatchesCurrent() {
+    const snapshot = current.indexSnapshot;
+    const settings = current.input.settings;
+    if (!snapshot) return false;
+    const { start, end } = indexRange();
+    if (snapshot.start !== start.slice(0, 7) || snapshot.end !== end.slice(0, 7)) return false;
+    if (snapshot.correctionType !== (indices.normalizeCorrectionType?.(settings.correctionType) || settings.correctionType)) return false;
+    const requestedMonths = indices.months?.(start, end) || [];
+    if (settings.correctionType !== "none" && requestedMonths.some((key) => !Object.prototype.hasOwnProperty.call(snapshot.correctionRates || {}, key))) return false;
+    const legalStart = indices.LEGAL_RATE_START_MONTH || "2024-08";
+    if (settings.interestType === "legal" && end.slice(0, 7) >= legalStart) {
+      const firstLegalMonth = start.slice(0, 7) < legalStart ? legalStart : start.slice(0, 7);
+      const legalMonths = indices.months?.(firstLegalMonth, end) || [];
+      if (legalMonths.some((key) => !Object.prototype.hasOwnProperty.call(snapshot.legalRates || {}, key))) return false;
+    }
+    return true;
   }
   function persist(record, status = record.status, touch = true) {
     if (!localAccessAllowed) return;
@@ -251,8 +281,7 @@
   async function calculate() {
     captureStepThree();
     const s = current.input.settings;
-    if ((s.correctionType !== "none" || s.interestType === "legal") && !current.indexSnapshot)
-      throw new Error("Carregue as séries oficiais antes de calcular.");
+    await ensureIndices();
     s.correctionRates = current.indexSnapshot?.correctionRates || {};
     s.legalRates = current.indexSnapshot?.legalRates || {};
     current.result = core.calculatePension(current.input);
@@ -261,16 +290,37 @@
     persist(current, "final", false);
   }
 
-  async function loadIndices() {
+  async function loadIndices(requestKey = indexCriteriaKey()) {
     captureStepThree(); setBusy(true, "Consultando IBGE e Banco Central…");
     try {
-      current.indexSnapshot = await indices.snapshot({
+      const { start, end } = indexRange();
+      const snapshot = await indices.snapshot({
         correctionType: current.input.settings.correctionType, interestType: current.input.settings.interestType,
-        start: current.input.startDate, end: current.input.calculationDate,
+        start, end,
       });
+      if (requestKey !== indexCriteriaKey()) return false;
+      current.indexSnapshot = snapshot;
       notify("Séries oficiais carregadas e congeladas no cálculo."); render();
-    } catch (error) { notify(error.message, true); }
+      return true;
+    } catch (error) { if (requestKey === indexCriteriaKey()) notify(error.message, true); return false; }
     finally { setBusy(false); }
+  }
+
+  async function ensureIndices() {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const settings = current.input.settings;
+      const needsIndices = settings.correctionType !== "none" || settings.interestType === "legal";
+      if (!needsIndices) {
+        if (indexLoadPromise) await indexLoadPromise.catch(() => {});
+        current.indexSnapshot = null;
+        return;
+      }
+      if (indexSnapshotMatchesCurrent()) return;
+      indexLoadPromise ||= loadIndices().finally(() => { indexLoadPromise = null; });
+      await indexLoadPromise;
+      if (indexSnapshotMatchesCurrent()) return;
+    }
+    throw new Error("As séries oficiais necessárias não foram carregadas para o período informado.");
   }
   async function makePdf(record) {
     setBusy(true, "Gerando PDF…");
@@ -329,6 +379,7 @@
       captureStepThree();
       current.indexSnapshot = null;
       render();
+      void ensureIndices().catch((error) => notify(error.message, true));
     }
   });
   app.addEventListener("submit", async (event) => {

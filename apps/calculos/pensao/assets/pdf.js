@@ -7,15 +7,16 @@
   const fmtInstantDate = (value) => value ? new Date(value).toLocaleDateString("pt-BR") : "—";
   const text = (value) => String(value ?? "—");
   const pensionVersion = (value) => {
-    const version = String(value || "pension-1.0.0");
+    const version = String(value || "pension-1.1.0");
     return /^\d/.test(version) ? `pension-${version}` : version;
   };
+  const legalSource = (source) => /bcdata\.sgs\.11\/dados|l14905|Resolu%C3%A7%C3%A3o5171|Taxa Legal:/i.test(String(source));
 
   async function create(record) {
     const { jsPDF } = window.jspdf;
     const core = window.OfficeJurCalculations;
     const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
-    const result = record.result || core.calculatePension(record.input);
+    const result = core.calculatePension(record.input);
     const colors = {
       navy: [23, 33, 58],
       green: [22, 128, 93],
@@ -191,9 +192,11 @@
 
     section("Parâmetros e metodologia");
     paragraph(`Base da pensão: ${record.input.basisLabel}. 13º: ${record.input.includeThirteenth ? "incluído" : "não incluído"}.`);
-    const correctionLabel = record.input.settings.correctionType === "none" ? "sem correção" : record.input.settings.correctionType;
+    const correctionSelected = record.input.settings.correctionType !== "none";
+    const legalSelected = record.input.settings.interestType === "legal";
+    const correctionLabel = correctionSelected ? record.input.settings.correctionType : "sem correção";
     paragraph(`Correção monetária: ${correctionLabel}. ${result.methodology.correctionConvention}`);
-    paragraph(`Juros: ${record.input.settings.interestType === "legal" ? "Taxa Legal (Lei 14.905/2024 e Resolução CMN 5.171/2024)" : record.input.settings.interestType === "fixed" ? `${record.input.settings.fixedMonthlyRate}% ao mês` : "não aplicados"}. ${result.methodology.interestConvention}`);
+    paragraph(`Juros: ${result.methodology.interestMethod || (record.input.settings.interestType === "fixed" ? `Taxa fixa de ${record.input.settings.fixedMonthlyRate}% ao mês` : record.input.settings.interestType === "legal" ? "Taxa Legal" : "não aplicados")}. ${result.methodology.interestConvention}`);
     paragraph(`${result.methodology.abatements} ${result.methodology.rounding}`);
 
     ensure(24);
@@ -237,18 +240,23 @@
     Object.entries(snapshot.legalRates || {}).forEach(([key, value]) => {
       rateRows.set(key, { ...(rateRows.get(key) || {}), legal: value });
     });
-    if (rateRows.size) {
-      table(
-        ["Competência", `${correctionLabel} (%)`, "Taxa Legal (% a.m.)"],
-        [50, 64, 64],
-        [...rateRows].sort().map(([key, value]) => [key, value.correction ?? "—", value.legal ?? "—"]),
-      );
+    const hasCorrectionSeries = [...rateRows.values()].some((value) => value.correction !== undefined);
+    const legalRates = legalSelected ? snapshot.legalRates || {} : {};
+    const hasLegalSeries = Object.keys(legalRates).length > 0;
+    if (rateRows.size && hasCorrectionSeries && hasLegalSeries) {
+      table(["Competência", `${correctionLabel} (%)`, "Taxa Legal (% a.m.)"], [50, 64, 64], [...rateRows].sort().map(([key, value]) => [key, value.correction ?? "—", value.legal ?? "—"]));
+    } else if (rateRows.size && hasCorrectionSeries) {
+      table(["Competência", `${correctionLabel} (%)`], [55, 123], [...rateRows].sort().map(([key, value]) => [key, value.correction ?? "—"]));
+    } else if (rateRows.size && hasLegalSeries) {
+      table(["Competência", "Taxa Legal (% a.m.)"], [55, 123], [...rateRows].sort().map(([key, value]) => [key, value.legal ?? "—"]));
     } else {
       paragraph("Nenhuma série econômica externa foi aplicada neste cálculo.");
     }
 
     section("Fontes declaradas");
     const declaredSources = new Set(snapshot.sources || []);
+    if (!legalSelected) [...declaredSources].filter(legalSource).forEach((source) => declaredSources.delete(source));
+    if (correctionSelected) declaredSources.add(`Índice de correção selecionado: ${correctionLabel}.`);
     if (record.input.basisType === "minimum_wage") {
       declaredSources.add("https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm");
     }

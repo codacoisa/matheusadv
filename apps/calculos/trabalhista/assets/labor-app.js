@@ -29,9 +29,10 @@
   let pendingPdf = false;
   const newRecord = () => ({
     id: uuid(), code: code(), type: 'labor', calculationVersion: labor.VERSION, status: 'draft', name: `Cálculo trabalhista — ${today.split('-').reverse().join('/')}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    input: { clientId: '', client: '', clientName: '', caseId: '', caseName: '', caseNumber: '', clientParty: null, opposingParty: null, additionalParties: [], clientRole: 'Reclamada', partyType: 'Reclamada', partySource: 'manual', admissionDate: today, terminationDate: '', prescriptionStart: '', startDate: today, endDate: today, calculationDate: today, baseSalary: 0, divisor: 220, salaryRows: [], claims: [], settings: { correctionType: 'none', interestType: 'none', fixedMonthlyRate: 0, preLegalMonthlyRate: 0, penaltyRate: 0, feeRate: 0 } },
+    input: { clientId: '', client: '', clientName: '', caseId: '', caseName: '', caseNumber: '', clientParty: null, opposingParty: null, additionalParties: [], clientRole: 'Reclamada', partyType: 'Reclamada', partySource: 'manual', admissionDate: today, terminationDate: '', prescriptionStart: '', startDate: today, endDate: today, calculationDate: today, baseSalary: 0, divisor: 220, salaryRows: [], claims: [], settings: { correctionType: 'none', interestType: 'none', fixedMonthlyRate: 0, penaltyRate: 0, feeRate: 0 } },
   });
   let record = newRecord();
+  let indexLoadPromise = null;
   const sync = syncFactory.create({
     storage,
     gistSettings,
@@ -66,13 +67,13 @@
     const s = record.input.settings;
     const snapshot = record.indexSnapshot;
     return `<div class="form-grid">
-      <div class="field"><label for="correctionType">Correção monetária</label><select id="correctionType"><option value="none" ${s.correctionType === 'none' ? 'selected' : ''}>Sem correção</option><option value="IPCA-E" ${s.correctionType === 'IPCA-E' ? 'selected' : ''}>IPCA-E</option><option value="IPCA" ${s.correctionType === 'IPCA' ? 'selected' : ''}>IPCA</option><option value="INPC" ${s.correctionType === 'INPC' ? 'selected' : ''}>INPC</option></select></div>
-      <div class="field"><label for="interestType">Juros</label><select id="interestType"><option value="none" ${s.interestType === 'none' ? 'selected' : ''}>Sem juros</option><option value="fixed" ${s.interestType === 'fixed' ? 'selected' : ''}>Taxa fixa</option><option value="legal" ${s.interestType === 'legal' ? 'selected' : ''}>Taxa legal</option></select></div>
-      <div class="field">${field({ type: 'settings', fixedMonthlyRate: s.fixedMonthlyRate }, 'fixedMonthlyRate', 'Juros simples mensais (%)', 'number', 'id="fixedMonthlyRate" min="0" step=".0001"').replace('data-claim="settings" data-key="fixedMonthlyRate"', '')}</div>
+      <div class="field"><label for="correctionType">Correção monetária</label><select id="correctionType"><option value="none" ${s.correctionType === 'none' ? 'selected' : ''}>Sem correção</option><option value="IPCA-E" ${s.correctionType === 'IPCA-E' ? 'selected' : ''}>IPCA-E (BACEN)</option><option value="IPCA" ${s.correctionType === 'IPCA' ? 'selected' : ''}>IPCA (BACEN)</option><option value="INPC" ${s.correctionType === 'INPC' ? 'selected' : ''}>INPC (BACEN)</option></select></div>
+      <div class="field"><label for="interestType">Juros</label><select id="interestType"><option value="none" ${s.interestType === 'none' ? 'selected' : ''}>Sem juros</option><option value="fixed" ${s.interestType === 'fixed' ? 'selected' : ''}>Taxa fixa</option><option value="legal" ${s.interestType === 'legal' ? 'selected' : ''}>Taxa Legal — Lei 14.905/2024</option></select></div>
+      ${s.interestType === 'fixed' ? `<div class="field">${field({ type: 'settings', fixedMonthlyRate: s.fixedMonthlyRate }, 'fixedMonthlyRate', 'Juros simples mensais (%)', 'number', 'id="fixedMonthlyRate" min="0" step=".0001"').replace('data-claim="settings" data-key="fixedMonthlyRate"', '')}</div>` : ''}
       <div class="field">${field({ type: 'settings', penaltyRate: s.penaltyRate }, 'penaltyRate', 'Multa (%)', 'number', 'id="penaltyRate" min="0" step=".01"').replace('data-claim="settings" data-key="penaltyRate"', '')}</div>
       <div class="field">${field({ type: 'settings', feeRate: s.feeRate }, 'feeRate', 'Honorários (%)', 'number', 'id="feeRate" min="0" step=".01"').replace('data-claim="settings" data-key="feeRate"', '')}</div>
       <div class="field full"><button class="secondary" type="button" data-action="indices">${snapshot ? 'Atualizar índices oficiais' : 'Carregar índices oficiais'}</button><span class="hint">${snapshot ? `Séries congeladas em ${new Date(snapshot.fetchedAt).toLocaleString('pt-BR')}.` : 'Obrigatório quando houver correção ou Taxa Legal.'}</span></div>
-      <div class="field full legal-note"><strong>Alerta jurídico.</strong> Índices, taxa legal, multas e honorários devem ser confirmados no título e na legislação aplicável.</div>
+      <div class="field full legal-note"><strong>Juros legais:</strong> 6% ao ano até 11/02/2003 (CC/1916); 12% ao ano de 12/02/2003 a 29/08/2024 (CC/2002 e art. 161, § 1º, do CTN); Taxa Legal do art. 406 do CC, conforme Lei 14.905/2024, a partir de 30/08/2024. A faixa de 2024 em diante é mensal e proporcional aos dias corridos. Índices, multas e honorários devem ser conferidos no título e na legislação aplicável.</div>
     </div>`;
   }
   function result() { const r = record.result; const cards = [['Principal líquido', r.totals.original], ['Correção', r.totals.correction], ['Juros', r.totals.interest], ['Multa', r.totals.penalty], ['Honorários', r.totals.fees], ['Total atualizado', r.totals.total]]; return `<div class="summary">${cards.map(([name, value], index) => `<div class="metric ${index === 5 ? 'total' : ''}"><span>${name}</span><strong>${fmt(value)}</strong></div>`).join('')}</div><h2>Totais por verba</h2><div class="table-wrap"><table><thead><tr><th>Verba</th><th>Devido</th><th>Pago</th><th>Saldo</th><th>Atualizado</th></tr></thead><tbody>${r.claimTotals.map(item => `<tr><td>${esc(item.label)}</td><td>${fmt(item.original)}</td><td>${fmt(item.paid)}</td><td>${fmt(item.outstanding)}</td><td>${fmt(item.updated)}</td></tr>`).join('')}</tbody></table></div><h2>Ledger de cálculo</h2><div class="table-wrap"><table><thead><tr><th>Data</th><th>Lançamento</th><th>Original</th><th>Corrigido</th><th>Juros</th><th>Total</th></tr></thead><tbody>${r.ledger.map(item => `<tr><td>${item.date.split('-').reverse().join('/')}</td><td>${esc(item.description)}</td><td>${fmt(item.original)}</td><td>${fmt(item.corrected)}</td><td>${fmt(item.interest)}</td><td>${fmt(item.total)}</td></tr>`).join('')}</tbody></table></div><p class="legal-note">${esc(r.methodology.legalReview)}</p>`; }
@@ -81,9 +82,88 @@
   function captureBasic() { const values = new FormData(document.querySelector('#labor-form')); const i = record.input; ['clientId', 'caseId', 'role', 'caseNumber', 'opposingPartyName', 'partyType', 'admissionDate', 'terminationDate', 'calculationDate', 'prescriptionStart'].forEach(key => { i[key] = String(values.get(key) || ''); }); i.clientRole = i.partyType; const selectedClient = financeApi?.findClient(financeData, i.clientId); const selectedCase = financeApi?.findCase(financeData, i.caseId); if (!selectedClient) throw new Error('Vincule o cálculo a um cliente do Financeiro.'); if (i.caseId && (!selectedCase || String(selectedCase.clientId) !== String(i.clientId))) throw new Error('Selecione um caso pertencente ao cliente escolhido.'); const context = caseContextApi?.partyContext(financeData, i, financeApi) || {}; caseContextApi?.applyCaseContext(i, context); i.client = i.clientName; i.clientParty = context.clientParty; i.opposingParty = { ...(i.opposingParty || {}), name: i.opposingPartyName, role: context.opposingRole, source: 'manual', sourceId: '' }; i.party = i.opposingParty.name; i.partySource = 'manual'; captureAdditionalParties(); i.active = values.has('active'); i.prescription = values.has('prescription'); i.baseSalary = Number(values.get('baseSalary') || 0); i.divisor = Number(values.get('divisor') || 220); record.name = String(values.get('name') || '').trim(); if (!record.name || !i.admissionDate || !i.calculationDate || !i.opposingParty.name) throw new Error('Preencha nome, cliente, polo do cliente, parte contrária, admissão e data-base.'); if (!i.active && !i.terminationDate) throw new Error('Informe a demissão ou marque que o empregado permanece ativo.'); const end = employmentEnd(); if (end < i.admissionDate) throw new Error('O fim do vínculo não pode anteceder a admissão.'); if (i.prescription && !i.prescriptionStart) throw new Error('Informe o início da prescrição.'); i.startDate = i.prescription && i.prescriptionStart > i.admissionDate ? i.prescriptionStart : i.admissionDate; if (i.startDate > end) throw new Error('O início da prescrição não pode ser posterior ao fim do período calculado.'); i.endDate = end; const old = new Map(i.salaryRows.map(row => [row.competence, row])); i.salaryRows = labor.createSalaryRows({ ...i, salaryRows: [...old.values()] }); if (record.indexSnapshot && (record.indexSnapshot.start !== i.startDate.slice(0, 7) || record.indexSnapshot.end !== i.calculationDate.slice(0, 7))) record.indexSnapshot = null; }
   function captureSalaries() { document.querySelectorAll('[data-salary]').forEach(element => { const row = record.input.salaryRows.find(item => item.competence === element.dataset.salary); const key = element.dataset.key; row[key] = numericKeys.has(key) ? Number(element.value || 0) : element.value; }); }
   function captureClaims() { document.querySelectorAll('[data-claim]').forEach(element => { const claim = claimMap().get(element.dataset.claim); if (!claim) return; const key = element.dataset.key; claim[key] = element.type === 'checkbox' ? element.checked : numericKeys.has(key) ? Number(element.value || 0) : element.value; }); record.input.claims.forEach(claim => { if (['family_salary', 'meal_voucher', 'transport_voucher'].includes(claim.type)) claim.value = Number(claim.quantity || 0) * Number(claim.unitValue || 0); if (claim.type === 'unemployment_insurance') claim.value = Number(claim.installments || 0) * Number(claim.installmentValue || 0); if (claim.type === 'commissions') claim.value = Number(claim.dueAmount || 0); if (claim.type === 'dsr') { const month = new Date(`${claim.dueDate}T00:00:00Z`); const ratio = Number(claim.days || 0) / new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 0)).getUTCDate(); claim.percentage = ratio * (claim.double ? 200 : 100); } }); }
-  function captureSettings() { const s = record.input.settings; ['correctionType', 'interestType'].forEach(key => { s[key] = document.querySelector(`#${key}`).value; }); ['fixedMonthlyRate', 'penaltyRate', 'feeRate'].forEach(key => { s[key] = Number(document.querySelector(`#${key}`).value || 0); }); }
-  async function loadIndices() { captureSettings(); const s = record.input.settings; notify('Carregando séries oficiais…'); record.indexSnapshot = await indices.snapshot({ correctionType: s.correctionType, interestType: s.interestType, start: record.input.startDate, end: record.input.calculationDate }); s.correctionRates = record.indexSnapshot.correctionRates; s.legalRates = record.indexSnapshot.legalRates; persist('draft', true); notify('Índices oficiais carregados e congelados neste rascunho.'); render(); }
-  function calculate() { captureSettings(); const s = record.input.settings; const snapshot = record.indexSnapshot; const needsSnapshot = s.correctionType !== 'none' || s.interestType === 'legal'; const snapshotMatches = snapshot && snapshot.correctionType === s.correctionType && (s.interestType !== 'legal' || Object.keys(snapshot.legalRates || {}).length > 0); if (needsSnapshot && !snapshotMatches) throw new Error('Carregue novamente os índices oficiais para os critérios selecionados.'); s.correctionRates = snapshot?.correctionRates || {}; s.legalRates = snapshot?.legalRates || {}; if (!record.input.claims.length) throw new Error('Selecione ao menos uma verba.'); record.result = labor.calculateLabor(record.input); persist('final', true); step = 5; }
+  function captureSettings() {
+    const settings = record.input.settings;
+    ['correctionType', 'interestType'].forEach((key) => {
+      const element = document.querySelector(`#${key}`);
+      if (element) settings[key] = element.value;
+    });
+    ['fixedMonthlyRate', 'penaltyRate', 'feeRate'].forEach((key) => {
+      const element = document.querySelector(`#${key}`);
+      if (element) settings[key] = Number(element.value || 0);
+    });
+  }
+  function indexRange() {
+    const dates = [
+      record.input.startDate,
+      ...record.input.claims.flatMap((claim) => [claim.dueDate, ...(claim.payments || []).map((payment) => payment.date)]),
+    ].filter(Boolean).sort();
+    return { start: dates[0] || record.input.startDate, end: record.input.calculationDate };
+  }
+  function indexCriteriaKey() {
+    const { start, end } = indexRange();
+    const { correctionType, interestType } = record.input.settings;
+    return JSON.stringify({ start: start?.slice(0, 7), end: end?.slice(0, 7), correctionType, interestType });
+  }
+  function indexSnapshotMatchesCurrent() {
+    const snapshot = record.indexSnapshot;
+    const settings = record.input.settings;
+    if (!snapshot) return false;
+    const { start, end } = indexRange();
+    if (snapshot.start !== start.slice(0, 7) || snapshot.end !== end.slice(0, 7)) return false;
+    if (snapshot.correctionType !== (indices.normalizeCorrectionType?.(settings.correctionType) || settings.correctionType)) return false;
+    const requestedMonths = indices.months?.(start, end) || [];
+    if (settings.correctionType !== 'none' && requestedMonths.some((key) => !Object.prototype.hasOwnProperty.call(snapshot.correctionRates || {}, key))) return false;
+    const legalStart = indices.LEGAL_RATE_START_MONTH || '2024-08';
+    if (settings.interestType === 'legal' && end.slice(0, 7) >= legalStart) {
+      const firstLegalMonth = start.slice(0, 7) < legalStart ? legalStart : start.slice(0, 7);
+      const legalMonths = indices.months?.(firstLegalMonth, end) || [];
+      if (legalMonths.some((key) => !Object.prototype.hasOwnProperty.call(snapshot.legalRates || {}, key))) return false;
+    }
+    return true;
+  }
+  async function loadIndices(requestKey = indexCriteriaKey()) {
+    captureSettings();
+    const s = record.input.settings;
+    const { start, end } = indexRange();
+    notify('Carregando séries oficiais…');
+    const snapshot = await indices.snapshot({ correctionType: s.correctionType, interestType: s.interestType, start, end });
+    if (requestKey !== indexCriteriaKey()) return false;
+    record.indexSnapshot = snapshot;
+    s.correctionRates = record.indexSnapshot.correctionRates;
+    s.legalRates = record.indexSnapshot.legalRates;
+    persist('draft', true);
+    notify('Índices oficiais carregados e congelados neste rascunho.');
+    render();
+    return true;
+  }
+  async function ensureIndices() {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const settings = record.input.settings;
+      const needsIndices = settings.correctionType !== 'none' || settings.interestType === 'legal';
+      if (!needsIndices) {
+        if (indexLoadPromise) await indexLoadPromise.catch(() => {});
+        record.indexSnapshot = null;
+        return;
+      }
+      if (indexSnapshotMatchesCurrent()) return;
+      indexLoadPromise ||= loadIndices().finally(() => { indexLoadPromise = null; });
+      await indexLoadPromise;
+      if (indexSnapshotMatchesCurrent()) return;
+    }
+    throw new Error('As séries oficiais necessárias não foram carregadas para o período informado.');
+  }
+  async function calculate() {
+    captureSettings();
+    await ensureIndices();
+    const s = record.input.settings;
+    s.correctionRates = record.indexSnapshot?.correctionRates || {};
+    s.legalRates = record.indexSnapshot?.legalRates || {};
+    if (!record.input.claims.length) throw new Error('Selecione ao menos uma verba.');
+    record.result = labor.calculateLabor(record.input);
+    persist('final', true);
+    step = 5;
+  }
   function makePdf() { const pdf = window.OfficeJurLaborPdf; if (!pdf?.create || !pdf.download) throw new Error('O gerador de PDF trabalhista não foi carregado.'); Promise.resolve(pdf.create(record)).then(file => { pdf.download(file); notify('PDF gerado.'); }).catch(error => notify(error.message || 'Falha ao gerar PDF.', true)); }
   function captureVisible() { if (step === 1) captureBasic(); if (step === 2) captureSalaries(); if (step === 3) captureClaims(); if (step === 4) captureSettings(); }
   app.addEventListener('input', event => { if (event.target.name === 'opposingPartyName') { record.input.partySource = 'manual'; record.input.opposingParty = { ...(record.input.opposingParty || {}), name: event.target.value, role: caseContextApi?.oppositeRole(record.input.partyType) || '' , source: 'manual' }; } if (event.target.dataset.additionalField) record.input.partySource = 'manual'; });
@@ -125,6 +205,13 @@
       render();
       return;
     }
+    if (event.target.id === 'interestType' || event.target.id === 'correctionType') {
+      captureSettings();
+      record.indexSnapshot = null;
+      render();
+      void ensureIndices().catch((error) => notify(error.message, true));
+      return;
+    }
     const actionType = event.target.dataset.toggleClaim;
     if (!actionType) return;
     captureClaims();
@@ -133,7 +220,7 @@
     render();
   });
   app.addEventListener('click', async event => { const action = event.target.closest('[data-action]')?.dataset.action; if (!action) return; try { if (action === 'cancel') { window.location.href = '../'; return; } if (action === 'finish') { window.location.href = '../'; return; } if (action === 'back') { captureVisible(); step = Math.max(1, step - 1); render(); } if (action === 'save') { captureVisible(); persist(); } if (action === 'indices') await loadIndices(); if (action === 'add-additional') { try { captureBasic(); } catch (_) { captureAdditionalParties(); } record.input.additionalParties.push({ id: uuid(), name: '', role: '', source: 'manual', sourceId: '' }); render(); } if (action === 'remove-additional') { try { captureBasic(); } catch (_) { captureAdditionalParties(); } record.input.additionalParties.splice(Number(event.target.closest('[data-action]').dataset.index), 1); render(); } } catch (error) { notify(error.message || 'Não foi possível salvar esta etapa.', true); } });
-  app.addEventListener('submit', event => { event.preventDefault(); try { if (step < 4) { captureVisible(); step += 1; } else if (step === 4) calculate(); else makePdf(); render(); } catch (error) { notify(error.message || 'Não foi possível concluir esta etapa.', true); } });
+  app.addEventListener('submit', async event => { event.preventDefault(); try { if (step < 4) { captureVisible(); step += 1; } else if (step === 4) await calculate(); else makePdf(); render(); } catch (error) { notify(error.message || 'Não foi possível concluir esta etapa.', true); } });
   function loadRequestedRecord() {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get('id');
