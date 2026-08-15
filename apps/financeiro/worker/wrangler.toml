@@ -17,3 +17,6 @@ namespace_id = "27072901"
 # npx wrangler secret put MP_ACCESS_TOKEN
 # npx wrangler secret put OFFICEJUR_API_KEY
 # npx wrangler secret put DATAJUD_API_KEY
+# Se a versão mais recente ainda não estiver publicada:
+# npx wrangler versions secret put OFFICEJUR_API_KEY
+# npx wrangler versions deploy
