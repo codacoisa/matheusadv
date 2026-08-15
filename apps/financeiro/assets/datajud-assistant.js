@@ -6,6 +6,7 @@
   "use strict";
 
   const API_BASE = "https://api-publica.datajud.cnj.jus.br";
+  const DATAJUD_PROXY_PATH = "/datajud/search";
   // A chave publicada pelo CNJ é pública e pode ser alterada pelo órgão.
   const PUBLIC_API_KEY =
     "cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw==";
@@ -276,34 +277,82 @@
     );
   }
 
-  async function lookupProcess(value, { fetchImpl = root.fetch, apiKey: providedKey } = {}) {
+  function resolveProxyUrl(value = "") {
+    const configured = firstText(value, root.OFFICEJUR_CONFIG?.datajud?.proxyUrl);
+    if (!configured) return "";
+    try {
+      const url = new URL(configured, root.location?.href || "https://officejur.invalid/");
+      const currentOrigin = root.location?.origin || "";
+      if (url.protocol !== "https:" && url.origin !== currentOrigin) return "";
+      return url.href.replace(/\/$/, "");
+    } catch {
+      return "";
+    }
+  }
+
+  async function lookupProcess(
+    value,
+    {
+      fetchImpl = root.fetch,
+      apiKey: providedKey,
+      proxyUrl: providedProxyUrl,
+      proxyKey: providedProxyKey,
+    } = {},
+  ) {
     const normalized = normalizeCnj(value);
     if (!validCnj(normalized)) throw new Error("Informe um número CNJ válido com 20 dígitos.");
     if (typeof fetchImpl !== "function") throw new Error("A consulta DataJud não está disponível neste navegador.");
+    const proxyUrl = resolveProxyUrl(providedProxyUrl);
+    if (!proxyUrl && root.location?.protocol === "https:")
+      throw new Error("Configure o proxy DataJud do OfficeJur para consultar processos neste navegador.");
+    if (proxyUrl && !String(providedProxyKey || "").trim())
+      throw new Error("Informe a chave de acesso do Worker para consultar o DataJud.");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetchImpl(endpointFor(normalized), {
+      const endpoint = endpointFor(normalized);
+      const response = await fetchImpl(
+        proxyUrl ? `${proxyUrl}${DATAJUD_PROXY_PATH}` : endpoint,
+        {
         method: "POST",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Authorization: `APIKey ${providedKey || apiKey()}`,
+          Authorization: proxyUrl
+            ? `Bearer ${String(providedProxyKey).trim()}`
+            : `APIKey ${providedKey || apiKey()}`,
         },
-        body: JSON.stringify(queryFor(normalized)),
+        body: JSON.stringify(
+          proxyUrl
+            ? { path: new URL(endpoint).pathname, number: normalized }
+            : queryFor(normalized),
+        ),
         signal: controller.signal,
-      });
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
       if (response.status === 401 || response.status === 403)
-        throw new Error("A API DataJud recusou a chave pública. Atualize a chave publicada pelo CNJ.");
+        throw new Error(
+          proxyUrl
+            ? "O Worker do OfficeJur recusou a chave de acesso."
+            : "A API DataJud recusou a chave pública. Atualize a chave publicada pelo CNJ.",
+        );
       if (response.status === 429)
         throw new Error("A API DataJud atingiu o limite temporário. Tente novamente em instantes.");
-      if (!response.ok) throw new Error(`Consulta DataJud indisponível (${response.status}).`);
-      const payload = await response.json();
+      if (!response.ok)
+        throw new Error(
+          payload?.message ||
+            (proxyUrl
+              ? `Proxy DataJud indisponível (${response.status}).`
+              : `Consulta DataJud indisponível (${response.status}).`),
+        );
       const source = payload?.hits?.hits?.[0]?._source;
       if (!source) throw new Error("Processo não encontrado na base pública do DataJud.");
       return normalizeProcess(source, normalized);
     } catch (error) {
       if (error?.name === "AbortError") throw new Error("A consulta DataJud demorou mais que o esperado.");
+      if (error?.name === "TypeError" && /load failed|fetch/i.test(error?.message || ""))
+        throw new Error("Não foi possível acessar o proxy DataJud. Confira a URL do Worker e a origem autorizada.");
       throw error;
     } finally {
       clearTimeout(timeout);
@@ -312,6 +361,7 @@
 
   return {
     API_BASE,
+    DATAJUD_PROXY_PATH,
     CNJ_LENGTH,
     PUBLIC_API_KEY,
     endpointFor,
@@ -322,6 +372,7 @@
     normalizeMovements,
     normalizeProcess,
     queryFor,
+    resolveProxyUrl,
     tribunalFromCnj,
     validCnj,
   };

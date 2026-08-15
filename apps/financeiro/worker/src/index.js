@@ -1,5 +1,7 @@
 const MP_API = "https://api.mercadopago.com";
+const DATAJUD_API = "https://api-publica.datajud.cnj.jus.br";
 const MAX_BODY_BYTES = 24 * 1024;
+const DATAJUD_PATH = /^\/api_publica_[a-z0-9-]+\/_search$/;
 
 function allowedOrigins(env) {
   return (env.ALLOWED_ORIGINS || "")
@@ -90,6 +92,55 @@ async function mercadoPago(path, env, options = {}) {
   return body;
 }
 
+function normalizeCnj(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 20);
+}
+
+function validCnj(value) {
+  const raw = normalizeCnj(value);
+  if (raw.length !== 20 || raw[13] === "0") return false;
+  const base = raw.slice(0, 7) + raw.slice(9);
+  const calculated = (98n - ((BigInt(base) * 100n) % 97n)).toString().padStart(2, "0");
+  return raw.slice(7, 9) === calculated;
+}
+
+async function dataJud(request, env) {
+  const body = await input(request);
+  const path = cleanText(body.path, 100);
+  const number = normalizeCnj(body.number);
+  const apiKey = cleanText(env.DATAJUD_API_KEY, 200);
+  if (!apiKey) {
+    const error = new Error("DATAJUD_NOT_CONFIGURED");
+    error.status = 503;
+    throw error;
+  }
+  if (!DATAJUD_PATH.test(path) || !validCnj(number)) {
+    const error = new Error("INVALID_DATAJUD_QUERY");
+    error.status = 400;
+    throw error;
+  }
+  const response = await fetch(`${DATAJUD_API}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `APIKey ${apiKey}`,
+    },
+    body: JSON.stringify({
+      size: 1,
+      query: { match: { numeroProcesso: number } },
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error("DATAJUD_ERROR");
+    error.status = response.status === 429 ? 429 : 502;
+    error.detail = cleanText(payload.message || payload.error, 160);
+    throw error;
+  }
+  return payload;
+}
+
 function errorResponse(error, headers) {
   if (error?.message === "REQUEST_TOO_LARGE")
     return json({ message: "A solicitação excede o tamanho permitido." }, 413, headers);
@@ -97,6 +148,12 @@ function errorResponse(error, headers) {
     return json({ message: "A solicitação é inválida." }, 400, headers);
   if (error?.message === "MERCADO_PAGO_ERROR")
     return json({ message: "O Mercado Pago recusou a solicitação. Revise os dados e tente novamente." }, 502, headers);
+  if (error?.message === "DATAJUD_NOT_CONFIGURED")
+    return json({ message: "O proxy DataJud ainda não foi configurado." }, 503, headers);
+  if (error?.message === "INVALID_DATAJUD_QUERY")
+    return json({ message: "A consulta DataJud é inválida." }, 400, headers);
+  if (error?.message === "DATAJUD_ERROR")
+    return json({ message: "O DataJud recusou ou não concluiu a consulta." }, error.status || 502, headers);
   return json({ message: "Não foi possível concluir a solicitação." }, 500, headers);
 }
 
@@ -109,9 +166,6 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
     if (!hasServiceKey(request, env))
       return json({ message: "Serviço não autorizado." }, 401, headers);
-    if (!env.MP_ACCESS_TOKEN)
-      return json({ message: "Serviço de cobrança indisponível." }, 503, headers);
-
     const url = new URL(request.url);
     if (env.RATE_LIMITER) {
       const { success } = await env.RATE_LIMITER.limit({
@@ -127,6 +181,14 @@ export default {
     try {
       if (request.method === "GET" && url.pathname === "/health")
         return json({ ok: true }, 200, headers);
+
+      if (request.method === "POST" && url.pathname === "/datajud/search") {
+        const payload = await dataJud(request, env);
+        return json(payload, 200, headers);
+      }
+
+      if (!env.MP_ACCESS_TOKEN)
+        return json({ message: "Serviço de cobrança indisponível." }, 503, headers);
 
       if (request.method === "POST" && url.pathname === "/preferences") {
         const body = await input(request);

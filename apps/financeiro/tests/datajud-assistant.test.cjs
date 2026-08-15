@@ -78,6 +78,46 @@ test("consultar e normalizar capa, assuntos e movimentações", async () => {
   assert.equal(result.movements[0].name, "Distribuição");
 });
 
+test("consultar pelo proxy same-origin sem expor a chave pública do DataJud", async () => {
+  let called;
+  const result = await dataJud.lookupProcess(sampleNumber, {
+    proxyUrl: "https://worker.example",
+    proxyKey: "chave-do-servico",
+    fetchImpl: async (url, options) => {
+      called = { url, options };
+      return new Response(JSON.stringify({
+        hits: { hits: [{ _source: { numeroProcesso: sampleNumber, classe: { nome: "Classe" } } }] },
+      }), { status: 200 });
+    },
+  });
+
+  assert.equal(called.url, "https://worker.example/datajud/search");
+  assert.equal(called.options.headers.Authorization, "Bearer chave-do-servico");
+  assert.deepEqual(JSON.parse(called.options.body), {
+    path: "/api_publica_trf1/_search",
+    number: sampleNumber,
+  });
+  assert.equal(result.processClass.name, "Classe");
+});
+
+test("exigir proxy quando a aplicação está em HTTPS", async () => {
+  const previousLocation = globalThis.location;
+  globalThis.location = {
+    protocol: "https:",
+    href: "https://officejur.example/financeiro/",
+    origin: "https://officejur.example",
+  };
+  try {
+    await assert.rejects(
+      dataJud.lookupProcess(sampleNumber, { fetchImpl: async () => { throw new Error("não deveria chamar"); } }),
+      /Configure o proxy DataJud/,
+    );
+  } finally {
+    if (previousLocation === undefined) delete globalThis.location;
+    else globalThis.location = previousLocation;
+  }
+});
+
 test("informar quando a API não encontra o processo", async () => {
   await assert.rejects(
     dataJud.lookupProcess(sampleNumber, {

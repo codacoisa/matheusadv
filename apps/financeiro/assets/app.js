@@ -2928,17 +2928,20 @@
     caseDataJudLookupTimer = setTimeout(async () => {
       if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
       try {
-        const process = await lookupProcess(normalized);
+        const process = await lookupProcess(normalized, {
+          proxyUrl: mp.apiUrl,
+          proxyKey: mp.apiKey,
+        });
         if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
         fillCaseFromDataJud(form, process);
       } catch (error) {
         if (request !== caseDataJudLookupRequest) return;
         setCaseDataJudStatus(
           form,
-          `${error.message || "Não foi possível consultar o DataJud."} Os campos foram liberados para preenchimento manual.`,
+          error.message || "Não foi possível consultar o DataJud. Os campos permanecem bloqueados.",
           "error",
         );
-        setCaseDataJudGate(form, false);
+        setCaseDataJudGate(form, true);
       }
     }, 450);
   }
