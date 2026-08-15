@@ -702,7 +702,7 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
               grau: 'JE',
               dataAjuizamento: '2018-10-29T00:00:00.000Z',
               orgaoJulgador: { codigo: 16403, nome: 'JEF Adj - Tefé', codigoMunicipioIBGE: 5128 },
-              assuntos: [{ codigo: 6177, nome: 'Concessão' }],
+              assuntos: [{ codigo: 6177, nome: 'Concessão' }, { codigo: 6178, nome: 'Benefício' }],
               movimentos: [{ codigo: 26, nome: 'Distribuição', dataHora: '2018-10-30T14:06:24.000Z' }],
               nivelSigilo: 0,
               dataHoraUltimaAtualizacao: '2023-07-21T19:10:08.483Z',
@@ -723,12 +723,12 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
   await form.locator('[name="number"]').fill(processNumber);
   await expect(form.locator('[data-case-datajud-status]')).toContainText('Dados públicos carregados', { timeout: 10_000 });
   await expect(form.locator('[name="title"]')).toBeEnabled();
-  await expect(form.locator('[name="title"]')).toHaveValue('Procedimento do Juizado Especial Cível');
+  await expect(form.locator('[name="title"]')).toHaveValue('Procedimento do Juizado Especial Cível · Concessão e outros assuntos');
   await expect(form.locator('#case-datajud-panel')).toBeVisible();
   await expect(form.locator('[data-datajud-field="tribunal"]')).toContainText('TRF1');
   await form.getByRole('button', { name: 'Salvar caso' }).click();
 
-  const card = page.locator('.case-card').filter({ hasText: 'Procedimento do Juizado Especial Cível' });
+  const card = page.locator('.case-card').filter({ hasText: 'Procedimento do Juizado Especial Cível · Concessão e outros assuntos' });
   await card.locator('[data-view-case]').click();
   await expect(page.locator('#detail-dialog')).toBeVisible();
   await page.getByRole('tab', { name: /Movimentações/ }).click();

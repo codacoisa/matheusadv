@@ -228,10 +228,17 @@
       .sort((left, right) => String(right.dateTime).localeCompare(String(left.dateTime)));
   }
 
+  function processTitle(className, subjects) {
+    const parts = [className, subjects[0]?.name].filter(Boolean);
+    if (subjects.length > 1) return `${parts.join(" · ")} e outros assuntos`;
+    return parts.join(" · ");
+  }
+
   function normalizeProcess(source, requestedCnj = "") {
     const tribunal = tribunalFromCnj(source?.numeroProcesso || requestedCnj);
     const rawNumber = normalizeCnj(source?.numeroProcesso || requestedCnj);
     const className = firstText(source?.classe?.nome);
+    const subjects = normalizeSubjects(source?.assuntos);
     return {
       id: firstText(source?.id),
       number: maskCnj(rawNumber),
@@ -260,11 +267,11 @@
       },
       filingDate: normalizeDateTime(source?.dataAjuizamento),
       secrecyLevel: numberValue(source?.nivelSigilo),
-      subjects: normalizeSubjects(source?.assuntos),
+      subjects,
       movements: normalizeMovements(source?.movimentos),
       sourceUpdatedAt: normalizeDateTime(source?.dataHoraUltimaAtualizacao),
       dataJudTimestamp: normalizeDateTime(source?.["@timestamp"]),
-      title: className,
+      title: processTitle(className, subjects),
       raw: source && typeof source === "object" ? structuredClone(source) : {},
     };
   }
