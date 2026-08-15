@@ -47,8 +47,8 @@ async function prepareCalculationPage(page, path = 'calculos/') {
 
 async function configureDataJudWorker(page) {
   await page.evaluate(() => {
-    localStorage.setItem('officejur::financeiro::mercado-pago::settings', JSON.stringify({ apiUrl: 'https://worker.example' }));
-    sessionStorage.setItem('officejur::financeiro::mercado-pago::session-key', 'chave-do-servico');
+    localStorage.setItem('officejur::financeiro::officejur::settings', JSON.stringify({ apiUrl: 'https://worker.example' }));
+    sessionStorage.setItem('officejur::financeiro::officejur::session-key', 'chave-do-servico');
   });
   await page.reload({ waitUntil: 'networkidle' });
 }
