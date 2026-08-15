@@ -65,6 +65,7 @@
     lookupProcess,
     maskCnj,
     normalizeCnj,
+    resolveProxyUrl,
     validCnj,
   } = dataJudAssistant;
   const {
@@ -2859,6 +2860,9 @@
     status.textContent = message;
     status.dataset.kind = kind;
   }
+  function dataJudProxyReady() {
+    return Boolean(resolveProxyUrl(mp.apiUrl) && String(mp.apiKey || "").trim());
+  }
   function setCaseDataJudGate(form, locked) {
     const keepEnabled = new Set([
       form.elements.id,
@@ -2920,6 +2924,15 @@
           ? "Corrija o número CNJ para liberar os campos do cadastro."
           : "Informe um número CNJ válido para liberar os campos do cadastro.",
         "locked",
+      );
+      return;
+    }
+    if (!dataJudProxyReady()) {
+      setCaseDataJudGate(form, false);
+      setCaseDataJudStatus(
+        form,
+        "Consulta DataJud não configurada. O preenchimento manual foi liberado.",
+        "manual",
       );
       return;
     }
