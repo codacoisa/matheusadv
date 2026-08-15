@@ -14,9 +14,12 @@
   const cnpjAssistant = window.OfficeJurCnpjAssistant;
   const dataJudAssistant = window.OfficeJurDataJud;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
-    MP_KEY = "officejur::financeiro::mercado-pago::settings",
-    MP_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
-    MP_REQUEST_PREFIX = "officejur::financeiro::mercado-pago::request:",
+    SERVICE_SETTINGS_KEY = "officejur::financeiro::officejur::settings",
+    SERVICE_SESSION_KEY = "officejur::financeiro::officejur::session-key",
+    SERVICE_REQUEST_PREFIX = "officejur::financeiro::officejur::request:",
+    LEGACY_SERVICE_SETTINGS_KEY = "officejur::financeiro::mercado-pago::settings",
+    LEGACY_SERVICE_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
+    LEGACY_SERVICE_REQUEST_PREFIX = "officejur::financeiro::mercado-pago::request:",
     FILES_FILE = "financeiro-documentos.json",
     FILES_DB = "officejur-financeiro-documentos",
     FILES_STORE = "state",
@@ -859,8 +862,22 @@
     }
   }
   function loadMp() {
+    let persistedRaw = "{}";
+    let sessionKey = "";
     try {
-      const persisted = JSON.parse(localStorage.getItem(MP_KEY) || "{}");
+      const currentRaw = localStorage.getItem(SERVICE_SETTINGS_KEY);
+      const legacyRaw = localStorage.getItem(LEGACY_SERVICE_SETTINGS_KEY);
+      persistedRaw = currentRaw || legacyRaw || "{}";
+      if (!currentRaw && legacyRaw) localStorage.setItem(SERVICE_SETTINGS_KEY, legacyRaw);
+      const currentSessionKey = sessionStorage.getItem(SERVICE_SESSION_KEY);
+      const legacySessionKey = sessionStorage.getItem(LEGACY_SERVICE_SESSION_KEY);
+      sessionKey = currentSessionKey || legacySessionKey || "";
+      if (!currentSessionKey && legacySessionKey) sessionStorage.setItem(SERVICE_SESSION_KEY, legacySessionKey);
+    } catch {
+      persistedRaw = "{}";
+    }
+    try {
+      const persisted = JSON.parse(persistedRaw);
       delete persisted.apiKey;
       return {
         environment: "test",
@@ -870,7 +887,7 @@
         statementDescriptor,
         autoReturn: true,
         ...persisted,
-        apiKey: sessionStorage.getItem(MP_SESSION_KEY) || "",
+        apiKey: sessionKey,
       };
     } catch {
       return {
@@ -880,7 +897,7 @@
         returnUrl: location.href.split("#")[0],
         statementDescriptor,
         autoReturn: true,
-        apiKey: sessionStorage.getItem(MP_SESSION_KEY) || "",
+        apiKey: sessionKey,
       };
     }
   }
@@ -4865,7 +4882,7 @@
     };
     const { apiKey, ...persistedMp } = mp;
     sessionStorage.setItem(MP_SESSION_KEY, apiKey);
-    localStorage.setItem(MP_KEY, JSON.stringify(persistedMp));
+    localStorage.setItem(SERVICE_SETTINGS_KEY, JSON.stringify(persistedMp));
     $("#mp-settings-dialog").close();
     renderCharges();
     toast("Configuração do Mercado Pago salva.");
@@ -4900,9 +4917,12 @@
           clientId: entry.clientId,
           clientDocument: client?.document || "",
         },
-        requestKey = MP_REQUEST_PREFIX + payload.externalReference,
+        requestKey = SERVICE_REQUEST_PREFIX + payload.externalReference,
+        legacyRequestKey = LEGACY_SERVICE_REQUEST_PREFIX + payload.externalReference,
         idempotencyKey =
-          sessionStorage.getItem(requestKey) || crypto.randomUUID();
+          sessionStorage.getItem(requestKey) ||
+          sessionStorage.getItem(legacyRequestKey) ||
+          crypto.randomUUID();
       sessionStorage.setItem(requestKey, idempotencyKey);
       const result = await createCharge(payload, idempotencyKey);
       data.charges.push({

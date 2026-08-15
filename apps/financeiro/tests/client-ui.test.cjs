@@ -22,6 +22,11 @@ const datajudAssistant = fs.readFileSync(
   path.join(root, "assets", "datajud-assistant.js"),
   "utf8",
 );
+const help = fs.readFileSync(path.join(root, "ajuda-mercado-pago.html"), "utf8");
+const workerConfig = fs.readFileSync(
+  path.join(root, "worker", "wrangler.toml"),
+  "utf8",
+);
 
 test("padronizar o estado da nuvem no cabeçalho", () => {
   assert.match(html, /office-cloud-status id="sync-label"/);
@@ -161,6 +166,14 @@ assert.match(app, /error\.message \|\| "Não foi possível consultar o DataJud\.
   assert.match(datajudAssistant, /numeroProcesso/);
   assert.match(styles, /\.case-detail-tab\s*\{/);
   assert.match(styles, /\.case-movement-warning\s*\{/);
+});
+
+test("usar nome compartilhado do Worker e preservar a namespace antiga", () => {
+  assert.match(app, /officejur::financeiro::officejur::settings/);
+  assert.match(app, /officejur::financeiro::mercado-pago::settings/);
+  assert.match(help, /<code>financeiro-officejur<\/code>/);
+  assert.doesNotMatch(help, /<code>financeiro-mercado-pago<\/code>/);
+  assert.match(workerConfig, /name = "financeiro-officejur"/);
 });
 
 test("listar pessoas como subpágina de clientes e permitir promoção", () => {
