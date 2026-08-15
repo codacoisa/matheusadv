@@ -150,6 +150,8 @@ test("consultar DataJud antes de liberar campos de processo judicial", () => {
   assert.match(app, /function setCaseDataJudGate/);
 assert.match(app, /function scheduleCaseDataJudLookup/);
 assert.match(app, /lookupProcess\(normalized, \{\s*proxyUrl: mp\.apiUrl/s);
+assert.match(app, /function dataJudProxyReady/);
+assert.match(app, /Consulta DataJud não configurada\. O preenchimento manual foi liberado/);
 assert.match(app, /dataJud: fd\.type === "judicial" \? caseDataJudDraft : null/);
 assert.match(app, /function caseDataJudTabs/);
 assert.match(app, /data-case-tab="movements"/);

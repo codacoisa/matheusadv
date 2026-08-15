@@ -45,6 +45,14 @@ async function prepareCalculationPage(page, path = 'calculos/') {
   await page.goto(path, { waitUntil: 'networkidle' });
 }
 
+async function configureDataJudWorker(page) {
+  await page.evaluate(() => {
+    localStorage.setItem('officejur::financeiro::mercado-pago::settings', JSON.stringify({ apiUrl: 'https://worker.example' }));
+    sessionStorage.setItem('officejur::financeiro::mercado-pago::session-key', 'chave-do-servico');
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+}
+
 async function stubBcbIndices(page) {
   const requests = [];
   await page.route('https://api.bcb.gov.br/dados/serie/**', async route => {
@@ -674,10 +682,11 @@ test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ 
 
 test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', async ({ page }) => {
   const processNumber = '00008323520184013202';
-  await page.route('https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search', async route => {
+  await page.route('https://worker.example/datajud/search', async route => {
     const request = route.request();
     expect(request.method()).toBe('POST');
-    expect(request.postDataJSON()).toEqual({ size: 1, query: { match: { numeroProcesso: processNumber } } });
+    expect(request.headers().authorization).toBe('Bearer chave-do-servico');
+    expect(request.postDataJSON()).toEqual({ path: '/api_publica_trf1/_search', number: processNumber });
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -704,6 +713,7 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
     });
   });
   await prepareCalculationPage(page, 'financeiro/');
+  await configureDataJudWorker(page);
   await page.locator('[data-view="cases"]').click();
   await page.locator('#new-case').click();
   const form = page.locator('#case-form');
@@ -726,9 +736,22 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
   await expect(page.locator('[data-case-panel="movements"]')).toContainText('podem estar atrasadas');
 });
 
-test('Financeiro mantém o judicial bloqueado quando o DataJud falha', async ({ page }) => {
-  await page.route('https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search', route => route.abort('failed'));
+test('Financeiro libera edição manual quando o Worker não está configurado', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="number"]').fill('00008323520184013202');
+  await expect(form.locator('[data-case-datajud-status]')).toContainText('Consulta DataJud não configurada', { timeout: 10_000 });
+  await expect(form.locator('[name="title"]')).toBeEnabled();
+  await expect(form.getByRole('button', { name: 'Salvar caso' })).toBeEnabled();
+});
+
+test('Financeiro mantém o judicial bloqueado quando o Worker configurado falha', async ({ page }) => {
+  await page.route('https://worker.example/datajud/search', route => route.abort('failed'));
+  await prepareCalculationPage(page, 'financeiro/');
+  await configureDataJudWorker(page);
   await page.locator('[data-view="cases"]').click();
   await page.locator('#new-case').click();
   const form = page.locator('#case-form');

@@ -965,6 +965,7 @@ dialog form {
 .case-datajud-status[data-kind="success"] { color: var(--success); }
 .case-datajud-status[data-kind="error"] { color: var(--danger); }
 .case-datajud-status[data-kind="locked"] { color: var(--warn); }
+.case-datajud-status[data-kind="manual"] { color: var(--warn); }
 .case-datajud-status:empty { min-height: 0; }
 .case-datajud-panel {
   padding: 13px;
