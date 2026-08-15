@@ -5,6 +5,7 @@ import worker from "../src/index.js";
 const env = {
   ALLOWED_ORIGINS: "https://officejur.example",
   OFFICEJUR_API_KEY: "chave-de-teste",
+  DATAJUD_API_KEY: "chave-datajud",
   MP_ACCESS_TOKEN: "token-mercado-pago",
 };
 
@@ -52,6 +53,49 @@ test("limita excesso de solicitações antes de consultar o provedor", async () 
   };
   const response = await worker.fetch(request("/health"), limitedEnv);
   assert.equal(response.status, 429);
+});
+
+test("consulta o DataJud pelo proxy sem exigir o token do Mercado Pago", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  let received;
+  globalThis.fetch = async (url, options) => {
+    received = { url, options };
+    return Response.json({ hits: { hits: [{ _source: { numeroProcesso: "00008323520184013202" } }] } });
+  };
+
+  const response = await worker.fetch(
+    request("/datajud/search", {
+      method: "POST",
+      body: JSON.stringify({
+        path: "/api_publica_trf1/_search",
+        number: "00008323520184013202",
+      }),
+    }),
+    { ...env, MP_ACCESS_TOKEN: "" },
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { hits: { hits: [{ _source: { numeroProcesso: "00008323520184013202" } }] } });
+  assert.equal(received.url, "https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search");
+  assert.equal(received.options.headers.Authorization, "APIKey chave-datajud");
+  assert.deepEqual(JSON.parse(received.options.body), {
+    size: 1,
+    query: { match: { numeroProcesso: "00008323520184013202" } },
+  });
+});
+
+test("recusa rota ou número inválidos no proxy DataJud", async () => {
+  const response = await worker.fetch(
+    request("/datajud/search", {
+      method: "POST",
+      body: JSON.stringify({ path: "/api_publica_tjgo/_search", number: "123" }),
+    }),
+    env,
+  );
+  assert.equal(response.status, 400);
 });
 
 test("valida idempotência e URL de retorno antes de criar cobrança", async () => {

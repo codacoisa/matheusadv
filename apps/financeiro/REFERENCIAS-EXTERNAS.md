@@ -75,8 +75,14 @@ incorporado.
   O tribunal é identificado pelos campos `J` e `TR` da numeração CNJ.
 - **Autenticação:** o CNJ publica uma chave pública para o cabeçalho
   `Authorization: APIKey ...`; ela não é um segredo do escritório, pode ser
-  alterada pelo CNJ e foi mantida isolada em `assets/datajud-assistant.js` para
-  atualização independente.
+  alterada pelo CNJ. Como a API não libera CORS para a aplicação estática, a
+  consulta no navegador passa pelo endpoint `/datajud/search` do Worker, que
+  mantém essa chave apenas no serviço.
+- **Proxy:** publique `worker/src/index.js`, cadastre `DATAJUD_API_KEY` como
+  segredo e informe a URL do Worker em `config/office.js`, no bloco
+  `datajud.proxyUrl`. A chave `OFFICEJUR_API_KEY` usada pelo Worker é enviada
+  somente na sessão do navegador; o token do Mercado Pago não é necessário
+  para a rota DataJud.
 - **Dados utilizados:** tribunal, segmento de Justiça, classe, sistema,
   formato, grau, data de ajuizamento, órgão julgador, assuntos, nível de sigilo,
   atualização da origem e movimentações. O retorno normalizado e a resposta
@@ -108,14 +114,14 @@ incorporado.
 
 ### Cloudflare Workers
 
-- **Uso:** opção adotada para publicar o serviço protegido que intermedeia o
-  sistema estático e a API do Mercado Pago.
+- **Uso:** publica o serviço protegido que intermedeia o sistema estático e as
+  APIs do Mercado Pago e do DataJud.
 - **Código do serviço:** `worker/src/index.js`.
 - **Configuração:** `worker/wrangler.toml`.
 - **Proteção de tráfego:** binding `RATE_LIMITER` do Cloudflare Workers,
   configurado para limitar chamadas ao serviço por origem e rota.
-- **Segredos:** o Access Token do Mercado Pago deve ser cadastrado como segredo
-  do Worker.
+- **Segredos:** `MP_ACCESS_TOKEN` é usado pelo Mercado Pago; `DATAJUD_API_KEY`
+  é usado pelo DataJud; `OFFICEJUR_API_KEY` protege as chamadas do navegador.
 - **Referências:** [Cloudflare Workers](https://developers.cloudflare.com/workers/)
   e [Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/).
 

@@ -16,3 +16,4 @@ namespace_id = "27072901"
 # Configure sem gravar o valor neste arquivo:
 # npx wrangler secret put MP_ACCESS_TOKEN
 # npx wrangler secret put OFFICEJUR_API_KEY
+# npx wrangler secret put DATAJUD_API_KEY

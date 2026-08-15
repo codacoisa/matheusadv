@@ -726,6 +726,19 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
   await expect(page.locator('[data-case-panel="movements"]')).toContainText('podem estar atrasadas');
 });
 
+test('Financeiro mantém o judicial bloqueado quando o DataJud falha', async ({ page }) => {
+  await page.route('https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search', route => route.abort('failed'));
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="number"]').fill('00008323520184013202');
+  await expect(form.locator('[data-case-datajud-status]')).toContainText('Não foi possível acessar o proxy DataJud', { timeout: 10_000 });
+  await expect(form.locator('[name="title"]')).toBeDisabled();
+  await expect(form.getByRole('button', { name: 'Salvar caso' })).toBeDisabled();
+});
+
 test('Financeiro gera recibo em PDF ao registrar pagamento', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
   await page.locator('#new-entry').click();
