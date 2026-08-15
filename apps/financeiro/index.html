@@ -23,7 +23,7 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" />
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=30" />
+    <link rel="stylesheet" href="./assets/styles.css?v=31" />
     <link rel="stylesheet" href="./assets/system.css?v=1" />
     <link rel="stylesheet" href="./assets/site-header.css?v=2" />
     <link rel="stylesheet" href="./assets/local-access-blocked.css?v=1" />
@@ -49,7 +49,8 @@
     <script src="./assets/local-access-blocked.js?v=3" defer></script>
     <script src="./assets/address-assistant.js?v=1" defer></script>
     <script src="./assets/cnpj-assistant.js?v=1" defer></script>
-    <script src="./assets/app.js?v=41" defer></script>
+    <script src="./assets/datajud-assistant.js?v=1" defer></script>
+    <script src="./assets/app.js?v=42" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -936,16 +937,36 @@
               <option>Administrativo</option>
               <option>Outro</option>
             </select></label
-          ><label class="span-2"
+          ><label class="span-2" id="case-number-label"
             >Número ou referência *<input
               name="number"
               required
-              placeholder="Número CNJ ou identificação interna" /></label
+              placeholder="Número CNJ ou identificação interna" /><small id="case-number-help">Para processos judiciais, informe a numeração única CNJ com 20 dígitos.</small><span class="case-datajud-status" id="case-datajud-status" data-case-datajud-status role="status" aria-live="polite"></span></label
           ><label class="span-2"
             >Título / objeto *<input
               name="title"
               required
               placeholder="Ex.: Ação de cobrança contra Empresa X" /></label
+          ><section class="case-datajud-panel span-2" id="case-datajud-panel" hidden aria-labelledby="case-datajud-title">
+            <div class="section-heading compact">
+              <div>
+                <strong id="case-datajud-title">Dados públicos do DataJud</strong>
+                <small>Metadados retornados pela consulta pública do CNJ. Confira antes de salvar.</small>
+              </div>
+              <i class="fa-solid fa-database" aria-hidden="true"></i>
+            </div>
+            <div class="datajud-grid">
+              <div class="datajud-field"><small>Tipo de justiça</small><strong data-datajud-field="justiceType"></strong></div>
+              <div class="datajud-field"><small>Tribunal</small><strong data-datajud-field="tribunal"></strong></div>
+              <div class="datajud-field"><small>Órgão julgador</small><strong data-datajud-field="court"></strong></div>
+              <div class="datajud-field"><small>Sistema</small><strong data-datajud-field="system"></strong></div>
+              <div class="datajud-field"><small>Classe processual</small><strong data-datajud-field="processClass"></strong></div>
+              <div class="datajud-field"><small>Grau</small><strong data-datajud-field="degree"></strong></div>
+              <div class="datajud-field"><small>Formato</small><strong data-datajud-field="format"></strong></div>
+              <div class="datajud-field"><small>Data de ajuizamento</small><strong data-datajud-field="filingDate"></strong></div>
+              <div class="datajud-field span-2"><small>Assuntos</small><strong data-datajud-field="subjects"></strong></div>
+            </div>
+          </section
           ><label
             >Status<select name="status">
               <option value="active">Ativo</option>
