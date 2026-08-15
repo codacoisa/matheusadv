@@ -672,6 +672,60 @@ test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ 
   await expect(page.locator('#package-dialog')).toBeVisible();
 });
 
+test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', async ({ page }) => {
+  const processNumber = '00008323520184013202';
+  await page.route('https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search', async route => {
+    const request = route.request();
+    expect(request.method()).toBe('POST');
+    expect(request.postDataJSON()).toEqual({ size: 1, query: { match: { numeroProcesso: processNumber } } });
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        hits: {
+          hits: [{
+            _source: {
+              id: `TRF1_436_JE_16403_${processNumber}`,
+              numeroProcesso: processNumber,
+              tribunal: 'TRF1',
+              classe: { codigo: 436, nome: 'Procedimento do Juizado Especial Cível' },
+              sistema: { codigo: 1, nome: 'Pje' },
+              formato: { codigo: 1, nome: 'Eletrônico' },
+              grau: 'JE',
+              dataAjuizamento: '2018-10-29T00:00:00.000Z',
+              orgaoJulgador: { codigo: 16403, nome: 'JEF Adj - Tefé', codigoMunicipioIBGE: 5128 },
+              assuntos: [{ codigo: 6177, nome: 'Concessão' }],
+              movimentos: [{ codigo: 26, nome: 'Distribuição', dataHora: '2018-10-30T14:06:24.000Z' }],
+              nivelSigilo: 0,
+              dataHoraUltimaAtualizacao: '2023-07-21T19:10:08.483Z',
+            },
+          }],
+        },
+      }),
+    });
+  });
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await expect(form.locator('[name="title"]')).toBeDisabled();
+  await expect(form.locator('[name="contractScope"]')).toBeDisabled();
+  await form.locator('[name="number"]').fill(processNumber);
+  await expect(form.locator('[data-case-datajud-status]')).toContainText('Dados públicos carregados', { timeout: 10_000 });
+  await expect(form.locator('[name="title"]')).toBeEnabled();
+  await expect(form.locator('[name="title"]')).toHaveValue('Procedimento do Juizado Especial Cível');
+  await expect(form.locator('#case-datajud-panel')).toBeVisible();
+  await expect(form.locator('[data-datajud-field="tribunal"]')).toContainText('TRF1');
+  await form.getByRole('button', { name: 'Salvar caso' }).click();
+
+  const card = page.locator('.case-card').filter({ hasText: 'Procedimento do Juizado Especial Cível' });
+  await card.locator('[data-view-case]').click();
+  await expect(page.locator('#detail-dialog')).toBeVisible();
+  await page.getByRole('tab', { name: /Movimentações/ }).click();
+  await expect(page.locator('[data-case-panel="movements"]')).toContainText('Distribuição');
+  await expect(page.locator('[data-case-panel="movements"]')).toContainText('podem estar atrasadas');
+});
+
 test('Financeiro gera recibo em PDF ao registrar pagamento', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
   await page.locator('#new-entry').click();

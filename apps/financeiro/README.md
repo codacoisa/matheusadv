@@ -6,7 +6,7 @@ Pessoas, clientes e casos possuem cadastros independentes. A lista de pessoas fi
 
 Para clientes pessoa física, nome completo, CPF válido, data de nascimento e telefone são obrigatórios. Telefones marcados como WhatsApp possuem atalho direto para conversa. No endereço, logradouro, número, quadra e lote são campos separados; termos que identificam esses complementos são retirados do logradouro durante a digitação e o formulário indica o campo correto.
 
-Todo processo ou caso judicial, administrativo, extrajudicial ou consultivo deve apontar para um cliente previamente cadastrado. O número ou referência é único, desconsiderando diferenças de máscara, pontuação, espaços, acentos e maiúsculas. O sistema bloqueia casos sem cliente e também impede excluir clientes que ainda possuam casos ou pacotes.
+Todo processo ou caso judicial, administrativo, extrajudicial ou consultivo deve apontar para um cliente previamente cadastrado. Casos judiciais exigem número CNJ válido; após a consulta pública ao DataJud, o cadastro é preenchido com os metadados disponíveis e liberado para conferência. Casos não judiciais continuam aceitando referência interna. O número ou referência é único, desconsiderando diferenças de máscara, pontuação, espaços, acentos e maiúsculas. O sistema bloqueia casos sem cliente e também impede excluir clientes que ainda possuam casos ou pacotes.
 
 Cada caso pode ter contratação própria, integrar um pacote de honorários específico ou deixar a contratação em branco. Um mesmo cliente pode possuir vários pacotes. Todos os casos vinculados ao mesmo pacote exibem os valores contratado, recebido e em aberto de forma conjunta.
 

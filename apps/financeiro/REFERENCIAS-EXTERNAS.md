@@ -67,6 +67,30 @@ incorporado.
   Receita Federal; a consulta é auxiliar e não substitui conferência cadastral
   ou documento oficial.
 
+### API Pública do DataJud
+
+- **Uso:** consulta de metadados públicos de processos judiciais pelo número
+  CNJ e exibição opcional das movimentações retornadas.
+- **Endpoint:** `https://api-publica.datajud.cnj.jus.br/api_publica_<tribunal>/_search`.
+  O tribunal é identificado pelos campos `J` e `TR` da numeração CNJ.
+- **Autenticação:** o CNJ publica uma chave pública para o cabeçalho
+  `Authorization: APIKey ...`; ela não é um segredo do escritório, pode ser
+  alterada pelo CNJ e foi mantida isolada em `assets/datajud-assistant.js` para
+  atualização independente.
+- **Dados utilizados:** tribunal, segmento de Justiça, classe, sistema,
+  formato, grau, data de ajuizamento, órgão julgador, assuntos, nível de sigilo,
+  atualização da origem e movimentações. O retorno normalizado e a resposta
+  pública da consulta ficam associados ao caso para permitir conferência e
+  sincronização.
+- **Limites:** a API cobre metadados de processos públicos, pode não retornar
+  processos sob sigilo, não garante atualidade durante atrasos de carga e não
+  substitui a consulta oficial do tribunal ou a conferência profissional.
+- **Referências:** [API Pública do CNJ](https://www.cnj.jus.br/sistemas/datajud/api-publica/),
+  [acesso e chave pública](https://datajud-wiki.cnj.jus.br/api-publica/acesso/),
+  [endpoints](https://datajud-wiki.cnj.jus.br/api-publica/endpoints/),
+  [exemplo por número de processo](https://datajud-wiki.cnj.jus.br/api-publica/exemplos/exemplo1/)
+  e [glossário de dados](https://datajud-wiki.cnj.jus.br/api-publica/glossario/).
+
 ### Mercado Pago
 
 - **Checkout Pro:** criação dos links de pagamento exibidos no módulo de

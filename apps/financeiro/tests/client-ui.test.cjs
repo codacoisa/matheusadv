@@ -18,6 +18,10 @@ const cnpjAssistant = fs.readFileSync(
   path.join(root, "assets", "cnpj-assistant.js"),
   "utf8",
 );
+const datajudAssistant = fs.readFileSync(
+  path.join(root, "assets", "datajud-assistant.js"),
+  "utf8",
+);
 
 test("padronizar o estado da nuvem no cabeçalho", () => {
   assert.match(html, /office-cloud-status id="sync-label"/);
@@ -136,6 +140,23 @@ test("alertar CNPJ inválido e manter o status da consulta pública no formulár
   assert.match(app, /dataset\.cnpjGate/);
   assert.match(app, /aguarde a consulta antes de salvar/);
   assert.match(cnpjAssistant, /https:\/\/api\.opencnpj\.org/);
+});
+
+test("consultar DataJud antes de liberar campos de processo judicial", () => {
+  assert.match(html, /datajud-assistant\.js/);
+  assert.match(html, /name="number"[^>]*placeholder="Número CNJ ou identificação interna"/);
+  assert.match(html, /id="case-datajud-panel"[^>]*hidden/);
+  assert.match(html, /data-case-datajud-status[^>]*role="status"/);
+  assert.match(app, /function setCaseDataJudGate/);
+  assert.match(app, /function scheduleCaseDataJudLookup/);
+  assert.match(app, /lookupProcess\(normalized\)/);
+  assert.match(app, /dataJud: fd\.type === "judicial" \? caseDataJudDraft : null/);
+  assert.match(app, /function caseDataJudTabs/);
+  assert.match(app, /data-case-tab="movements"/);
+  assert.match(datajudAssistant, /https:\/\/api-publica\.datajud\.cnj\.jus\.br/);
+  assert.match(datajudAssistant, /numeroProcesso/);
+  assert.match(styles, /\.case-detail-tab\s*\{/);
+  assert.match(styles, /\.case-movement-warning\s*\{/);
 });
 
 test("listar pessoas como subpágina de clientes e permitir promoção", () => {

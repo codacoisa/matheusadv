@@ -12,6 +12,7 @@
   const financeDataStore = window.FinanceDataStore;
   const addressAssistant = window.OfficeJurAddressAssistant;
   const cnpjAssistant = window.OfficeJurCnpjAssistant;
+  const dataJudAssistant = window.OfficeJurDataJud;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
     MP_KEY = "officejur::financeiro::mercado-pago::settings",
     MP_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
@@ -60,6 +61,12 @@
     normalizeCnpj,
     validCnpj,
   } = cnpjAssistant;
+  const {
+    lookupProcess,
+    maskCnj,
+    normalizeCnj,
+    validCnj,
+  } = dataJudAssistant;
   const {
     hasDuplicateCaseReference,
     hasDuplicateDocument,
@@ -462,6 +469,13 @@
   }
   const date = (v) =>
     v ? new Date(`${v}T12:00:00`).toLocaleDateString("pt-BR") : "—";
+  const dateTime = (v) => {
+    if (!v) return "—";
+    const value = new Date(v);
+    return Number.isNaN(value.getTime())
+      ? String(v)
+      : value.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  };
   const monthLabel = (v) =>
     new Date(`${v}-02T12:00:00`).toLocaleDateString("pt-BR", {
       month: "long",
@@ -591,6 +605,7 @@
       "contractScope",
       "packageId",
       "notes",
+      "dataJud",
       "createdAt",
       "updatedAt",
     ];
@@ -606,6 +621,9 @@
     normalized.assignments = Array.isArray(item.assignments)
       ? item.assignments
       : [];
+    normalized.dataJud = item.dataJud && typeof item.dataJud === "object"
+      ? item.dataJud
+      : null;
     normalized.parties = Array.isArray(item.parties)
       ? item.parties
           .filter((party) => party && String(party.name || "").trim())
@@ -1016,6 +1034,9 @@
     syncPending = false,
     clientCnpjLookupTimer = 0,
     clientCnpjLookupRequest = 0,
+    caseDataJudLookupTimer = 0,
+    caseDataJudLookupRequest = 0,
+    caseDataJudDraft = null,
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "",
@@ -1899,7 +1920,7 @@
             (entry) => entry.personId === filterPerson.id,
           )) &&
         (!status || item.status === status) &&
-        `${item.number} ${item.title} ${item.area} ${clientName(item.clientId)} ${item.assignments.map((entry) => teamName(entry.personId)).join(" ")}`
+        `${item.number} ${item.title} ${item.area} ${item.dataJud?.tribunalName || ""} ${item.dataJud?.court?.name || ""} ${item.dataJud?.system?.name || ""} ${clientName(item.clientId)} ${item.assignments.map((entry) => teamName(entry.personId)).join(" ")}`
           .toLowerCase()
           .includes(q),
     );
@@ -1958,7 +1979,7 @@
                 : contracted
                   ? `${money(received)} de ${money(contracted)} recebidos · saldo ${money(balance)}${success ? ` · êxito de ${successAgreement.successRate}% à parte` : ""}`
                   : `${money(ownReceived)} recebido neste caso`;
-            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client ? clientDisplayName(client) : "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
+            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}${item.dataJud?.tribunal ? ` · ${escapeHtml(item.dataJud.tribunal)}` : ""}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client ? clientDisplayName(client) : "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum caso encontrado para os filtros selecionados.</div>';
@@ -2832,6 +2853,120 @@
     $("#case-package-field").hidden = scope !== "package";
     $("#case-agreement-editor").hidden = scope !== "own";
   }
+  function setCaseDataJudStatus(form, message = "", kind = "") {
+    const status = form.querySelector("[data-case-datajud-status]");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.kind = kind;
+  }
+  function setCaseDataJudGate(form, locked) {
+    const keepEnabled = new Set([
+      form.elements.id,
+      form.elements.clientId,
+      form.elements.type,
+      form.elements.number,
+    ]);
+    form.querySelectorAll("input, select, textarea, button").forEach((control) => {
+      if (keepEnabled.has(control) || control.matches("#delete-case, [value=cancel]")) return;
+      control.disabled = locked;
+    });
+    form.dataset.datajudGate = locked ? "locked" : "ready";
+  }
+  function renderCaseDataJud(info = null) {
+    const panel = $("#case-datajud-panel");
+    if (!panel) return;
+    panel.hidden = !info;
+    const values = {
+      justiceType: info?.justiceType,
+      tribunal: [info?.tribunalName, info?.tribunal].filter(Boolean).join(" · "),
+      court: info?.court?.name,
+      system: info?.system?.name,
+      processClass: info?.processClass?.name,
+      degree: info?.degree,
+      format: info?.format?.name,
+      filingDate: dateTime(info?.filingDate),
+      subjects: info?.subjects?.map((subject) => subject.name).filter(Boolean).join(" · "),
+    };
+    panel.querySelectorAll("[data-datajud-field]").forEach((field) => {
+      field.textContent = values[field.dataset.datajudField] || "Não informado";
+    });
+  }
+  function fillCaseFromDataJud(form, info) {
+    const previousTitle = caseDataJudDraft?.title || "";
+    caseDataJudDraft = { ...info, fetchedAt: now() };
+    form.elements.number.value = maskCnj(info.number || info.rawNumber);
+    if (!String(form.elements.title.value || "").trim() || form.elements.title.value.trim() === previousTitle)
+      form.elements.title.value = info.title || "";
+    renderCaseDataJud(caseDataJudDraft);
+    setCaseDataJudStatus(
+      form,
+      `Dados públicos carregados. Confira antes de salvar.${info.sourceUpdatedAt ? ` Última atualização na origem: ${dateTime(info.sourceUpdatedAt)}.` : ""}`,
+      "success",
+    );
+    setCaseDataJudGate(form, false);
+  }
+  function scheduleCaseDataJudLookup(form) {
+    clearTimeout(caseDataJudLookupTimer);
+    const request = ++caseDataJudLookupRequest,
+      normalized = normalizeCnj(form.elements.number.value);
+    caseDataJudDraft = null;
+    renderCaseDataJud();
+    if (form.elements.type.value !== "judicial") return;
+    if (!validCnj(normalized)) {
+      setCaseDataJudGate(form, true);
+      setCaseDataJudStatus(
+        form,
+        normalized
+          ? "Corrija o número CNJ para liberar os campos do cadastro."
+          : "Informe um número CNJ válido para liberar os campos do cadastro.",
+        "locked",
+      );
+      return;
+    }
+    setCaseDataJudGate(form, true);
+    setCaseDataJudStatus(form, "Consultando dados públicos do DataJud…", "loading");
+    caseDataJudLookupTimer = setTimeout(async () => {
+      if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
+      try {
+        const process = await lookupProcess(normalized);
+        if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
+        fillCaseFromDataJud(form, process);
+      } catch (error) {
+        if (request !== caseDataJudLookupRequest) return;
+        setCaseDataJudStatus(
+          form,
+          `${error.message || "Não foi possível consultar o DataJud."} Os campos foram liberados para preenchimento manual.`,
+          "error",
+        );
+        setCaseDataJudGate(form, false);
+      }
+    }, 450);
+  }
+  function syncCaseType() {
+    const form = $("#case-form"), judicial = form.elements.type.value === "judicial";
+    $("#case-number-help").textContent = judicial
+      ? "Para processos judiciais, informe a numeração única CNJ com 20 dígitos."
+      : "Para casos não judiciais, use uma referência interna ou o número do procedimento.";
+    form.elements.number.placeholder = judicial
+      ? "0000000-00.0000.0.00.0000"
+      : "Número do procedimento ou referência interna";
+    if (!judicial) {
+      clearTimeout(caseDataJudLookupTimer);
+      caseDataJudLookupRequest += 1;
+      caseDataJudDraft = null;
+      renderCaseDataJud();
+      setCaseDataJudGate(form, false);
+      setCaseDataJudStatus(form);
+      return;
+    }
+    const saved = Boolean(form.elements.id.value && caseDataJudDraft);
+    if (saved) {
+      setCaseDataJudGate(form, false);
+      setCaseDataJudStatus(form, "Dados DataJud já consultados neste cadastro. Consulte novamente se o número for alterado.", "success");
+      return;
+    }
+    scheduleCaseDataJudLookup(form);
+  }
   function renderCaseParties(parties = []) {
     const rows = $("#case-parties-rows");
     rows.innerHTML = "";
@@ -2864,6 +2999,9 @@
       return;
     }
     const f = $("#case-form");
+    clearTimeout(caseDataJudLookupTimer);
+    caseDataJudLookupRequest += 1;
+    caseDataJudDraft = null;
     f.reset();
     f.elements.id.value = caseId;
     f.elements.clientId.innerHTML =
@@ -2875,6 +3013,7 @@
         )
         .join("");
     const item = data.cases.find((x) => x.id === caseId);
+    caseDataJudDraft = item?.dataJud || null;
     if (item) {
       [
         "clientId",
@@ -2900,6 +3039,8 @@
     );
     renderCaseParties(item?.parties || []);
     updateCaseContractFields();
+    renderCaseDataJud(caseDataJudDraft);
+    syncCaseType();
     $("#case-modal-title").textContent = item
       ? "Editar processo ou caso"
       : "Novo processo ou caso";
@@ -3117,6 +3258,31 @@
       onEdit: () => openClient(id),
     });
   }
+  function caseDataJudTabs(info) {
+    if (!info)
+      return '<div class="detail-note"><strong>Dados do DataJud</strong><p>Este processo ainda não possui uma consulta pública DataJud salva.</p></div>';
+    const subjects = info.subjects?.map((subject) => subject.name).filter(Boolean).join(" · "),
+      movements = Array.isArray(info.movements) ? info.movements : [],
+      summary = `<div class="detail-grid">${detailField("Tipo de justiça", info.justiceType, "fa-scale-balanced")}${detailField("Tribunal", [info.tribunalName, info.tribunal].filter(Boolean).join(" · "), "fa-building-columns")}${detailField("Órgão julgador", info.court?.name, "fa-landmark")}${detailField("Sistema", info.system?.name, "fa-laptop-code")}${detailField("Classe processual", info.processClass?.name, "fa-file-lines")}${detailField("Grau", info.degree, "fa-layer-group")}${detailField("Formato", info.format?.name, "fa-file-circle-check")}${detailField("Data de ajuizamento", dateTime(info.filingDate), "fa-calendar-day")}${detailField("Assuntos", subjects, "fa-tags")}${detailField("Nível de sigilo", info.secrecyLevel === "" || info.secrecyLevel === undefined ? "Não informado" : String(info.secrecyLevel), "fa-user-shield")}${detailField("Atualização na origem", dateTime(info.sourceUpdatedAt), "fa-arrows-rotate")}</div>`,
+      movementRows = movements
+        .map((movement) => `<article class="case-movement"><div class="case-movement-date">${escapeHtml(dateTime(movement.dateTime))}</div><div><strong>${escapeHtml(movement.name || "Movimentação sem descrição")}</strong>${movement.court?.name ? `<small>${escapeHtml(movement.court.name)}</small>` : ""}${movement.complements?.length ? `<small>${escapeHtml(movement.complements.map((item) => item.name || item.description).filter(Boolean).join(" · "))}</small>` : ""}</div></article>`)
+        .join("") || '<p class="detail-empty">Nenhuma movimentação foi disponibilizada pelo DataJud.</p>',
+      movementPanel = `<div class="case-movements"><div class="case-movement-warning"><i class="fa-solid fa-triangle-exclamation"></i><span>As movimentações podem estar atrasadas e não necessariamente refletem o estado atual do processo.</span></div>${movementRows}</div>`;
+    return `<section class="case-detail-tabs" data-case-detail-tabs><div class="case-detail-tablist" role="tablist" aria-label="Informações públicas do processo"><button type="button" class="case-detail-tab active" data-case-tab="summary" role="tab" aria-selected="true">Dados do processo</button><button type="button" class="case-detail-tab" data-case-tab="movements" role="tab" aria-selected="false">Movimentações <span>${movements.length}</span></button></div><div data-case-panel="summary">${summary}</div><div data-case-panel="movements" hidden><div class="detail-note"><strong>Fonte e atualização</strong><p>Dados públicos retornados pela API DataJud. A última atualização informada pela origem é ${escapeHtml(dateTime(info.sourceUpdatedAt))}.</p></div>${movementPanel}</div></section>`;
+  }
+  function activateCaseTab(button) {
+    const tabs = button.closest("[data-case-detail-tabs]");
+    if (!tabs) return;
+    const selected = button.dataset.caseTab;
+    tabs.querySelectorAll("[data-case-tab]").forEach((tab) => {
+      const active = tab === button;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+    tabs.querySelectorAll("[data-case-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.casePanel !== selected;
+    });
+  }
   function viewCase(id) {
     const x = data.cases.find((v) => v.id === id);
     if (!x) return;
@@ -3142,7 +3308,7 @@
       eyebrow: "PROCESSO / CASO",
       title: x.title,
       subtitle: `${x.number} · ${x.area} · ${{ active: "Ativo", suspended: "Suspenso", closed: "Encerrado" }[x.status] || x.status}`,
-      body: `<div class="detail-grid">${detailField("Cliente", client ? clientDisplayName(client) : "Cliente não encontrado", "fa-user")}${detailField("Tipo", { judicial: "Judicial", administrative: "Administrativo", extrajudicial: "Extrajudicial", consulting: "Consultivo" }[x.type], "fa-folder")}${detailField("Contratação", packageItem ? `Pacote · ${packageItem.name}` : x.contractScope === "own" ? agreementLabel(agreement) : "Não informada", "fa-file-invoice-dollar")}${detailField("Parte fixa", stats.contracted ? money(stats.contracted) : "Não informada", "fa-coins")}${detailField("Situação financeira", financialStatus, balance < 0.005 && stats.contracted ? "fa-circle-check" : "fa-chart-line")}${detailField("Êxito", ["success", "mixed"].includes(agreement.mode) ? `${agreement.successRate}% · ${agreement.successBase || "base não informada"}` : "Não aplicável", "fa-percent")}${detailField("Responsável", teamName(assignments.find((a) => a.isLead)?.personId), "fa-user-tie")}</div>${x.notes ? `<div class="detail-note"><strong>Observações</strong><p>${x.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Equipe e participações</strong><span>${assignments.reduce((s, a) => s + Number(a.sharePercent || 0), 0)}%</span></header>${assignments.map((a) => `<button class="detail-list-row" data-view-team="${a.personId}"><span><strong>${teamName(a.personId)}${a.isLead ? " · Responsável" : ""}</strong><small>${assignmentRoleLabel(a.assignmentRole)}${a.notes ? ` · ${a.notes}` : ""}</small></span><b>${a.sharePercent || 0}%</b></button>`).join("") || '<p class="detail-empty">Nenhuma pessoa atribuída.</p>'}</div><div class="detail-totals"><span><small>Receitas deste caso</small><strong>${money(t.income)}</strong></span><span><small>Recebido neste caso</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
+      body: `<div class="detail-grid">${detailField("Cliente", client ? clientDisplayName(client) : "Cliente não encontrado", "fa-user")}${detailField("Tipo", { judicial: "Judicial", administrative: "Administrativo", extrajudicial: "Extrajudicial", consulting: "Consultivo" }[x.type], "fa-folder")}${detailField("Contratação", packageItem ? `Pacote · ${packageItem.name}` : x.contractScope === "own" ? agreementLabel(agreement) : "Não informada", "fa-file-invoice-dollar")}${detailField("Parte fixa", stats.contracted ? money(stats.contracted) : "Não informada", "fa-coins")}${detailField("Situação financeira", financialStatus, balance < 0.005 && stats.contracted ? "fa-circle-check" : "fa-chart-line")}${detailField("Êxito", ["success", "mixed"].includes(agreement.mode) ? `${agreement.successRate}% · ${agreement.successBase || "base não informada"}` : "Não aplicável", "fa-percent")}${detailField("Responsável", teamName(assignments.find((a) => a.isLead)?.personId), "fa-user-tie")}</div>${x.type === "judicial" ? caseDataJudTabs(x.dataJud) : ""}${x.notes ? `<div class="detail-note"><strong>Observações</strong><p>${x.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Equipe e participações</strong><span>${assignments.reduce((s, a) => s + Number(a.sharePercent || 0), 0)}%</span></header>${assignments.map((a) => `<button class="detail-list-row" data-view-team="${a.personId}"><span><strong>${teamName(a.personId)}${a.isLead ? " · Responsável" : ""}</strong><small>${assignmentRoleLabel(a.assignmentRole)}${a.notes ? ` · ${a.notes}` : ""}</small></span><b>${a.sharePercent || 0}%</b></button>`).join("") || '<p class="detail-empty">Nenhuma pessoa atribuída.</p>'}</div><div class="detail-totals"><span><small>Receitas deste caso</small><strong>${money(t.income)}</strong></span><span><small>Recebido neste caso</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
       links: `<button class="btn ghost" type="button" data-view-client="${x.clientId}"><i class="fa-solid fa-user"></i> Ver cliente</button><button class="btn ghost" type="button" data-manage-team="${x.clientId}:${x.id}"><i class="fa-solid fa-user-group"></i> Equipe</button>`,
       onEdit: () => openCase(x.clientId, id),
     });
@@ -4112,6 +4278,10 @@
     if (!client) return toast("Selecione um cliente cadastrado.");
     if (!fd.number || !fd.title)
       return toast("Informe a referência e o objeto do caso.");
+    if (fd.type === "judicial" && !validCnj(fd.number))
+      return toast("Informe um número CNJ válido com 20 dígitos.");
+    if (fd.type === "judicial" && f.dataset.datajudGate === "locked")
+      return toast("Aguarde a consulta do DataJud antes de salvar o processo.");
     if (hasDuplicateCaseReference(data.cases, fd.number, fd.id))
       return toast(
         "Já existe um caso ou processo cadastrado com este número ou referência.",
@@ -4134,13 +4304,14 @@
         clientId: client.id,
         type: fd.type,
         area: fd.area,
-        number: fd.number.trim(),
+        number: fd.type === "judicial" ? maskCnj(fd.number) : fd.number.trim(),
         title: fd.title.trim(),
         status: fd.status,
         contractScope: scope,
         packageId: scope === "package" ? selectedPackage.id : "",
         agreement,
         notes: fd.notes.trim(),
+        dataJud: fd.type === "judicial" ? caseDataJudDraft : null,
         assignments: old?.assignments || [],
         parties: readCaseParties(),
         createdAt: old?.createdAt || now(),
@@ -4403,6 +4574,15 @@
     $("#case-form [name=packageId]").value = "";
     updateCaseContractFields();
   };
+  $("#case-form [name=type]").onchange = syncCaseType;
+  $("#case-form [name=number]").addEventListener("input", (event) => {
+    if (event.target.form.elements.type.value === "judicial") {
+      event.target.value = maskCnj(event.target.value);
+      scheduleCaseDataJudLookup(event.target.form);
+    } else {
+      setCaseDataJudStatus(event.target.form);
+    }
+  });
   $("#case-form [name=contractScope]").onchange = updateCaseContractFields;
   $("#add-case-party").onclick = () => {
     const parties = readCaseParties();
@@ -4540,7 +4720,9 @@
       vx = e.target.closest("[data-view-case]"),
       vp = e.target.closest("[data-view-package]"),
       vt = e.target.closest("[data-view-team]"),
-      ve = e.target.closest("[data-view-entry]");
+      ve = e.target.closest("[data-view-entry]"),
+      caseTab = e.target.closest("[data-case-tab]");
+    if (caseTab) activateCaseTab(caseTab);
     if (vperson) viewPerson(vperson.dataset.viewPerson);
     if (vc) viewClient(vc.dataset.viewClient);
     if (vx) viewCase(vx.dataset.viewCase);
