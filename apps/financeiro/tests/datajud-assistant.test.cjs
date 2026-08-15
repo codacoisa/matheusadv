@@ -75,7 +75,18 @@ test("consultar e normalizar capa, assuntos e movimentações", async () => {
   assert.equal(result.processClass.name, "Procedimento do Juizado Especial Cível");
   assert.equal(result.court.name, "JEF Adj - Tefé");
   assert.equal(result.subjects[0].name, "Concessão");
+  assert.equal(result.title, "Procedimento do Juizado Especial Cível · Concessão");
   assert.equal(result.movements[0].name, "Distribuição");
+});
+
+test("complementar o título com o primeiro assunto e indicar os demais", () => {
+  const result = dataJud.normalizeProcess({
+    numeroProcesso: sampleNumber,
+    classe: { nome: "Ação de Cobrança" },
+    assuntos: [{ nome: "Contratos" }, { nome: "Obrigações" }],
+  });
+
+  assert.equal(result.title, "Ação de Cobrança · Contratos e outros assuntos");
 });
 
 test("consultar pelo proxy same-origin sem expor a chave pública do DataJud", async () => {
