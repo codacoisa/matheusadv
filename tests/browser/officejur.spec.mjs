@@ -47,8 +47,8 @@ async function prepareCalculationPage(page, path = 'calculos/') {
 
 async function configureDataJudWorker(page) {
   await page.evaluate(() => {
-    localStorage.setItem('officejur::financeiro::officejur::settings', JSON.stringify({ apiUrl: 'https://worker.example' }));
-    sessionStorage.setItem('officejur::financeiro::officejur::session-key', 'chave-do-servico');
+    localStorage.setItem('officejur-worker-settings', JSON.stringify({ version: 1, apiUrl: 'https://worker.example' }));
+    sessionStorage.setItem('officejur-worker-session-key', 'chave-do-servico');
   });
   await page.reload({ waitUntil: 'networkidle' });
 }
@@ -144,7 +144,7 @@ const pages = [
   'documentos/honorarios/',
   'documentos/ciencia-audiencia/',
   'financeiro/',
-  'financeiro/ajuda-mercado-pago.html',
+  'configuracoes/ajuda-cloudflare-workers.html',
   'validador-projudi/',
   'lab/',
   'lab/controle-pagamentos/',
@@ -1776,13 +1776,17 @@ test('configuração global do Gist permanece centralizada', async ({ page }) =>
   await page.goto('configuracoes/', { waitUntil: 'networkidle' });
   await expect(page.getByLabel(/Gist ID|ID.*Gist/i)).toBeVisible();
   await expect(page.getByLabel(/token/i)).toBeVisible();
-  await expect(page.locator('h1')).toHaveText('Gist do OfficeJur');
+  await expect(page.locator('h1')).toHaveText('Configurações globais do OfficeJur');
   await expect(page.getByRole('button', { name: 'Salvar e sincronizar' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Criar novo Gist (começar do zero)' })).toBeVisible();
+  await expect(page.getByLabel(/URL do Cloudflare Worker/i)).toBeVisible();
+  await expect(page.getByLabel(/Chave de acesso do serviço/i)).toBeVisible();
+  await expect(page.locator('#worker-panel')).toContainText('Cloudflare Worker não configurado');
+  await expect(page.getByRole('link', { name: /guia do Cloudflare Worker/i })).toBeVisible();
   await expect(page.locator('main')).not.toContainText(/Gist secreto|Salvar e testar|arquivos JSON próprios|controle-pagamentos\.json/i);
   await expect(page.locator('body')).not.toContainText(/Configurar Gist.*Financeiro/i);
 
-  const actionLayout = await page.locator('.actions').evaluate(element => {
+  const actionLayout = await page.locator('#gist-form .actions').evaluate(element => {
     const buttons = [...element.querySelectorAll('.button')];
     const tops = buttons.map(button => Math.round(button.getBoundingClientRect().top));
     return {
@@ -1792,6 +1796,23 @@ test('configuração global do Gist permanece centralizada', async ({ page }) =>
     };
   });
   expect(actionLayout).toEqual({ display: 'grid', sameRow: true, fits: true });
+});
+
+test('configuração global salva o Worker para os módulos', async ({ page }) => {
+  await page.goto('configuracoes/', { waitUntil: 'networkidle' });
+  await page.getByLabel(/URL do Cloudflare Worker/i).fill('https://worker.example');
+  await page.getByLabel(/Chave de acesso do serviço/i).fill('chave-do-servico');
+  await page.getByRole('button', { name: 'Salvar configuração' }).click();
+  await expect(page.locator('#worker-status')).toHaveText('Configuração global do Worker salva.');
+  await expect(page.locator('#worker-title')).toHaveText('Cloudflare Worker configurado');
+  const settings = await page.evaluate(() => ({
+    local: JSON.parse(localStorage.getItem('officejur-worker-settings')),
+    session: sessionStorage.getItem('officejur-worker-session-key'),
+  }));
+  expect(settings).toEqual({
+    local: { version: 1, apiUrl: 'https://worker.example' },
+    session: 'chave-do-servico',
+  });
 });
 
 test('componentes compartilhados rejeitam URLs com protocolos inseguros', async ({ page }) => {

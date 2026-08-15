@@ -22,7 +22,10 @@ const datajudAssistant = fs.readFileSync(
   path.join(root, "assets", "datajud-assistant.js"),
   "utf8",
 );
-const help = fs.readFileSync(path.join(root, "ajuda-mercado-pago.html"), "utf8");
+const help = fs.readFileSync(
+  path.join(root, "..", "configuracoes", "ajuda-cloudflare-workers.html"),
+  "utf8",
+);
 const workerConfig = fs.readFileSync(
   path.join(root, "worker", "wrangler.toml"),
   "utf8",
@@ -154,7 +157,7 @@ test("consultar DataJud antes de liberar campos de processo judicial", () => {
   assert.match(html, /data-case-datajud-status[^>]*role="status"/);
   assert.match(app, /function setCaseDataJudGate/);
 assert.match(app, /function scheduleCaseDataJudLookup/);
-assert.match(app, /lookupProcess\(normalized, \{\s*proxyUrl: mp\.apiUrl/s);
+assert.match(app, /lookupProcess\(normalized, \{\s*proxyUrl: worker\.apiUrl/s);
 assert.match(app, /function dataJudProxyReady/);
 assert.match(app, /Consulta DataJud não configurada\. O preenchimento manual foi liberado/);
 assert.match(app, /dataJud: fd\.type === "judicial" \? caseDataJudDraft : null/);
@@ -168,11 +171,13 @@ assert.match(app, /error\.message \|\| "Não foi possível consultar o DataJud\.
   assert.match(styles, /\.case-movement-warning\s*\{/);
 });
 
-test("usar nome compartilhado do Worker e preservar a namespace antiga", () => {
-  assert.match(app, /officejur::financeiro::officejur::settings/);
-  assert.match(app, /officejur::financeiro::mercado-pago::settings/);
+test("usar a configuração global atual do Worker", () => {
+  assert.match(app, /const workerSettings = window\.OfficeJurWorkerSettings/);
+  assert.match(app, /worker\.apiUrl/);
+  assert.doesNotMatch(app, /LEGACY_SERVICE_/);
+  assert.match(help, /Cloudflare Worker compartilhado do OfficeJur/);
   assert.match(help, /<code>financeiro-officejur<\/code>/);
-  assert.doesNotMatch(help, /<code>financeiro-mercado-pago<\/code>/);
+  assert.doesNotMatch(help, /Ajuda do Mercado Pago/);
   assert.match(workerConfig, /name = "financeiro-officejur"/);
 });
 

@@ -285,7 +285,7 @@
   }
 
   function resolveProxyUrl(value = "") {
-    const configured = firstText(value, root.OFFICEJUR_CONFIG?.datajud?.proxyUrl);
+    const configured = firstText(value);
     if (!configured) return "";
     try {
       const url = new URL(configured, root.location?.href || "https://officejur.invalid/");

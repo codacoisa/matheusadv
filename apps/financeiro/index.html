@@ -43,6 +43,7 @@
     <script src="./assets/storage.js?v=2" defer></script>
     <script src="./assets/data-store.js?v=2" defer></script>
     <script src="./assets/gist-settings.js?v=3" defer></script>
+    <script src="./assets/worker-settings.js?v=1" defer></script>
     <script src="./assets/gist-client.js?v=3" defer></script>
     <script src="./assets/gist-access-lease.js?v=5" defer></script>
     <script src="./assets/cloud-status.js?v=1" defer></script>
@@ -50,7 +51,7 @@
     <script src="./assets/address-assistant.js?v=1" defer></script>
     <script src="./assets/cnpj-assistant.js?v=1" defer></script>
     <script src="./assets/datajud-assistant.js?v=2" defer></script>
-    <script src="./assets/app.js?v=44" defer></script>
+    <script src="./assets/app.js?v=45" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -410,9 +411,9 @@
                 Gere links seguros do Checkout Pro e acompanhe o vínculo
                 financeiro.
               </p>
-              <a class="page-help-link" href="./ajuda-mercado-pago.html"
+              <a class="page-help-link" href="../configuracoes/ajuda-cloudflare-workers.html"
                 ><i class="fa-regular fa-circle-question"></i> Como configurar o
-                Mercado Pago</a
+                Cloudflare Worker</a
               >
             </div>
             <div class="head-actions">
@@ -1143,21 +1144,10 @@
               name="publicKey"
               placeholder="APP_USR-..." /></label
           ><label class="span-2"
-            >URL do serviço seguro<input
-              name="apiUrl"
-              type="url"
-              placeholder="https://seu-worker.workers.dev" /></label
-          ><label class="span-2"
             >URL de retorno do sistema<input
               name="returnUrl"
               type="url"
               placeholder="https://seu-dominio.example/officejur/financeiro/" /></label
-          ><label class="span-2"
-            >Chave de acesso do serviço<input
-              name="apiKey"
-              type="password"
-              autocomplete="off"
-              placeholder="Configurada como OFFICEJUR_API_KEY no Worker" /></label
           ><label class="span-2"
             >Identificação no extrato<input
               name="statementDescriptor"
@@ -1174,9 +1164,9 @@
           <div>
             <strong>Credencial privada protegida</strong>
             <p>
-              Cadastre <code>MP_ACCESS_TOKEN</code> como segredo no serviço.
-              Este painel nunca solicita nem salva o Access Token. A chave de
-              acesso do serviço fica apenas nesta sessão do navegador.
+              Cadastre <code>MP_ACCESS_TOKEN</code> como segredo no Worker.
+              Este painel nunca solicita nem salva o Access Token. Configure a
+              URL e a chave compartilhada em <a href="../configuracoes/">Configurações</a>.
             </p>
           </div>
         </div>

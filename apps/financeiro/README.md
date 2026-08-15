@@ -8,7 +8,7 @@ Para clientes pessoa física, nome completo, CPF válido, data de nascimento e t
 
 Todo processo ou caso judicial, administrativo, extrajudicial ou consultivo deve apontar para um cliente previamente cadastrado. Casos judiciais exigem número CNJ válido; após a consulta pública ao DataJud, o cadastro é preenchido com os metadados disponíveis e liberado para conferência. Casos não judiciais continuam aceitando referência interna. O número ou referência é único, desconsiderando diferenças de máscara, pontuação, espaços, acentos e maiúsculas. O sistema bloqueia casos sem cliente e também impede excluir clientes que ainda possuam casos ou pacotes.
 
-Como a API pública do DataJud não libera CORS para páginas estáticas, a consulta exige o Worker do Financeiro como proxy. Publique `worker/src/index.js`, cadastre `DATAJUD_API_KEY` e `OFFICEJUR_API_KEY` na Cloudflare e informe o endereço em `config/office.js` (`datajud.proxyUrl`) ou na configuração do serviço seguro do módulo Cobranças. Sem URL e chave do Worker, o CNJ continua obrigatório, mas o preenchimento manual é liberado; quando o Worker está configurado, uma falha de consulta mantém os campos bloqueados.
+Como a API pública do DataJud não libera CORS para páginas estáticas, a consulta usa o Worker compartilhado do OfficeJur como proxy. Publique `worker/src/index.js`, cadastre `DATAJUD_API_KEY` e `OFFICEJUR_API_KEY` na Cloudflare e informe a URL e a chave na área global **Configurações → Cloudflare Workers**. Sem URL e chave do Worker, o CNJ continua obrigatório, mas o preenchimento manual é liberado; quando o Worker está configurado, uma falha de consulta mantém os campos bloqueados.
 
 Cada caso pode ter contratação própria, integrar um pacote de honorários específico ou deixar a contratação em branco. Um mesmo cliente pode possuir vários pacotes. Todos os casos vinculados ao mesmo pacote exibem os valores contratado, recebido e em aberto de forma conjunta.
 
@@ -32,15 +32,19 @@ O sistema inicia completamente vazio, sem clientes, casos, equipe, configuraçõ
 
 Não há compilação do código da aplicação. O workflow do OfficeJur publica este módulo em `/officejur/financeiro/`.
 
+## Cloudflare Workers
+
+O Worker compartilhado protege credenciais e atende o Mercado Pago, o DataJud e futuras integrações. A configuração global fica na central **[Configurações](../configuracoes/)**.
+
+**[Ajuda do Cloudflare Workers](../configuracoes/ajuda-cloudflare-workers.html)**
+
+O código do serviço protegido permanece em `worker/src/index.js`.
+
 ## Mercado Pago
 
 O módulo **Cobranças** gera links do Checkout Pro vinculados aos recebíveis. Por segurança, a credencial privada não é armazenada na página estática.
 
-Para configurar a integração sem terminal, abra a central de ajuda:
-
-**[Ajuda de configuração do Mercado Pago](ajuda-mercado-pago.html)**
-
-O código do serviço protegido permanece em `worker/src/index.js`.
+Para configurar a aplicação e a Public Key do Checkout Pro, use a seção Mercado Pago do guia global. A URL e a chave do Worker não são mais configuradas neste módulo.
 
 ## Referências externas
 

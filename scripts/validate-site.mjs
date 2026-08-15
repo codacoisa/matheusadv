@@ -204,7 +204,7 @@ const sharedHeaderPages = [
   "apps/configuracoes/index.html",
   "apps/configuracoes/ajuda.html",
   "apps/financeiro/index.html",
-  "apps/financeiro/ajuda-mercado-pago.html",
+  "apps/configuracoes/ajuda-cloudflare-workers.html",
   "apps/lab/index.html",
   "apps/lab/tools/central-guias/index.html",
   "apps/lab/tools/controle-pagamentos/index.html",
