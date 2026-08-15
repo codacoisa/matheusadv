@@ -13,12 +13,13 @@
     <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
     <script src="../assets/office-config.js"></script>
     <script src="../assets/office-context.js" defer></script>
-    <link rel="stylesheet" href="./assets/styles.css?v=3">
+    <link rel="stylesheet" href="./assets/styles.css?v=4">
     <link rel="stylesheet" href="./assets/site-header.css?v=2">
     <script src="./assets/gist-settings.js?v=3" defer></script>
+    <script src="./assets/worker-settings.js?v=1" defer></script>
     <script src="./assets/gist-client.js?v=3" defer></script>
     <script src="./assets/gist-access-lease.js?v=5" defer></script>
-    <script src="./assets/app.js?v=5" defer></script>
+    <script src="./assets/app.js?v=6" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
     <script src="./assets/site-footer.js?v=5" defer></script>
@@ -35,11 +36,12 @@
     <main>
       <header class="page-head">
         <p class="eyebrow">CONFIGURAÇÃO CENTRAL</p>
-        <h1>Gist do OfficeJur</h1>
-        <p>Configure uma vez neste navegador. Todo módulo sincronizável utilizará essa conexão e manterá seu próprio arquivo no Gist.</p>
+        <h1>Configurações globais do OfficeJur</h1>
+        <p>Configure uma vez neste navegador o Gist de sincronização e o Cloudflare Worker compartilhado pelos módulos do OfficeJur.</p>
       </header>
 
       <div class="layout">
+        <div class="config-stack">
         <section class="panel">
           <div class="connection-head">
             <div>
@@ -71,6 +73,32 @@
           </form>
           <p id="action-status" class="action-status" role="status" aria-live="polite"></p>
         </section>
+        <section class="panel" id="worker-panel">
+          <div class="connection-head">
+            <div>
+              <span id="worker-dot" class="status-dot"></span>
+              <strong id="worker-title">Cloudflare Worker não configurado</strong>
+              <small id="worker-detail">O Financeiro permitirá preenchimento manual e não consultará o DataJud até o serviço ser configurado.</small>
+            </div>
+          </div>
+          <form id="worker-form">
+            <label>
+              URL do Cloudflare Worker
+              <input id="worker-url" type="url" autocomplete="url" placeholder="https://financeiro-officejur.sua-conta.workers.dev">
+            </label>
+            <label>
+              Chave de acesso do serviço
+              <input id="worker-key" type="password" autocomplete="off" placeholder="Configurada como OFFICEJUR_API_KEY no Worker">
+            </label>
+            <p class="field-note">A URL fica neste navegador e a chave permanece somente na sessão atual. Este Worker pode atender o Mercado Pago, o DataJud e futuras integrações do OfficeJur.</p>
+            <div class="actions worker-actions">
+              <button id="save-worker" class="button primary" type="submit">Salvar configuração</button>
+              <button id="clear-worker" class="button danger" type="button">Remover configuração</button>
+            </div>
+          </form>
+          <p id="worker-status" class="action-status" role="status" aria-live="polite"></p>
+        </section>
+        </div>
 
         <aside class="side">
           <section class="info-card">
@@ -83,6 +111,12 @@
             <h2>Permissão mínima</h2>
             <p>Use um token dedicado com acesso somente a Gists e prazo de validade. Mantenha o endereço do Gist e o token sob controle das pessoas autorizadas.</p>
             <a class="guide-link" href="./ajuda.html">Abrir guia completo de sincronização <span aria-hidden="true">→</span></a>
+          </section>
+          <section class="info-card security">
+            <p class="eyebrow">INFRAESTRUTURA</p>
+            <h2>Cloudflare Workers</h2>
+            <p>O Worker compartilhado protege credenciais e intermedeia integrações externas do OfficeJur.</p>
+            <a class="guide-link" href="./ajuda-cloudflare-workers.html">Abrir guia do Cloudflare Worker <span aria-hidden="true">→</span></a>
           </section>
         </aside>
       </div>

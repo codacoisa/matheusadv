@@ -81,6 +81,7 @@ h1 { font-size: clamp(34px, 5vw, 52px); line-height: 1.05; }
 .page-head > p:last-child { margin: 16px 0 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .8fr); gap: 22px; align-items: start; }
+.config-stack { display: grid; gap: 22px; }
 .panel, .info-card {
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -124,6 +125,7 @@ input:focus { outline: 3px solid rgba(179, 135, 49, .18); border-color: var(--go
   gap: 10px;
   align-items: stretch;
 }
+.worker-actions { grid-template-columns: 1fr 1fr; }
 .button {
   width: 100%;
   min-height: 42px;

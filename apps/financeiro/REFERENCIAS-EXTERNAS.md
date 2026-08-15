@@ -79,10 +79,10 @@ incorporado.
   consulta no navegador passa pelo endpoint `/datajud/search` do Worker, que
   mantém essa chave apenas no serviço.
 - **Proxy:** publique `worker/src/index.js`, cadastre `DATAJUD_API_KEY` como
-  segredo e informe a URL do Worker em `config/office.js`, no bloco
-  `datajud.proxyUrl`. A chave `OFFICEJUR_API_KEY` usada pelo Worker é enviada
-  somente na sessão do navegador; o token do Mercado Pago não é necessário
-  para a rota DataJud.
+  segredo e informe a URL e a chave do Worker na área global
+  **Configurações → Cloudflare Workers**. A chave `OFFICEJUR_API_KEY` usada pelo
+  Worker é enviada somente na sessão do navegador; o token do Mercado Pago não
+  é necessário para a rota DataJud.
 - **Dados utilizados:** tribunal, segmento de Justiça, classe, sistema,
   formato, grau, data de ajuizamento, órgão julgador, assuntos, nível de sigilo,
   atualização da origem e movimentações. O retorno normalizado e a resposta
@@ -105,8 +105,8 @@ incorporado.
   `worker/src/index.js`, por meio de `https://api.mercadopago.com`.
 - **Credencial privada:** `MP_ACCESS_TOKEN`, armazenada como segredo no serviço
   protegido e nunca na página estática.
-- **Chave do serviço:** `OFFICEJUR_API_KEY`, também armazenada como segredo no
-  Worker e informada somente na sessão ativa do navegador.
+- **Chave do serviço:** `OFFICEJUR_API_KEY`, armazenada como segredo no Worker
+  e informada somente na sessão ativa do navegador pela configuração global.
 - **Referências:** [Visão geral do Checkout Pro](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/overview),
   [criação da aplicação](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/create-application),
   [testes da integração](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/integration-test)
@@ -115,7 +115,7 @@ incorporado.
 ### Cloudflare Workers
 
 - **Uso:** publica o serviço protegido que intermedeia o sistema estático e as
-  APIs do Mercado Pago e do DataJud.
+  APIs do Mercado Pago, do DataJud e de futuras integrações.
 - **Código do serviço:** `worker/src/index.js`.
 - **Configuração:** `worker/wrangler.toml`.
 - **Proteção de tráfego:** binding `RATE_LIMITER` do Cloudflare Workers,

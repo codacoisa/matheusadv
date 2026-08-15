@@ -8,14 +8,13 @@
   <meta name="application-name" content="OfficeJur">
   <meta name="apple-mobile-web-app-title" content="OfficeJur">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Ajuda do Mercado Pago | Financeiro Jurídico</title>
+  <title>Ajuda do Cloudflare Workers | Configurações do OfficeJur</title>
   <link rel="icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" type="image/png">
   <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
   <script src="../assets/office-config.js"></script>
   <script src="../assets/office-context.js" defer></script>
-  <link rel="stylesheet" href="./assets/styles.css?v=15">
-  <link rel="stylesheet" href="./assets/help.css?v=1">
-  <link rel="stylesheet" href="./assets/system.css?v=1">
+  <link rel="stylesheet" href="./assets/styles.css?v=4">
+  <link rel="stylesheet" href="./assets/help.css?v=3">
   <link rel="stylesheet" href="./assets/site-header.css?v=2">
   <script src="./assets/fontawesome-7.3.0.min.js" data-auto-replace-svg="nest" data-observe-mutations="true" defer></script>
 <script src="./assets/app-switcher.js?v=5" defer></script>
@@ -24,10 +23,10 @@
 </head>
 <body class="help-page">
   <header class="topbar help-topbar">
-    <a class="brand" href="./index.html#charges"><img src="../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt=""><span><strong>Financeiro Jurídico</strong><small>Ajuda do Mercado Pago</small></span></a>
+    <a class="brand" href="./index.html"><img src="../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt=""><span><strong>Configurações</strong><small>Ajuda do Cloudflare Workers</small></span></a>
     <div class="top-actions">
-      <a class="btn ghost light help-back" href="./index.html#charges"><i class="fa-solid fa-arrow-left"></i><span> Voltar às cobranças</span></a>
-      <office-app-switcher current="financeiro"></office-app-switcher>
+      <a class="btn ghost light help-back" href="./index.html"><i class="fa-solid fa-arrow-left"></i><span> Voltar às configurações</span></a>
+      <office-app-switcher current="configuracoes"></office-app-switcher>
     </div>
   </header>
 
@@ -35,10 +34,11 @@
     <aside class="help-nav" aria-label="Nesta página">
       <p class="eyebrow">NESTA PÁGINA</p>
       <a href="#arquitetura"><i class="fa-solid fa-diagram-project"></i> Como funciona</a>
-      <a href="#aplicacao"><i class="fa-solid fa-store"></i> Aplicação Mercado Pago</a>
-      <a href="#worker"><i class="fa-solid fa-cloud"></i> Serviço Cloudflare</a>
+      <a href="#worker"><i class="fa-solid fa-cloud"></i> Criar e publicar Worker</a>
       <a href="#variaveis"><i class="fa-solid fa-key"></i> Variáveis e segredo</a>
-      <a href="#sistema"><i class="fa-solid fa-sliders"></i> Configurar o sistema</a>
+      <a href="#sistema"><i class="fa-solid fa-sliders"></i> Configurar OfficeJur</a>
+      <a href="#datajud"><i class="fa-solid fa-scale-balanced"></i> DataJud</a>
+      <a href="#mercado-pago"><i class="fa-solid fa-store"></i> Mercado Pago</a>
       <a href="#teste"><i class="fa-solid fa-vial"></i> Primeira cobrança</a>
       <a href="#producao"><i class="fa-solid fa-rocket"></i> Entrar em produção</a>
       <a href="#problemas"><i class="fa-solid fa-screwdriver-wrench"></i> Resolver problemas</a>
@@ -46,35 +46,36 @@
 
     <article class="help-content">
       <header class="help-hero">
-        <span class="help-hero-icon"><i class="fa-solid fa-credit-card"></i></span>
-        <div><p class="eyebrow">CHECKOUT PRO E SERVIÇO PROTEGIDO</p><h1>Configure as cobranças do Mercado Pago</h1><p>Este guia mostra como criar a aplicação, proteger o Access Token em um Worker da Cloudflare, conectar o Financeiro Jurídico e validar uma cobrança antes de receber pagamentos reais.</p></div>
+        <span class="help-hero-icon"><i class="fa-brands fa-cloudflare"></i></span>
+        <div><p class="eyebrow">CLOUDFLARE WORKERS · OFFICEJUR</p><h1>Configure o Cloudflare Worker compartilhado do OfficeJur</h1><p>Este guia mostra como publicar o Worker protegido, cadastrar seus segredos e conectar as integrações atuais do OfficeJur — Mercado Pago, DataJud e futuras APIs — em uma configuração global.</p></div>
       </header>
 
-      <div class="help-alert important"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>O Access Token nunca vai no navegador</strong><p>O token é uma credencial privada e deve existir somente como segredo criptografado na Cloudflare. Nunca o coloque no código, no GitHub, no Gist, no campo “Public Key” ou em capturas de tela.</p></div></div>
+      <div class="help-alert important"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Credenciais privadas nunca vão para o navegador</strong><p>Access Tokens, chaves do DataJud e a chave de acesso do serviço devem existir somente como segredos protegidos na Cloudflare ou na sessão local do navegador, conforme a finalidade. Nunca os coloque no código, no GitHub, no Gist ou em capturas de tela.</p></div></div>
 
       <section id="arquitetura" class="help-section">
         <p class="eyebrow">VISÃO GERAL</p><h2>Por que existe um serviço separado?</h2>
-        <p>O Financeiro Jurídico é uma página estática: ela não possui um servidor privado para guardar senhas. Por isso, o navegador envia apenas os dados necessários da cobrança ao Worker. O Worker adiciona o Access Token protegido e conversa com a API do Mercado Pago.</p>
+        <p>As páginas do OfficeJur são estáticas e não possuem um servidor privado para guardar credenciais. Por isso, o navegador envia somente dados autorizados ao Worker compartilhado. O Worker valida a origem e a chave do serviço, aplica limites e conversa com cada API usando os segredos corretos.</p>
         <div class="help-flow">
-          <div><i class="fa-solid fa-laptop"></i><strong>Financeiro</strong><small>Solicita a cobrança</small></div><span><i class="fa-solid fa-arrow-right"></i></span><div class="central"><i class="fa-solid fa-cloud"></i><strong>Worker protegido</strong><small>Guarda o token</small></div><span><i class="fa-solid fa-arrow-right"></i></span><div><i class="fa-solid fa-credit-card"></i><strong>Mercado Pago</strong><small>Cria o Checkout Pro</small></div>
+          <div><i class="fa-solid fa-laptop"></i><strong>OfficeJur</strong><small>Solicita a integração</small></div><span><i class="fa-solid fa-arrow-right"></i></span><div class="central"><i class="fa-solid fa-cloud"></i><strong>Cloudflare Worker</strong><small>Autoriza e roteia</small></div><span><i class="fa-solid fa-arrow-right"></i></span><div><i class="fa-solid fa-plug"></i><strong>APIs externas</strong><small>Mercado Pago, DataJud e outras</small></div>
         </div>
         <ul class="help-checks">
-          <li><i class="fa-solid fa-check"></i><span>O cliente paga no ambiente seguro do Mercado Pago.</span></li>
-          <li><i class="fa-solid fa-check"></i><span>O sistema guarda o vínculo entre a cobrança e o lançamento financeiro.</span></li>
-          <li><i class="fa-solid fa-check"></i><span>Ao atualizar o status, um pagamento aprovado marca o lançamento como realizado.</span></li>
-          <li><i class="fa-solid fa-check"></i><span>Os primeiros testes usam credenciais e compradores de teste, sem dinheiro real.</span></li>
+          <li><i class="fa-solid fa-check"></i><span>A chave do serviço autoriza o navegador sem expor os segredos das integrações.</span></li>
+          <li><i class="fa-solid fa-check"></i><span>Cada rota usa somente os dados e segredos necessários para sua finalidade.</span></li>
+          <li><i class="fa-solid fa-check"></i><span>O mesmo Worker pode receber novas integrações sem criar uma configuração por módulo.</span></li>
+          <li><i class="fa-solid fa-check"></i><span>As APIs externas continuam responsáveis por suas próprias credenciais, limites e estados.</span></li>
         </ul>
         <h3>O que será necessário</h3>
         <div class="help-grid">
-          <article><i class="fa-solid fa-wallet"></i><strong>Conta de vendedor</strong><p>Uma conta Mercado Pago ou Mercado Livre habilitada para receber pagamentos.</p></article>
-          <article><i class="fa-solid fa-puzzle-piece"></i><strong>Aplicação Checkout Pro</strong><p>A integração criada em “Suas integrações” no Mercado Pago Developers.</p></article>
-          <article><i class="fa-brands fa-cloudflare"></i><strong>Conta Cloudflare</strong><p>Uma conta com acesso a Workers para publicar o serviço protegido.</p></article>
-          <article><i class="fa-solid fa-link"></i><strong>Endereço do sistema</strong><p>A URL HTTPS em que o Financeiro Jurídico está publicado.</p></article>
+          <article><i class="fa-brands fa-cloudflare"></i><strong>Conta Cloudflare</strong><p>Uma conta com acesso a Workers para publicar e proteger o serviço.</p></article>
+          <article><i class="fa-solid fa-code"></i><strong>Código do Worker</strong><p>O código versionado em <code>apps/financeiro/worker</code> e o arquivo de configuração Wrangler.</p></article>
+          <article><i class="fa-solid fa-key"></i><strong>Segredos por integração</strong><p>Cadastre somente os segredos das APIs que serão utilizadas: Mercado Pago, DataJud e outras futuras.</p></article>
+          <article><i class="fa-solid fa-link"></i><strong>Endereço do sistema</strong><p>A origem HTTPS do OfficeJur para configurar o acesso permitido.</p></article>
         </div>
       </section>
 
-      <section id="aplicacao" class="help-section">
-        <p class="eyebrow">ETAPA 1</p><h2>Crie a aplicação no Mercado Pago</h2>
+      <section id="mercado-pago" class="help-section">
+        <p class="eyebrow">INTEGRAÇÃO OPCIONAL</p><h2>Conecte o Mercado Pago</h2>
+        <p>Esta etapa é necessária somente para usar o módulo de Cobranças. O Worker compartilhado continua sendo a infraestrutura global; aqui você cria as credenciais específicas da conta Mercado Pago.</p>
         <ol class="help-steps">
           <li><span>1</span><div><strong>Entre no Mercado Pago Developers</strong><p>Use a conta que receberá os honorários. Se solicitado, conclua a verificação de identidade ou a reautenticação.</p><a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noopener">Abrir “Suas integrações” <i class="fa-solid fa-arrow-up-right-from-square"></i></a></div></li>
           <li><span>2</span><div><strong>Escolha “Criar aplicação”</strong><p>Dê um nome identificável, como “Financeiro OfficeJur”.</p></div></li>
@@ -86,53 +87,58 @@
       </section>
 
       <section id="worker" class="help-section">
-        <p class="eyebrow">ETAPA 2</p><h2>Publique o Worker protegido na Cloudflare</h2>
-        <p>O repositório já contém o código necessário. A configuração pode ser feita inteiramente pelo painel da Cloudflare, sem instalar programas no computador.</p>
+        <p class="eyebrow">ETAPA 1</p><h2>Crie e publique o Worker compartilhado</h2>
+        <p>O repositório já contém o código necessário. A configuração pode ser feita inteiramente pelo painel da Cloudflare, sem instalar programas no computador. O nome sugerido é <code>financeiro-officejur</code> porque o serviço não pertence a um único módulo.</p>
         <ol class="help-steps">
           <li><span>1</span><div><strong>Abra o painel da Cloudflare</strong><p>Entre na conta do escritório e acesse <em>Workers &amp; Pages</em>.</p><a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Abrir Cloudflare Dashboard <i class="fa-solid fa-arrow-up-right-from-square"></i></a></div></li>
           <li><span>2</span><div><strong>Crie um Worker</strong><p>Escolha criar um Worker, use o nome <code>financeiro-officejur</code> e publique o exemplo inicial.</p></div></li>
           <li><span>3</span><div><strong>Abra o editor de código</strong><p>No Worker recém-criado, escolha <em>Edit code</em> ou <em>Quick edit</em> e apague o exemplo.</p></div></li>
-          <li><span>4</span><div><strong>Publique o Worker revisado</strong><p>Abra o código versionado do serviço, revise os segredos exigidos e publique-o pela Cloudflare. O mesmo Worker também intermedeia a consulta pública do DataJud.</p><a href="./" data-officejur-href="installation.workerSourceUrl" target="_blank" rel="noopener">Abrir código do Worker <i class="fa-solid fa-code"></i></a></div></li>
+          <li><span>4</span><div><strong>Publique o Worker revisado</strong><p>Abra o código versionado do serviço, revise as rotas e publique-o pela Cloudflare. O mesmo Worker intermedeia o Mercado Pago, a consulta pública do DataJud e futuras integrações.</p><a href="./" data-officejur-href="installation.workerSourceUrl" target="_blank" rel="noopener">Abrir código do Worker <i class="fa-solid fa-code"></i></a></div></li>
           <li><span>5</span><div><strong>Salve e publique</strong><p>Escolha <em>Save and deploy</em>. Guarde o endereço final, semelhante a <code>https://financeiro-officejur.sua-conta.workers.dev</code>.</p></div></li>
         </ol>
-        <div class="help-alert important"><i class="fa-solid fa-key"></i><div><strong>A chave de acesso é criada pelo escritório</strong><p>A <code>OFFICEJUR_API_KEY</code> não é fornecida pelo CNJ nem pelo Mercado Pago. Gere uma chave aleatória longa, guarde-a em um gerenciador de senhas e use o mesmo valor no segredo do Worker e no campo “Chave de acesso do serviço” do OfficeJur.</p></div></div>
+        <div class="help-alert important"><i class="fa-solid fa-key"></i><div><strong>A chave de acesso é criada pelo escritório</strong><p>A <code>OFFICEJUR_API_KEY</code> não é fornecida por nenhuma API externa. Gere uma chave aleatória longa, guarde-a em um gerenciador de senhas e use o mesmo valor no segredo do Worker e na configuração global de Cloudflare Workers do OfficeJur.</p></div></div>
         <details><summary>Alternativa para desenvolvedores: publicar pelo terminal</summary><div><p>Dentro da pasta <code>worker</code>, use Wrangler 4.36.0 ou superior, autentique a conta, ajuste <code>ALLOWED_ORIGINS</code> e confirme o identificador exclusivo do limitador em <code>wrangler.toml</code>. Depois, publique o código com <code>npx wrangler deploy</code> e cadastre os segredos com <code>npx wrangler secret put MP_ACCESS_TOKEN</code>, <code>npx wrangler secret put DATAJUD_API_KEY</code> e <code>npx wrangler secret put OFFICEJUR_API_KEY</code>. O comando <code>secret put</code> publica a alteração imediatamente quando a versão mais recente já está publicada.</p></div></details>
       </section>
 
       <section id="variaveis" class="help-section">
-        <p class="eyebrow">ETAPA 3</p><h2>Cadastre as variáveis e o segredo</h2>
+        <p class="eyebrow">ETAPA 2</p><h2>Cadastre as variáveis e os segredos</h2>
         <p>No Worker, abra <em>Settings → Variables and Secrets</em>. Adicione os itens abaixo e publique a nova versão quando a Cloudflare solicitar.</p>
         <div class="help-actions help-variables">
           <div><i class="fa-solid fa-globe"></i><span><strong><code>ALLOWED_ORIGINS</code> — texto normal</strong><small>Informe somente a origem do sistema, sem caminho e sem barra final. Exemplo: <code data-officejur-field="installation.origin">https://seu-dominio.example</code>. Para várias origens, separe por vírgula.</small></span></div>
-          <div><i class="fa-solid fa-key"></i><span><strong><code>OFFICEJUR_API_KEY</code> — tipo Secret</strong><small>Crie uma chave aleatória, como com <code>openssl rand -hex 32</code>. Cole-a neste segredo e depois informe exatamente o mesmo valor no campo “Chave de acesso do serviço” do OfficeJur.</small></span></div>
+          <div><i class="fa-solid fa-key"></i><span><strong><code>OFFICEJUR_API_KEY</code> — tipo Secret</strong><small>Crie uma chave aleatória, como com <code>openssl rand -hex 32</code>. Cole-a neste segredo e depois informe exatamente o mesmo valor em <strong>Configurações → Cloudflare Workers</strong>.</small></span></div>
           <div><i class="fa-solid fa-key"></i><span><strong><code>MP_ACCESS_TOKEN</code> — tipo Secret</strong><small>Cole o Access Token do ambiente que será usado. Selecione explicitamente o tipo segredo para que o valor fique oculto no painel.</small></span></div>
           <div><i class="fa-solid fa-database"></i><span><strong><code>DATAJUD_API_KEY</code> — tipo Secret</strong><small>Cadastre a chave pública vigente do CNJ para que o Worker faça a consulta sem depender de CORS no navegador.</small></span></div>
           <div><i class="fa-solid fa-bell"></i><span><strong><code>MP_WEBHOOK_URL</code> — opcional</strong><small>Reservado para notificações automáticas. Não é necessário para criar links nem para consultar pagamentos pelo botão de atualização.</small></span></div>
         </div>
-        <details><summary>Como gerar e cadastrar a OFFICEJUR_API_KEY?</summary><div><ol class="help-steps"><li><span>1</span><div><strong>Gere a chave</strong><p>No macOS ou Linux, execute <code>openssl rand -hex 32</code> e guarde o resultado. Também é possível usar o gerador do seu gerenciador de senhas.</p></div></li><li><span>2</span><div><strong>Cadastre o segredo</strong><p>No painel da Cloudflare, adicione <code>OFFICEJUR_API_KEY</code> como <em>Secret</em>. Pelo terminal, dentro da pasta <code>worker</code>, execute <code>npx wrangler secret put OFFICEJUR_API_KEY</code> e cole a chave quando solicitado.</p></div></li><li><span>3</span><div><strong>Repita a chave no OfficeJur</strong><p>Na configuração de cobrança, informe o mesmo valor em “Chave de acesso do serviço”. A chave fica somente na sessão ativa do navegador e não deve ser salva no código, no Git ou no Gist.</p></div></li></ol><p>Se o Wrangler informar que a versão mais recente ainda não está publicada, primeiro execute <code>npx wrangler deploy</code> e repita o cadastro. Como alternativa, use <code>npx wrangler versions secret put OFFICEJUR_API_KEY</code> e depois <code>npx wrangler versions deploy</code> para publicar essa versão.</p></div></details>
+        <details><summary>Como gerar e cadastrar a OFFICEJUR_API_KEY?</summary><div><ol class="help-steps"><li><span>1</span><div><strong>Gere a chave</strong><p>No macOS ou Linux, execute <code>openssl rand -hex 32</code> e guarde o resultado. Também é possível usar o gerador do seu gerenciador de senhas.</p></div></li><li><span>2</span><div><strong>Cadastre o segredo</strong><p>No painel da Cloudflare, adicione <code>OFFICEJUR_API_KEY</code> como <em>Secret</em>. Pelo terminal, dentro da pasta <code>worker</code>, execute <code>npx wrangler secret put OFFICEJUR_API_KEY</code> e cole a chave quando solicitado.</p></div></li><li><span>3</span><div><strong>Repita a chave no OfficeJur</strong><p>Na área central <strong>Configurações → Cloudflare Workers</strong>, informe o mesmo valor. A chave fica somente na sessão ativa do navegador e não deve ser salva no código, no Git ou no Gist.</p></div></li></ol><p>Se o Wrangler informar que a versão mais recente ainda não está publicada, primeiro execute <code>npx wrangler deploy</code> e repita o cadastro. Como alternativa, use <code>npx wrangler versions secret put OFFICEJUR_API_KEY</code> e depois <code>npx wrangler versions deploy</code> para publicar essa versão.</p></div></details>
         <div class="help-alert important"><i class="fa-solid fa-shield-halved"></i><div><strong>Origem não é o endereço completo</strong><p>Use apenas <code data-officejur-field="installation.origin">https://seu-dominio.example</code> em <code>ALLOWED_ORIGINS</code>, sem o caminho da aplicação.</p></div></div>
         <h3>Teste a saúde do serviço</h3>
-        <p>Abra o endereço do Worker acrescentando <code>/health</code>. Com o segredo configurado corretamente, a resposta será <code>{"ok":true}</code>. Se aparecer “MP_ACCESS_TOKEN não configurado”, revise o nome e o ambiente do segredo.</p>
+        <p>Abra o endereço do Worker acrescentando <code>/health</code>. Com a origem e a chave de acesso configuradas corretamente, a resposta será <code>{"ok":true}</code>. Os segredos específicos são verificados somente quando a respectiva rota é utilizada.</p>
         <div class="help-alert"><i class="fa-brands fa-cloudflare"></i><div><strong>Documentação da Cloudflare</strong><p>Segredos são apropriados para chaves e tokens porque o valor deixa de ser exibido no painel depois de cadastrado.</p><a href="https://developers.cloudflare.com/workers/configuration/secrets/" target="_blank" rel="noopener">Consultar documentação de Secrets</a></div></div>
       </section>
 
       <section id="sistema" class="help-section">
-        <p class="eyebrow">ETAPA 4</p><h2>Configure o Financeiro Jurídico</h2>
+        <p class="eyebrow">ETAPA 3</p><h2>Configure o OfficeJur globalmente</h2>
         <ol class="help-steps">
-          <li><span>1</span><div><strong>Abra Cobranças</strong><p>No menu lateral, escolha “Cobranças” e clique em <strong>Configurar conta</strong>.</p></div></li>
-          <li><span>2</span><div><strong>Comece no ambiente de testes</strong><p>Selecione “Testes” e informe a Public Key de teste da aplicação.</p></div></li>
-          <li><span>3</span><div><strong>Informe a URL do serviço seguro</strong><p>Cole o endereço do Worker sem <code>/health</code> e sem caminhos adicionais.</p></div></li>
-          <li><span>4</span><div><strong>Informe a chave de acesso</strong><p>Cole em “Chave de acesso do serviço” o mesmo valor cadastrado como <code>OFFICEJUR_API_KEY</code> no Worker. Não use aqui o Access Token do Mercado Pago nem a chave do DataJud.</p></div></li>
-          <li><span>5</span><div><strong>Configure o retorno</strong><p>Use o endereço completo publicado do Financeiro Jurídico. É para essa página que o cliente retornará depois do Checkout Pro.</p></div></li>
-          <li><span>6</span><div><strong>Defina a identificação no extrato</strong><p>Use um nome reconhecível, em letras latinas, com no máximo 22 caracteres, como <code data-officejur-field="office.statementDescriptor">OFFICEJUR</code>.</p></div></li>
-          <li><span>7</span><div><strong>Salve a configuração</strong><p>O painel não possui campo para Access Token. Isso é intencional: a credencial privada permanece somente na Cloudflare.</p></div></li>
+          <li><span>1</span><div><strong>Abra Configurações</strong><p>Use o menu do OfficeJur e abra a área central <strong>Configurações</strong>.</p></div></li>
+          <li><span>2</span><div><strong>Informe a URL e a chave do Worker</strong><p>Na seção <strong>Cloudflare Workers</strong>, cole o endereço sem <code>/health</code> e informe a mesma <code>OFFICEJUR_API_KEY</code> cadastrada na Cloudflare.</p></div></li>
+          <li><span>3</span><div><strong>Salve a configuração global</strong><p>A URL será usada pelos módulos que precisarem do Worker. A chave fica somente na sessão ativa deste navegador.</p></div></li>
+          <li><span>4</span><div><strong>Configure cada integração</strong><p>Mercado Pago mantém sua Public Key e ambiente no módulo Cobranças. DataJud usa o Worker automaticamente ao informar um CNJ judicial.</p></div></li>
+          <li><span>5</span><div><strong>Teste a saúde do serviço</strong><p>Abra a URL do Worker com <code>/health</code> e confirme a resposta antes de testar as integrações.</p></div></li>
         </ol>
         <div class="help-actions">
-          <div><i class="fa-solid fa-vial"></i><span><strong>Ambiente</strong><small>Define se o sistema usa o link sandbox ou o checkout real.</small></span></div>
-          <div><i class="fa-solid fa-fingerprint"></i><span><strong>Public Key</strong><small>Identificação pública da aplicação correspondente ao ambiente.</small></span></div>
-          <div><i class="fa-solid fa-server"></i><span><strong>URL do serviço seguro</strong><small>Endereço publicado do Worker que contém o Access Token protegido.</small></span></div>
-          <div><i class="fa-solid fa-arrow-rotate-left"></i><span><strong>URL de retorno</strong><small>Endereço HTTPS para o qual o comprador retorna após o pagamento.</small></span></div>
+          <div><i class="fa-solid fa-server"></i><span><strong>URL global</strong><small>Endereço publicado do Worker compartilhado pelo OfficeJur.</small></span></div>
+          <div><i class="fa-solid fa-key"></i><span><strong>Chave do serviço</strong><small>Credencial de acesso do navegador ao Worker; não é um token de provedor.</small></span></div>
+          <div><i class="fa-solid fa-plug"></i><span><strong>Integrações</strong><small>Cada rota usa seus próprios segredos e validações no Worker.</small></span></div>
+          <div><i class="fa-solid fa-heart-pulse"></i><span><strong>Saúde</strong><small>O endpoint <code>/health</code> confirma que o serviço responde.</small></span></div>
         </div>
+      </section>
+
+      <section id="datajud" class="help-section">
+        <p class="eyebrow">INTEGRAÇÃO ATUAL</p><h2>DataJud</h2>
+        <p>O cadastro de casos judiciais consulta o DataJud pelo Worker para contornar a ausência de CORS na API pública. Quando a configuração global estiver completa, o OfficeJur envia o CNJ ao Worker e recebe os dados públicos disponíveis, incluindo movimentações quando fornecidas.</p>
+        <div class="help-alert"><i class="fa-solid fa-scale-balanced"></i><div><strong>Segredos diferentes</strong><p><code>DATAJUD_API_KEY</code> autoriza o Worker perante o CNJ. <code>OFFICEJUR_API_KEY</code> autoriza o navegador perante o Worker. Não são a mesma chave.</p></div></div>
+        <p>Sem URL e chave globais do Worker, o CNJ continua obrigatório, mas os campos do caso judicial ficam disponíveis para preenchimento manual. Com o Worker configurado, uma falha de consulta mantém o cadastro bloqueado para evitar dados incompletos.</p>
       </section>
 
       <section id="teste" class="help-section">
@@ -163,7 +169,7 @@
         <div class="help-faq">
           <details open><summary>“Failed to fetch” ou erro de CORS</summary><div>Confira a URL do Worker e a variável <code>ALLOWED_ORIGINS</code>. Informe apenas a origem do sistema, sem o caminho <code>/financeiro</code> e sem barra no final. Depois, publique novamente o Worker.</div></details>
           <details><summary>“MP_ACCESS_TOKEN não configurado”</summary><div>O segredo precisa se chamar exatamente <code>MP_ACCESS_TOKEN</code>, estar no mesmo Worker e no ambiente publicado. Confirme que o tipo escolhido foi Secret e que a implantação foi concluída.</div></details>
-          <details><summary>Erro 401 ou “Serviço não autorizado”</summary><div>Confira se <code>OFFICEJUR_API_KEY</code> existe como Secret no Worker e se a chave informada no campo “Chave de acesso do serviço” é exatamente igual. Se a chave tiver sido exposta, gere outra, substitua o segredo no Worker e atualize a configuração do OfficeJur.</div></details>
+          <details><summary>Erro 401 ou “Serviço não autorizado”</summary><div>Confira se <code>OFFICEJUR_API_KEY</code> existe como Secret no Worker e se a chave informada em <strong>Configurações → Cloudflare Workers</strong> é exatamente igual. Se a chave tiver sido exposta, gere outra, substitua o segredo no Worker e atualize a configuração global do OfficeJur.</div></details>
           <details><summary>“A versão mais recente do Worker ainda não está publicada”</summary><div>Esse aviso aparece quando o Wrangler está usando versões separadas de código e implantação. Publique primeiro com <code>npx wrangler deploy</code> e depois repita <code>npx wrangler secret put NOME_DO_SEGREDO</code>. Se quiser manter o fluxo separado, use <code>npx wrangler versions secret put NOME_DO_SEGREDO</code> e finalize com <code>npx wrangler versions deploy</code>.</div></details>
           <details><summary>“O proxy DataJud ainda não foi configurado”</summary><div>Cadastre também <code>DATAJUD_API_KEY</code> como Secret no Worker. Ela é diferente da <code>OFFICEJUR_API_KEY</code>: a primeira autoriza o Worker perante o CNJ; a segunda autoriza o navegador perante o Worker.</div></details>
           <details><summary>Erro do Access Token do Mercado Pago</summary><div>O Access Token pode estar incorreto, revogado ou ser de outro ambiente. Troque o segredo na Cloudflare e confirme que a Public Key informada no Financeiro pertence à mesma aplicação e ao mesmo ambiente.</div></details>

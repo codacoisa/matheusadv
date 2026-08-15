@@ -2,6 +2,7 @@
   'use strict';
 
   const gistSettings = window.OfficeJurGistSettings;
+  const workerSettings = window.OfficeJurWorkerSettings;
   const gistClient = window.OfficeJurGistClient;
   const access = window.OfficeJurGistAccessLease?.create();
   const officeName = window.OFFICEJUR_CONFIG?.office?.name || 'OfficeJur';
@@ -16,6 +17,15 @@
   const connectionDot = document.querySelector('#connection-dot');
   const connectionTitle = document.querySelector('#connection-title');
   const connectionDetail = document.querySelector('#connection-detail');
+  const workerForm = document.querySelector('#worker-form');
+  const workerUrlInput = document.querySelector('#worker-url');
+  const workerKeyInput = document.querySelector('#worker-key');
+  const workerSaveButton = document.querySelector('#save-worker');
+  const workerClearButton = document.querySelector('#clear-worker');
+  const workerStatus = document.querySelector('#worker-status');
+  const workerDot = document.querySelector('#worker-dot');
+  const workerTitle = document.querySelector('#worker-title');
+  const workerDetail = document.querySelector('#worker-detail');
 
   function currentFormSettings() {
     return gistSettings.normalize({
@@ -50,15 +60,70 @@
     }
   }
 
+  function renderWorker(settings = workerSettings.load()) {
+    workerUrlInput.value = settings.apiUrl;
+    workerKeyInput.value = settings.apiKey;
+    const configured = !!(settings.apiUrl && settings.apiKey);
+    const hasUrl = !!settings.apiUrl;
+    workerDot.classList.toggle('configured', configured);
+    if (configured) {
+      workerTitle.textContent = 'Cloudflare Worker configurado';
+      workerDetail.textContent = 'As integrações compartilhadas do OfficeJur podem usar o serviço protegido.';
+    } else if (hasUrl) {
+      workerTitle.textContent = 'URL registrada; chave de acesso ausente';
+      workerDetail.textContent = 'Informe a chave do serviço para habilitar consultas protegidas.';
+    } else {
+      workerTitle.textContent = 'Cloudflare Worker não configurado';
+      workerDetail.textContent = 'O Financeiro permitirá preenchimento manual e não consultará o DataJud até o serviço ser configurado.';
+    }
+  }
+
   function setStatus(message, tone = '') {
     status.textContent = message;
     status.className = `action-status${tone ? ` ${tone}` : ''}`;
   }
 
   function setBusy(busy) {
-    [saveButton, createButton, clearButton].forEach((button) => {
+    [saveButton, createButton, clearButton, workerSaveButton, workerClearButton].forEach((button) => {
       button.disabled = busy;
     });
+  }
+
+  function validWorkerUrl(value) {
+    if (!value) return true;
+    try {
+      const url = new URL(value, window.location.href);
+      return url.protocol === 'https:' || url.origin === window.location.origin;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function saveWorker(event) {
+    event.preventDefault();
+    const settings = workerSettings.normalize({
+      apiUrl: workerUrlInput.value,
+      apiKey: workerKeyInput.value,
+    });
+    if (!validWorkerUrl(settings.apiUrl)) {
+      workerStatus.textContent = 'Informe uma URL HTTPS válida para o Cloudflare Worker.';
+      workerStatus.className = 'action-status error';
+      return;
+    }
+    const saved = workerSettings.save(settings);
+    renderWorker(saved);
+    workerStatus.textContent = saved.apiUrl && saved.apiKey
+      ? 'Configuração global do Worker salva.'
+      : 'Configuração salva. Sem URL e chave completas, o preenchimento manual continuará disponível.';
+    workerStatus.className = 'action-status ok';
+  }
+
+  function clearWorker() {
+    if (!confirm('Remover a URL e a chave do Cloudflare Worker deste navegador?')) return;
+    const cleared = workerSettings.clear();
+    renderWorker(cleared);
+    workerStatus.textContent = 'Configuração global do Worker removida.';
+    workerStatus.className = 'action-status ok';
   }
 
   async function saveAndTest(event) {
@@ -138,8 +203,11 @@
   }
 
   form.addEventListener('submit', saveAndTest);
+  workerForm.addEventListener('submit', saveWorker);
   createButton.addEventListener('click', createGist);
   clearButton.addEventListener('click', clearSettings);
+  workerClearButton.addEventListener('click', clearWorker);
   access?.subscribe(() => render());
   render();
+  renderWorker();
 })();

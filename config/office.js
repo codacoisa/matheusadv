@@ -87,13 +87,6 @@
     copyrightStartYear: 2026
   });
 
-  // O navegador não pode consultar o DataJud diretamente porque a API pública
-  // não libera CORS. Publique o Worker do Financeiro e informe aqui o endereço
-  // dele para que o cadastro judicial use o proxy same-origin autorizado.
-  const datajud = Object.freeze({
-    proxyUrl: ''
-  });
-
   // Recursos institucionais definidos pela implantação. Para trocar o modelo,
   // substitua o arquivo Base64 em config/document-templates e atualize os metadados abaixo.
   const documents = Object.freeze({
@@ -120,5 +113,5 @@
   // sem nova validação. Altere somente se a política de acesso exigir.
   const gistAccessLease = Object.freeze({ leaseHours: 3, graceMinutes: 180, minLeaseMinutes: 15, maxLeaseHours: 24 });
 
-  window.OFFICEJUR_CONFIG = Object.freeze({ office, theme, installation, product, datajud, documents, gistAccessLease });
+  window.OFFICEJUR_CONFIG = Object.freeze({ office, theme, installation, product, documents, gistAccessLease });
 })();

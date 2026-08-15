@@ -3,6 +3,7 @@
   const officeConfig = window.OFFICEJUR_CONFIG?.office || {};
   const statementDescriptor = officeConfig.statementDescriptor || "OFFICEJUR";
   const gistSettings = window.OfficeJurGistSettings;
+  const workerSettings = window.OfficeJurWorkerSettings;
   const access = window.OfficeJurGistAccessLease?.create();
   const gistClient = access?.gatedClient(window.OfficeJurGistClient) || window.OfficeJurGistClient;
   let localAccessAllowed = true;
@@ -14,12 +15,8 @@
   const cnpjAssistant = window.OfficeJurCnpjAssistant;
   const dataJudAssistant = window.OfficeJurDataJud;
   const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
-    SERVICE_SETTINGS_KEY = "officejur::financeiro::officejur::settings",
-    SERVICE_SESSION_KEY = "officejur::financeiro::officejur::session-key",
-    SERVICE_REQUEST_PREFIX = "officejur::financeiro::officejur::request:",
-    LEGACY_SERVICE_SETTINGS_KEY = "officejur::financeiro::mercado-pago::settings",
-    LEGACY_SERVICE_SESSION_KEY = "officejur::financeiro::mercado-pago::session-key",
-    LEGACY_SERVICE_REQUEST_PREFIX = "officejur::financeiro::mercado-pago::request:",
+    MP_SETTINGS_KEY = "officejur::financeiro::mercado-pago::settings",
+    MP_REQUEST_PREFIX = "officejur::financeiro::mercado-pago::request:",
     FILES_FILE = "financeiro-documentos.json",
     FILES_DB = "officejur-financeiro-documentos",
     FILES_STORE = "state",
@@ -862,43 +859,26 @@
     }
   }
   function loadMp() {
-    let persistedRaw = "{}";
-    let sessionKey = "";
+    let persisted = {};
     try {
-      const currentRaw = localStorage.getItem(SERVICE_SETTINGS_KEY);
-      const legacyRaw = localStorage.getItem(LEGACY_SERVICE_SETTINGS_KEY);
-      persistedRaw = currentRaw || legacyRaw || "{}";
-      if (!currentRaw && legacyRaw) localStorage.setItem(SERVICE_SETTINGS_KEY, legacyRaw);
-      const currentSessionKey = sessionStorage.getItem(SERVICE_SESSION_KEY);
-      const legacySessionKey = sessionStorage.getItem(LEGACY_SERVICE_SESSION_KEY);
-      sessionKey = currentSessionKey || legacySessionKey || "";
-      if (!currentSessionKey && legacySessionKey) sessionStorage.setItem(SERVICE_SESSION_KEY, legacySessionKey);
+      persisted = JSON.parse(localStorage.getItem(MP_SETTINGS_KEY) || "{}");
     } catch {
-      persistedRaw = "{}";
+      persisted = {};
     }
+    return {
+      environment: "test",
+      publicKey: "",
+      returnUrl: location.href.split("#")[0],
+      statementDescriptor,
+      autoReturn: true,
+      ...persisted,
+    };
+  }
+  function loadWorker() {
     try {
-      const persisted = JSON.parse(persistedRaw);
-      delete persisted.apiKey;
-      return {
-        environment: "test",
-        publicKey: "",
-        apiUrl: "",
-        returnUrl: location.href.split("#")[0],
-        statementDescriptor,
-        autoReturn: true,
-        ...persisted,
-        apiKey: sessionKey,
-      };
+      return workerSettings.load();
     } catch {
-      return {
-        environment: "test",
-        publicKey: "",
-        apiUrl: "",
-        returnUrl: location.href.split("#")[0],
-        statementDescriptor,
-        autoReturn: true,
-        apiKey: sessionKey,
-      };
+      return { apiUrl: "", apiKey: "" };
     }
   }
   function clientDocumentPerson(client) {
@@ -1047,6 +1027,7 @@
       lastSyncSignature: "",
     },
     mp = loadMp(),
+    worker = loadWorker(),
     syncTimer = 0,
     syncInFlight = null,
     syncPending = false,
@@ -2081,10 +2062,10 @@
       : '<div class="panel empty">Nenhuma pessoa encontrada.</div>';
   }
   function renderCharges() {
-    const configured = Boolean(mp.apiUrl && mp.apiKey);
+    const configured = Boolean(resolveProxyUrl(worker.apiUrl) && worker.apiKey);
     $("#mp-alert").innerHTML = configured
       ? `<div class="integration-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Integração configurada em ${mp.environment === "production" ? "produção" : "testes"}</strong><p>As preferências são criadas pelo serviço seguro, sem expor o Access Token.</p></div></div>`
-      : `<div class="integration-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Configure o serviço seguro antes de cobrar</strong><p>Informe a URL do backend e a chave desta sessão no painel “Configurar conta”.</p></div></div>`;
+      : `<div class="integration-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Configure o Cloudflare Worker antes de cobrar</strong><p>Informe a URL e a chave do serviço na área global <a href="../configuracoes/">Configurações</a>.</p></div></div>`;
     const charges = data.charges || [],
       paid = charges
         .filter((c) => c.status === "approved")
@@ -2144,9 +2125,9 @@
     $("#mp-settings-dialog").showModal();
   }
   function openCharge() {
-    if (!mp.apiUrl) {
+    if (!worker.apiUrl || !worker.apiKey) {
       openMpSettings();
-      return toast("Configure o serviço seguro antes de gerar cobranças.");
+      return toast("Configure o Cloudflare Worker em Configurações antes de gerar cobranças.");
     }
     const pending = data.entries.filter(
         (e) => e.kind === "income" && statusOf(e) !== "paid",
@@ -2177,14 +2158,14 @@
     f.externalReference.value = `FIN-${e.id}`;
   }
   async function mpRequest(path, options = {}) {
-    const base = mp.apiUrl.replace(/\/$/, "");
-    if (!mp.apiKey)
-      throw new Error("Informe a chave de acesso do serviço nesta sessão.");
+    const base = worker.apiUrl.replace(/\/$/, "");
+    if (!worker.apiKey)
+      throw new Error("Configure a chave de acesso do Worker em Configurações.");
     const r = await fetch(`${base}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + mp.apiKey,
+        Authorization: "Bearer " + worker.apiKey,
         ...options.headers,
       },
     });
@@ -2878,7 +2859,7 @@
     status.dataset.kind = kind;
   }
   function dataJudProxyReady() {
-    return Boolean(resolveProxyUrl(mp.apiUrl) && String(mp.apiKey || "").trim());
+    return Boolean(resolveProxyUrl(worker.apiUrl) && String(worker.apiKey || "").trim());
   }
   function setCaseDataJudGate(form, locked) {
     const keepEnabled = new Set([
@@ -2959,8 +2940,8 @@
       if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
       try {
         const process = await lookupProcess(normalized, {
-          proxyUrl: mp.apiUrl,
-          proxyKey: mp.apiKey,
+          proxyUrl: worker.apiUrl,
+          proxyKey: worker.apiKey,
         });
         if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
         fillCaseFromDataJud(form, process);
@@ -4874,15 +4855,11 @@
     mp = {
       environment: f.environment.value,
       publicKey: f.publicKey.value.trim(),
-      apiUrl: f.apiUrl.value.trim().replace(/\/$/, ""),
       returnUrl: f.returnUrl.value.trim(),
       statementDescriptor: f.statementDescriptor.value.trim().toUpperCase(),
       autoReturn: f.autoReturn.checked,
-      apiKey: f.apiKey.value.trim(),
     };
-    const { apiKey, ...persistedMp } = mp;
-    sessionStorage.setItem(MP_SESSION_KEY, apiKey);
-    localStorage.setItem(SERVICE_SETTINGS_KEY, JSON.stringify(persistedMp));
+    localStorage.setItem(MP_SETTINGS_KEY, JSON.stringify(mp));
     $("#mp-settings-dialog").close();
     renderCharges();
     toast("Configuração do Mercado Pago salva.");
@@ -4917,12 +4894,8 @@
           clientId: entry.clientId,
           clientDocument: client?.document || "",
         },
-        requestKey = SERVICE_REQUEST_PREFIX + payload.externalReference,
-        legacyRequestKey = LEGACY_SERVICE_REQUEST_PREFIX + payload.externalReference,
-        idempotencyKey =
-          sessionStorage.getItem(requestKey) ||
-          sessionStorage.getItem(legacyRequestKey) ||
-          crypto.randomUUID();
+        requestKey = MP_REQUEST_PREFIX + payload.externalReference,
+        idempotencyKey = sessionStorage.getItem(requestKey) || crypto.randomUUID();
       sessionStorage.setItem(requestKey, idempotencyKey);
       const result = await createCharge(payload, idempotencyKey);
       data.charges.push({
