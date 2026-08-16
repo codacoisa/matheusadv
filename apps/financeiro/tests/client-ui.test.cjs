@@ -162,6 +162,10 @@ assert.match(app, /function dataJudProxyReady/);
 assert.match(app, /Consulta DataJud não configurada\. O preenchimento manual foi liberado/);
 assert.match(app, /dataJud: fd\.type === "judicial" \? caseDataJudDraft : null/);
 assert.match(app, /function caseDataJudTabs/);
+assert.match(app, /data-view-case-datajud/);
+assert.match(app, /function viewCaseDataJud/);
+assert.match(app, /data-refresh-case-datajud/);
+assert.match(app, /function refreshCaseDataJud/);
 assert.match(app, /data-case-tab="movements"/);
 assert.match(datajudAssistant, /https:\/\/api-publica\.datajud\.cnj\.jus\.br/);
 assert.match(datajudAssistant, /DATAJUD_PROXY_PATH/);
@@ -170,6 +174,13 @@ assert.match(app, /error\.message \|\| "Não foi possível consultar o DataJud\.
   assert.match(datajudAssistant, /numeroProcesso/);
   assert.match(styles, /\.case-detail-tab\s*\{/);
   assert.match(styles, /\.case-movement-warning\s*\{/);
+});
+
+test("gerar referência interna para casos não judiciais sem número", () => {
+  assert.doesNotMatch(html, /name="number"[^>]*required/);
+  assert.match(app, /function generateInternalCaseReference/);
+  assert.match(app, /reference = `INT-\$\{randomUppercaseToken\(\)\}`/);
+  assert.match(app, /generatedInternalReference = fd\.type !== "judicial"/);
 });
 
 test("usar a configuração global atual do Worker", () => {
