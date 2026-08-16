@@ -452,6 +452,43 @@ main {
   opacity: 0.48;
   cursor: default;
 }
+.case-filter-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.case-filter-panel label {
+  display: grid;
+  gap: 6px;
+  color: #596275;
+  font-size: 11px;
+  font-weight: 800;
+}
+.case-search-field input {
+  width: 100%;
+}
+.case-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+}
+.case-filter-grid select {
+  width: 100%;
+  min-width: 0;
+}
+.case-filter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.case-filter-footer .btn:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
 #clients-grid > .empty {
   grid-column: 1 / -1;
 }
@@ -2893,11 +2930,21 @@ textarea {
   .client-filter-grid {
     grid-template-columns: 1fr;
   }
+  .case-filter-grid {
+    grid-template-columns: 1fr;
+  }
   .client-filter-footer {
     align-items: stretch;
     flex-direction: column;
   }
+  .case-filter-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .client-filter-footer .btn {
+    justify-content: center;
+  }
+  .case-filter-footer .btn {
     justify-content: center;
   }
   .person-row {

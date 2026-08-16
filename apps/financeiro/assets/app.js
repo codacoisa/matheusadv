@@ -1917,27 +1917,102 @@
           .join("")
       : '<p class="detail-empty">Nenhum pacote cadastrado. Crie um pacote para compartilhar a mesma contratação entre vários casos.</p>';
   }
+  function refreshCaseFilterOptions() {
+    const clientSelect = $("#case-client-filter"),
+      selectedClient = clientSelect?.value || "";
+    if (clientSelect) {
+      const clients = data.clients
+        .slice()
+        .sort((left, right) =>
+          clientCollator.compare(clientDisplayName(left), clientDisplayName(right)),
+        );
+      clientSelect.innerHTML = `<option value="">Todos os clientes</option>${clients
+        .map((client) => `<option value="${escapeHtml(client.id)}">${escapeHtml(clientDisplayName(client))}</option>`)
+        .join("")}`;
+      clientSelect.value = clients.some((client) => client.id === selectedClient)
+        ? selectedClient
+        : "";
+    }
+    const personSelect = $("#case-person-filter");
+    if (!personSelect) return;
+    const people = data.team
+      .filter((person) => !person.status || person.status === "active" || person.id === caseTeamFilterId)
+      .slice()
+      .sort((left, right) => clientCollator.compare(left.name || "", right.name || ""));
+    personSelect.innerHTML = `<option value="">Todos os responsáveis</option>${people
+      .map((person) => `<option value="${escapeHtml(person.id)}">${escapeHtml(person.name || "Pessoa não informada")}</option>`)
+      .join("")}`;
+    personSelect.value = people.some((person) => person.id === caseTeamFilterId)
+      ? caseTeamFilterId
+      : "";
+  }
   function renderCases() {
-    const q = $("#case-search")?.value.toLowerCase() || "",
+    let filterPerson = data.team.find((p) => p.id === caseTeamFilterId);
+    if (caseTeamFilterId && !filterPerson) {
+      caseTeamFilterId = "";
+      filterPerson = null;
+    }
+    refreshCaseFilterOptions();
+    const q = $("#case-search")?.value.toLocaleLowerCase("pt-BR") || "",
       status = $("#case-status-filter")?.value || "",
-      filterPerson = data.team.find((p) => p.id === caseTeamFilterId),
+      type = $("#case-type-filter")?.value || "",
+      area = $("#case-area-filter")?.value || "",
+      clientId = $("#case-client-filter")?.value || "",
+      dataJudFilter = $("#case-datajud-filter")?.value || "",
       filterBox = $("#case-team-filter");
-    if (caseTeamFilterId && !filterPerson) caseTeamFilterId = "";
     filterBox.hidden = !filterPerson;
     filterBox.innerHTML = filterPerson
       ? `<span><i class="fa-solid fa-user-tie"></i> Exibindo apenas os casos de <strong>${escapeHtml(filterPerson.name)}</strong></span><button type="button" data-clear-team-cases><i class="fa-solid fa-xmark"></i> Limpar filtro</button>`
       : "";
     const cases = data.cases.filter(
-      (item) =>
-        (!filterPerson ||
-          item.assignments.some(
-            (entry) => entry.personId === filterPerson.id,
-          )) &&
-        (!status || item.status === status) &&
-        `${item.number} ${item.title} ${item.area} ${item.dataJud?.tribunalName || ""} ${item.dataJud?.court?.name || ""} ${item.dataJud?.system?.name || ""} ${clientName(item.clientId)} ${item.assignments.map((entry) => teamName(entry.personId)).join(" ")}`
-          .toLowerCase()
-          .includes(q),
+      (item) => {
+        const itemType = String(item.type || "").toLowerCase(),
+          itemStatus = String(item.status || "").toLowerCase(),
+          subjects = Array.isArray(item.dataJud?.subjects)
+            ? item.dataJud.subjects.map((subject) => subject.name).filter(Boolean).join(" ")
+            : "",
+          searchText = [
+            item.number,
+            item.title,
+            item.area,
+            itemType,
+            item.dataJud?.tribunalName,
+            item.dataJud?.tribunal,
+            item.dataJud?.court?.name,
+            item.dataJud?.court?.municipality?.name,
+            item.dataJud?.system?.name,
+            item.dataJud?.processClass?.name,
+            subjects,
+            clientName(item.clientId),
+            ...(item.assignments || []).map((entry) => teamName(entry.personId)),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLocaleLowerCase("pt-BR"),
+          matchesPerson =
+            !filterPerson ||
+            (item.assignments || []).some(
+              (entry) => entry.personId === filterPerson.id,
+            ),
+          matchesDataJud =
+            !dataJudFilter ||
+            (dataJudFilter === "available" ? Boolean(item.dataJud) : !item.dataJud);
+        return (
+          matchesPerson &&
+          (!status || itemStatus === status) &&
+          (!type || itemType === type) &&
+          (!area || item.area === area) &&
+          (!clientId || item.clientId === clientId) &&
+          matchesDataJud &&
+          searchText.includes(q)
+        );
+      },
     );
+    const filtered = Boolean(
+      q || status !== "active" || type || area || clientId || caseTeamFilterId || dataJudFilter,
+    );
+    $("#case-filter-summary").textContent = `Exibindo ${cases.length} de ${data.cases.length} ${data.cases.length === 1 ? "caso" : "casos"}.`;
+    $("#clear-case-filters").disabled = !filtered;
     $("#cases-grid").innerHTML = cases.length
       ? cases
           .map((item) => {
@@ -4967,7 +5042,28 @@
   };
   $("#person-search").oninput = renderPeople;
   $("#case-search").oninput = renderCases;
-  $("#case-status-filter").onchange = renderCases;
+  [
+    "#case-type-filter",
+    "#case-area-filter",
+    "#case-status-filter",
+    "#case-client-filter",
+    "#case-datajud-filter",
+  ].forEach((selector) => ($(selector).onchange = renderCases));
+  $("#case-person-filter").onchange = (event) => {
+    caseTeamFilterId = event.currentTarget.value;
+    renderCases();
+  };
+  $("#clear-case-filters").onclick = () => {
+    caseTeamFilterId = "";
+    $("#case-search").value = "";
+    $("#case-type-filter").value = "";
+    $("#case-area-filter").value = "";
+    $("#case-status-filter").value = "active";
+    $("#case-client-filter").value = "";
+    $("#case-datajud-filter").value = "";
+    renderCases();
+    $("#case-search").focus();
+  };
   $("#team-search").oninput = renderTeam;
   $("#team-status").onchange = renderTeam;
   $("#export-csv").onclick = exportCsv;

@@ -679,6 +679,35 @@ test('Financeiro gerencia pessoas e organiza pacotes junto aos casos', async ({ 
   await expect(page.locator('#package-dialog')).toBeVisible();
 });
 
+test('Financeiro filtra casos por tipo, área e disponibilidade no DataJud', async ({ page }) => {
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('[data-view="cases"]').click();
+  await expect(page.locator('#case-filter-summary')).toHaveText('Exibindo 1 de 1 caso.');
+
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="type"]').selectOption('extrajudicial');
+  await form.locator('[name="area"]').selectOption({ label: 'Família' });
+  await form.locator('[name="title"]').fill('Inventário extrajudicial');
+  await form.getByRole('button', { name: 'Salvar caso' }).click();
+  await expect(page.locator('.case-card')).toHaveCount(2);
+
+  await page.locator('#case-type-filter').selectOption('extrajudicial');
+  await expect(page.locator('.case-card')).toHaveCount(1);
+  await expect(page.locator('.case-card')).toContainText('Inventário extrajudicial');
+  await page.locator('#case-area-filter').selectOption({ label: 'Família' });
+  await expect(page.locator('.case-card')).toHaveCount(1);
+  await page.locator('#case-datajud-filter').selectOption('available');
+  await expect(page.locator('.case-card')).toHaveCount(0);
+  await page.locator('#case-datajud-filter').selectOption('missing');
+  await expect(page.locator('.case-card')).toHaveCount(1);
+  await page.locator('#clear-case-filters').click();
+  await expect(page.locator('.case-card')).toHaveCount(2);
+  await expect(page.locator('#case-type-filter')).toHaveValue('');
+  await expect(page.locator('#case-status-filter')).toHaveValue('active');
+});
+
 test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', async ({ page }) => {
   const processNumber = '00008323520184013202';
   await page.route('https://worker.example/datajud/search', async route => {

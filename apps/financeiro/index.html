@@ -362,16 +362,71 @@
               <div id="packages-grid" class="package-grid"></div>
             </div>
           </section>
-          <div class="panel filters">
-            <input
-              id="case-search"
-              placeholder="Buscar processo, objeto, cliente ou responsável"
-            /><select id="case-status-filter">
-              <option value="active">Ativos</option>
-              <option value="">Todos</option>
-              <option value="suspended">Suspensos</option>
-              <option value="closed">Encerrados</option>
-            </select>
+          <div class="panel case-filter-panel">
+            <label class="case-search-field">
+              <span>Buscar casos e processos</span>
+              <input
+                id="case-search"
+                type="search"
+                placeholder="Número, objeto, cliente, tribunal ou responsável"
+              />
+            </label>
+            <div class="case-filter-grid">
+              <label>Tipo
+                <select id="case-type-filter">
+                  <option value="">Todos</option>
+                  <option value="judicial">Judicial</option>
+                  <option value="administrative">Administrativo</option>
+                  <option value="extrajudicial">Extrajudicial</option>
+                  <option value="consulting">Consultivo</option>
+                </select>
+              </label>
+              <label>Área
+                <select id="case-area-filter">
+                  <option value="">Todas</option>
+                  <option>Cível</option>
+                  <option>Trabalhista</option>
+                  <option>Previdenciário</option>
+                  <option>Família</option>
+                  <option>Empresarial</option>
+                  <option>Criminal</option>
+                  <option>Tributário</option>
+                  <option>Administrativo</option>
+                  <option>Outro</option>
+                </select>
+              </label>
+              <label>Status
+                <select id="case-status-filter">
+                  <option value="active">Ativos</option>
+                  <option value="">Todos</option>
+                  <option value="suspended">Suspensos</option>
+                  <option value="closed">Encerrados</option>
+                </select>
+              </label>
+              <label>Cliente
+                <select id="case-client-filter">
+                  <option value="">Todos os clientes</option>
+                </select>
+              </label>
+              <label>Responsável
+                <select id="case-person-filter">
+                  <option value="">Todos os responsáveis</option>
+                </select>
+              </label>
+              <label>DataJud
+                <select id="case-datajud-filter">
+                  <option value="">Todos</option>
+                  <option value="available">Com dados consultados</option>
+                  <option value="missing">Sem dados consultados</option>
+                </select>
+              </label>
+            </div>
+            <div class="case-filter-footer">
+              <span id="case-filter-summary" role="status"></span>
+              <button class="btn ghost compact" id="clear-case-filters" type="button">
+                <i class="fa-solid fa-filter-circle-xmark"></i> Limpar filtros
+              </button>
+            </div>
           </div>
           <div id="case-team-filter" class="case-filter-context" hidden></div>
           <div id="cases-grid" class="cards cases-grid"></div>
