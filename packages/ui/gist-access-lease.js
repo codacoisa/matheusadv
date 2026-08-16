@@ -5,33 +5,33 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, () => {
   "use strict";
 
-  const STORAGE_KEY = "officejur::gist-access-lease";
-  const LOCK_KEY = "officejur::gist-access-lease::purge-lock";
-  const VERIFY_LOCK_KEY = "officejur::gist-access-lease::verify-lock";
+  const STORAGE_KEY = "officejur-gist-access-lease";
+  const LOCK_KEY = "officejur-gist-access-lease-purge-lock";
+  const VERIFY_LOCK_KEY = "officejur-gist-access-lease-verify-lock";
   const VERSION = 3;
   const HEARTBEAT_DEDUPLICATION_MS = 5 * 60_000;
   const DEFAULT_POLICY = Object.freeze({ leaseHours: 3, graceMinutes: 180, minLeaseMinutes: 15, maxLeaseHours: 24 });
   const PHASES = new Set(["active", "grace", "stale", "unverified", "purging", "purged"]);
   const verificationFlights = new WeakMap();
   const PROTECTED_STORAGE_KEYS = Object.freeze([
-    "officejur::calculos-juridicos::data",
-    "officejur::calculos-juridicos::sync-state",
-    "officejur::financeiro::sync-state",
-    "officejur::documentos::sync-state",
-    "officejur::controle-pagamentos::data",
-    "officejur::controle-pagamentos::sync-state",
+    "officejur-calculos-juridicos-data",
+    "officejur-calculos-juridicos-sync-state",
+    "officejur-financeiro-sync-state",
+    "officejur-documentos-sync-state",
+    "officejur-controle-pagamentos-data",
+    "officejur-controle-pagamentos-sync-state",
     "officejur-gist-settings",
   ]);
   const PROTECTED_DERIVED_STORAGE_KEYS = Object.freeze([
-    "officejur::documentos::honorarios::draft",
-    "officejur::documentos::procuracao::draft",
+    "officejur-documentos-honorarios-draft",
+    "officejur-documentos-procuracao-draft",
   ]);
   const PROTECTED_DATABASES = Object.freeze([
     "officejur-financeiro",
     "officejur-financeiro-documentos",
     "officejur-arquivos",
   ]);
-  const HANDOFF_PREFIX = "officejur::documentos::handoff:";
+  const HANDOFF_PREFIX = "officejur-documentos-handoff-";
   const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || min));
   const nowMs = (clock) => Number(clock?.now?.() ?? Date.now());
   const normalizeId = (value) => String(value || "").trim().toLowerCase();

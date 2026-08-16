@@ -30,16 +30,13 @@ test("identificar o tribunal e montar a rota DataJud", () => {
     dataJud.endpointFor(sampleNumber),
     "https://api-publica.datajud.cnj.jus.br/api_publica_trf1/_search",
   );
-  assert.deepEqual(dataJud.queryFor(sampleNumber), {
-    size: 1,
-    query: { match: { numeroProcesso: sampleNumber } },
-  });
 });
 
-test("consultar e normalizar capa, assuntos e movimentações", async () => {
+test("consultar pelo Worker e normalizar capa, assuntos e movimentações", async () => {
   let called;
   const result = await dataJud.lookupProcess(sampleNumber, {
-    apiKey: "chave-de-teste",
+    proxyUrl: "https://worker.example",
+    proxyKey: "chave-do-servico",
     fetchImpl: async (url, options) => {
       called = { url, options };
       return new Response(JSON.stringify({
@@ -66,10 +63,13 @@ test("consultar e normalizar capa, assuntos e movimentações", async () => {
     },
   });
 
-  assert.equal(called.url, dataJud.endpointFor(sampleNumber));
+  assert.equal(called.url, "https://worker.example/datajud/search");
   assert.equal(called.options.method, "POST");
-  assert.equal(called.options.headers.Authorization, "APIKey chave-de-teste");
-  assert.deepEqual(JSON.parse(called.options.body), dataJud.queryFor(sampleNumber));
+  assert.equal(called.options.headers.Authorization, "Bearer chave-do-servico");
+  assert.deepEqual(JSON.parse(called.options.body), {
+    path: "/api_publica_trf1/_search",
+    number: sampleNumber,
+  });
   assert.equal(result.number, "0000832-35.2018.4.01.3202");
   assert.equal(result.justiceType, "Justiça Federal");
   assert.equal(result.processClass.name, "Procedimento do Juizado Especial Cível");
@@ -89,49 +89,18 @@ test("complementar o título com o primeiro assunto e indicar os demais", () => 
   assert.equal(result.title, "Ação de Cobrança · Contratos e outros assuntos");
 });
 
-test("consultar pelo proxy same-origin sem expor a chave pública do DataJud", async () => {
-  let called;
-  const result = await dataJud.lookupProcess(sampleNumber, {
-    proxyUrl: "https://worker.example",
-    proxyKey: "chave-do-servico",
-    fetchImpl: async (url, options) => {
-      called = { url, options };
-      return new Response(JSON.stringify({
-        hits: { hits: [{ _source: { numeroProcesso: sampleNumber, classe: { nome: "Classe" } } }] },
-      }), { status: 200 });
-    },
-  });
-
-  assert.equal(called.url, "https://worker.example/datajud/search");
-  assert.equal(called.options.headers.Authorization, "Bearer chave-do-servico");
-  assert.deepEqual(JSON.parse(called.options.body), {
-    path: "/api_publica_trf1/_search",
-    number: sampleNumber,
-  });
-  assert.equal(result.processClass.name, "Classe");
-});
-
-test("exigir proxy quando a aplicação está em HTTPS", async () => {
-  const previousLocation = globalThis.location;
-  globalThis.location = {
-    protocol: "https:",
-    href: "https://officejur.example/financeiro/",
-    origin: "https://officejur.example",
-  };
-  try {
-    await assert.rejects(
-      dataJud.lookupProcess(sampleNumber, { fetchImpl: async () => { throw new Error("não deveria chamar"); } }),
-      /Configure o proxy DataJud/,
-    );
-  } finally {
-    if (previousLocation === undefined) delete globalThis.location;
-    else globalThis.location = previousLocation;
-  }
+test("exigir proxy do Worker para qualquer consulta", async () => {
+  await assert.rejects(
+    dataJud.lookupProcess(sampleNumber, { fetchImpl: async () => { throw new Error("não deveria chamar"); } }),
+    /Configure o proxy DataJud/,
+  );
 });
 
 test("informar quando a API não encontra o processo", async () => {
   await assert.rejects(
     dataJud.lookupProcess(sampleNumber, {
+      proxyUrl: "https://worker.example",
+      proxyKey: "chave-do-servico",
       fetchImpl: async () => new Response(JSON.stringify({ hits: { hits: [] } }), { status: 200 }),
     }),
     /Processo não encontrado/,

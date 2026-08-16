@@ -14,7 +14,7 @@
   const $ = (selector) => document.querySelector(selector);
   const AUTO_SAVE_INTERVAL = 10000;
   const AUTO_SAVE_KEY = 'officejur.documentos.autosave';
-  const SYNC_STATE_KEY = 'officejur::documentos::sync-state';
+  const SYNC_STATE_KEY = 'officejur-documentos-sync-state';
   const state = { clients: [], documents: [], selectedId: '', query: '', dialogMode: 'create', dirty: false, deletedDocuments: [] };
   let officeReady = false;
   let officeOpenId = '';

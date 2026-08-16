@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'officejur::documentos::honorarios::draft';
+const STORAGE_KEY = 'officejur-documentos-honorarios-draft';
 const form = document.getElementById('document-form');
 const preview = document.getElementById('preview');
 const loading = document.getElementById('preview-loading');
@@ -34,7 +34,7 @@ const LEFT = 19;
 const WIDTH = 172;
 const PEOPLE_LIMIT = 4;
 const PDF_DRAFT_MARKER = TEMPLATE_CONFIG.draftMarker;
-const DOCUMENT_HANDOFF_PREFIX = 'officejur::documentos::handoff:';
+const DOCUMENT_HANDOFF_PREFIX = 'officejur-documentos-handoff-';
 const DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
 const GIST_PROTECTED_MARKER = '__officejurGistProtected';
 let gistProtectedDraft = false;

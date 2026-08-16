@@ -5,7 +5,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, () => {
   "use strict";
   const FILE = "officejur-calculos-juridicos.json";
-  const STORAGE_KEY = "officejur::calculos-juridicos::data";
+  const STORAGE_KEY = "officejur-calculos-juridicos-data";
   const SCHEMA = "officejur/calculos-juridicos-data";
   const VERSION = 1;
   const stamp = (item) => String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");

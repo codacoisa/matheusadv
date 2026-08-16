@@ -44,7 +44,7 @@ O código do serviço protegido permanece em `worker/src/index.js`.
 
 O módulo **Cobranças** gera links do Checkout Pro vinculados aos recebíveis. Por segurança, a credencial privada não é armazenada na página estática.
 
-Para configurar a aplicação e a Public Key do Checkout Pro, use a seção Mercado Pago do guia global. A URL e a chave do Worker não são mais configuradas neste módulo.
+Para configurar o Mercado Pago, use a seção correspondente do guia global. O Access Token fica protegido no Worker; a URL e a chave do Worker são configuradas somente na área global de **Configurações**.
 
 ## Referências externas
 

@@ -16,18 +16,17 @@ function memoryStorage(initial = {}) {
   };
 }
 
-test("salva a URL global e mantém a chave apenas na sessão", () => {
+test("salva a URL e a chave global no armazenamento persistente", () => {
   const storage = memoryStorage();
-  const sessionStorage = memoryStorage();
 
   assert.deepEqual(
     workerSettings.save(
       { apiUrl: " https://worker.example/ ", apiKey: " chave " },
-      { storage, sessionStorage },
+      { storage },
     ),
     { version: 1, apiUrl: "https://worker.example", apiKey: "chave" },
   );
-  assert.deepEqual(workerSettings.load({ storage, sessionStorage }), {
+  assert.deepEqual(workerSettings.load({ storage }), {
     version: 1,
     apiUrl: "https://worker.example",
     apiKey: "chave",
@@ -35,21 +34,25 @@ test("salva a URL global e mantém a chave apenas na sessão", () => {
   assert.deepEqual(JSON.parse(storage.getItem(workerSettings.STORAGE_KEY)), {
     version: 1,
     apiUrl: "https://worker.example",
+    apiKey: "chave",
   });
-  assert.equal(sessionStorage.getItem(workerSettings.SESSION_KEY), "chave");
 });
 
 test("limpa a configuração global do Worker", () => {
   const storage = memoryStorage();
-  const sessionStorage = memoryStorage();
-  workerSettings.save({ apiUrl: "https://worker.example", apiKey: "chave" }, { storage, sessionStorage });
+  workerSettings.save({ apiUrl: "https://worker.example", apiKey: "chave" }, { storage });
 
-  assert.deepEqual(workerSettings.clear({ storage, sessionStorage }), {
+  assert.deepEqual(workerSettings.clear({ storage }), {
     version: 1,
     apiUrl: "",
     apiKey: "",
   });
-  assert.deepEqual(workerSettings.load({ storage, sessionStorage }), {
+  assert.deepEqual(workerSettings.load({ storage }), {
+    version: 1,
+    apiUrl: "",
+    apiKey: "",
+  });
+  assert.deepEqual(JSON.parse(storage.getItem(workerSettings.STORAGE_KEY)), {
     version: 1,
     apiUrl: "",
     apiKey: "",

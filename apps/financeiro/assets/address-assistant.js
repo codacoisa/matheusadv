@@ -3,7 +3,7 @@
 
   const IBGE_BASE = "https://servicodados.ibge.gov.br/api/v1/localidades";
   const VIACEP_BASE = "https://viacep.com.br/ws";
-  const CACHE_PREFIX = "officejur::localidades::";
+  const CACHE_PREFIX = "officejur-localidades-";
   const CACHE_TTL = 30 * 24 * 60 * 60 * 1000;
   const STATES = [
     ["AC", "Acre"], ["AL", "Alagoas"], ["AP", "Amapá"],

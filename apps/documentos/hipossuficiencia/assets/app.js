@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'officejur::documentos::hipossuficiencia::draft';
+const STORAGE_KEY = 'officejur-documentos-hipossuficiencia-draft';
 const form = document.getElementById('document-form');
 const preview = document.getElementById('preview');
 const loading = document.getElementById('preview-loading');

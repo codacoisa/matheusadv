@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'officejur::documentos::procuracao::draft';
+const STORAGE_KEY = 'officejur-documentos-procuracao-draft';
 const form = document.getElementById('document-form');
 const preview = document.getElementById('preview');
 const loading = document.getElementById('preview-loading');
@@ -24,7 +24,7 @@ const CONTENT_TOP = 69;
 const CONTENT_BOTTOM = 268;
 const SIGNATURE_BOTTOM = 268;
 const PDF_DRAFT_MARKER = TEMPLATE_CONFIG.draftMarker;
-const DOCUMENT_HANDOFF_PREFIX = 'officejur::documentos::handoff:';
+const DOCUMENT_HANDOFF_PREFIX = 'officejur-documentos-handoff-';
 const DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
 const GIST_PROTECTED_MARKER = '__officejurGistProtected';
 
