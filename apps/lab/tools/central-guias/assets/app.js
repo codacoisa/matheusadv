@@ -138,11 +138,11 @@
         try {
           await navigator.clipboard.writeText(value);
           button.dataset.copied = 'true';
-          const original = button.textContent;
-          button.textContent = 'Copiado';
+          const originalHtml = button.innerHTML;
+          button.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i><span class="sr-only">Copiado</span>';
           window.setTimeout(() => {
             button.dataset.copied = 'false';
-            button.textContent = original;
+            button.innerHTML = originalHtml;
           }, 1200);
         } catch (error) {
           setStatus('Não foi possível copiar o número do processo.', true);
@@ -154,9 +154,12 @@
         if (!button) return;
         try {
           await navigator.clipboard.writeText(button.dataset.copyProcess || '');
-          button.textContent = 'Copiado';
+          const originalHtml = button.innerHTML;
+          button.dataset.copied = 'true';
+          button.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i><span class="sr-only">Processo copiado</span>';
           window.setTimeout(() => {
-            button.textContent = 'Copiar processo';
+            button.dataset.copied = 'false';
+            button.innerHTML = originalHtml;
           }, 1200);
         } catch (_) {
           setStatus('Não foi possível copiar o número do processo.', true);
@@ -361,6 +364,8 @@
           serventia: String(process.serventia || '').trim(),
           classe: String(process.classe || '').trim(),
           assunto: String(process.assunto || '').trim(),
+          activeParty: String(process.activeParty || '').trim(),
+          passiveParty: String(process.passiveParty || '').trim(),
           processUrl: String(process.processUrl || '').trim(),
           lastProcessSeenAt: String(process.lastProcessSeenAt || '').trim(),
           lastGuidesSyncAt: String(process.lastGuidesSyncAt || '').trim(),
@@ -609,6 +614,8 @@
           row.processRecord.classe,
           row.processRecord.assunto,
           row.processRecord.serventia,
+          row.processRecord.activeParty,
+          row.processRecord.passiveParty,
           row.guide.number,
           row.guide.type,
           row.guide.situation,
@@ -827,11 +834,26 @@
       `;
     }
 
+    function partyValue(value) {
+      return String(value || '').trim() || 'não capturado';
+    }
+
+    function renderPartySummary(processRecord) {
+      const activeParty = partyValue(processRecord.activeParty);
+      const passiveParty = partyValue(processRecord.passiveParty);
+      return `
+        <div class="party-summary" title="Autor: ${escapeHtml(activeParty)} | Réu: ${escapeHtml(passiveParty)}">
+          <span class="party-line party-line--active"><strong>Autor:</strong> ${escapeHtml(activeParty)}</span>
+          <span class="party-line party-line--passive"><strong>Réu:</strong> ${escapeHtml(passiveParty)}</span>
+        </div>
+      `;
+    }
+
     function renderRow(row) {
       const processLabel = row.processRecord.shortNumber || row.processRecord.cnj || row.processRecord.processId || 'Sem número';
       const cnj = row.processRecord.cnj && row.processRecord.cnj !== processLabel ? row.processRecord.cnj : '';
       const tone = getStatusTone(row.status);
-      const dueDate = row.guide.dueDate ? formatDateTime(row.guide.dueDate) : '--';
+      const dueDate = row.guide.dueDate ? formatDateOnly(row.guide.dueDate) : '--';
       const syncDate = getEffectiveSyncAt(row.processRecord) ? formatDateTime(getEffectiveSyncAt(row.processRecord)) : '--';
       const syncLabel = row.processRecord.lastGuidesSyncAt ? 'Última sync' : 'Backup exportado';
 
@@ -845,6 +867,7 @@
                 ${row.processRecord.classe ? `Classe: ${escapeHtml(row.processRecord.classe)}<br>` : ''}
                 ${row.processRecord.assunto ? `Assunto: ${escapeHtml(row.processRecord.assunto)}` : ''}
               </div>
+              ${renderPartySummary(row.processRecord)}
             </div>
           </td>
           <td>
@@ -864,7 +887,7 @@
           </td>
           <td>
             <div class="stack">
-              <strong>${escapeHtml(dueDate)}</strong>
+              <strong class="due-date">${escapeHtml(dueDate)}</strong>
               <div class="guide-meta">Emissão: ${escapeHtml(row.guide.issueDate ? formatDateTime(row.guide.issueDate) : '--')}</div>
             </div>
           </td>
@@ -878,14 +901,14 @@
             </div>
           </td>
           <td>
-            <button type="button" class="copy-btn" data-copy="${escapeHtml(processLabel)}">Copiar processo</button>
+            <button type="button" class="copy-btn copy-btn--icon" data-copy="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
           </td>
         </tr>
       `;
     }
 
     function renderProcesses(processSummaries) {
-      nodes.processSubtitle.textContent = `${processSummaries.length} processo(s) monitorado(s).`;
+      nodes.processSubtitle.textContent = `${processSummaries.length} processo(s) monitorado(s), com polos resumidos quando capturados.`;
 
       if (!processSummaries.length) {
         nodes.processGrid.innerHTML = '<div class="empty">Nenhum processo encontrado no backup.</div>';
@@ -911,8 +934,9 @@
                 <div class="panel-subtitle">
                   ${escapeHtml(processRecord.assunto || processRecord.classe || processRecord.serventia || 'Sem metadados adicionais')}
                 </div>
+                ${renderPartySummary(processRecord)}
               </div>
-              <button type="button" class="copy-btn" data-copy-process="${escapeHtml(processLabel)}">Copiar processo</button>
+              <button type="button" class="copy-btn copy-btn--icon" data-copy-process="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
             </div>
 
             <div class="process-card-summary">
@@ -954,6 +978,17 @@
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
+      });
+    }
+
+    function formatDateOnly(value) {
+      if (!value) return '--';
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) return '--';
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
       });
     }
 

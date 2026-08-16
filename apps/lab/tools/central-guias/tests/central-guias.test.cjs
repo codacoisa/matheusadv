@@ -38,3 +38,20 @@ test('Central oferece uma fila de trabalho orientada a vencimentos', () => {
   assert.match(styles, /\.hero-card--config/);
   assert.match(app, /renderFocusActions/);
 });
+
+test('Central reflete os polos resumidos e mantém o vencimento legível', () => {
+  const index = read('apps/lab/tools/central-guias/index.html');
+  const styles = read('apps/lab/tools/central-guias/assets/styles.css');
+  const app = read('apps/lab/tools/central-guias/assets/app.js');
+
+  assert.match(index, /Autor, Réu/);
+  assert.match(index, /file-invoice-dollar/);
+  assert.match(app, /activeParty/);
+  assert.match(app, /passiveParty/);
+  assert.match(app, /function renderPartySummary/);
+  assert.match(app, /function formatDateOnly/);
+  assert.match(app, /fa-regular fa-copy/);
+  assert.match(styles, /\.table-wrap table\s*\{[\s\S]*table-layout: fixed/);
+  assert.match(styles, /\.party-summary/);
+  assert.match(styles, /\.due-date/);
+});
