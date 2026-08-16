@@ -1397,45 +1397,6 @@ dialog form {
   margin: 14px 0;
 }
 
-.case-parties-editor {
-  border-top: 1px solid var(--line, #d9deea);
-  padding-top: 1rem;
-}
-
-.case-parties-editor .section-heading {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: .65rem;
-}
-
-.case-parties-editor .section-heading small {
-  color: var(--muted, #667085);
-  display: block;
-  margin-top: .2rem;
-}
-
-.case-party-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(10rem, .45fr) auto;
-  gap: .5rem;
-  margin-top: .5rem;
-}
-
-.case-party-row .icon-btn {
-  align-self: center;
-  color: var(--danger, #b42318);
-}
-
-@media (max-width: 640px) {
-  .case-parties-editor .section-heading,
-  .case-party-row {
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-  }
-}
 .assignment-row {
   display: grid;
   grid-template-columns: 1.25fr 1fr 0.6fr 0.55fr auto;
@@ -1795,6 +1756,15 @@ dialog form {
 .case-movement-warning i {
   flex: 0 0 auto;
   margin-top: 1px;
+}
+.case-movement-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0 2px;
+  color: var(--navy);
+  font-size: 10px;
 }
 .case-movement {
   display: grid;

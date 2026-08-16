@@ -323,7 +323,11 @@
             `Proxy DataJud indisponível (${response.status}).`,
         );
       const source = payload?.hits?.hits?.[0]?._source;
-      if (!source) throw new Error("Processo não encontrado na base pública do DataJud.");
+      if (!source) {
+        const error = new Error("Processo não encontrado na base pública do DataJud.");
+        error.code = "DATAJUD_PROCESS_NOT_FOUND";
+        throw error;
+      }
       return normalizeProcess(source, normalized);
     } catch (error) {
       if (error?.name === "AbortError") throw new Error("A consulta DataJud demorou mais que o esperado.");

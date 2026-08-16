@@ -614,6 +614,11 @@
       : [];
     return normalized;
   }
+  function sanitizeDataJudRecord(info) {
+    if (!info || typeof info !== "object") return null;
+    const { movements: _movements, raw: _raw, ...record } = info;
+    return record;
+  }
   function normalizeCase(item = {}) {
     const fields = [
       "id",
@@ -642,18 +647,7 @@
     normalized.assignments = Array.isArray(item.assignments)
       ? item.assignments
       : [];
-    normalized.dataJud = item.dataJud && typeof item.dataJud === "object"
-      ? item.dataJud
-      : null;
-    normalized.parties = Array.isArray(item.parties)
-      ? item.parties
-          .filter((party) => party && String(party.name || "").trim())
-          .map((party, index) => ({
-            id: String(party.id || `party-${index + 1}`),
-            name: String(party.name || "").trim(),
-            role: String(party.role || "Autor").trim(),
-          }))
-      : [];
+    normalized.dataJud = sanitizeDataJudRecord(item.dataJud);
     return normalized;
   }
   function normalizePackage(item = {}) {
@@ -1056,6 +1050,7 @@
     caseDataJudLookupTimer = 0,
     caseDataJudLookupRequest = 0,
     caseDataJudDraft = null,
+    dataJudMovementsSession = new Map(),
     caseTeamFilterId = "",
     currentFilesClientId = "",
     filePreviewUrl = "",
@@ -2883,6 +2878,22 @@
   function dataJudProxyReady() {
     return Boolean(resolveProxyUrl(worker.apiUrl) && String(worker.apiKey || "").trim());
   }
+  function dataJudMunicipalityLabel(info) {
+    return [info?.court?.municipality?.name, info?.state].filter(Boolean).join(" · ")
+      || (info?.court?.ibgeCode ? `Código IBGE ${info.court.ibgeCode}` : "");
+  }
+  async function enrichDataJudMunicipality(info) {
+    const code = info?.court?.ibgeCode;
+    if (!code || typeof addressAssistant?.lookupMunicipality !== "function") return info;
+    try {
+      const municipality = await addressAssistant.lookupMunicipality(code);
+      return municipality?.name
+        ? { ...info, court: { ...info.court, municipality } }
+        : info;
+    } catch {
+      return info;
+    }
+  }
   function setCaseDataJudGate(form, locked) {
     const keepEnabled = new Set([
       form.elements.id,
@@ -2904,6 +2915,7 @@
       justiceType: info?.justiceType,
       tribunal: [info?.tribunalName, info?.tribunal].filter(Boolean).join(" · "),
       court: info?.court?.name,
+      municipality: dataJudMunicipalityLabel(info),
       system: info?.system?.name,
       processClass: info?.processClass?.name,
       degree: info?.degree,
@@ -2917,7 +2929,7 @@
   }
   function fillCaseFromDataJud(form, info) {
     const previousTitle = caseDataJudDraft?.title || "";
-    caseDataJudDraft = { ...info, fetchedAt: now() };
+    caseDataJudDraft = sanitizeDataJudRecord({ ...info, fetchedAt: now() });
     form.elements.number.value = maskCnj(info.number || info.rawNumber);
     if (!String(form.elements.title.value || "").trim() || form.elements.title.value.trim() === previousTitle)
       form.elements.title.value = info.title || "";
@@ -2966,9 +2978,20 @@
           proxyKey: worker.apiKey,
         });
         if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
-        fillCaseFromDataJud(form, process);
+        const enrichedProcess = await enrichDataJudMunicipality(process);
+        if (request !== caseDataJudLookupRequest || normalizeCnj(form.elements.number.value) !== normalized) return;
+        fillCaseFromDataJud(form, enrichedProcess);
       } catch (error) {
         if (request !== caseDataJudLookupRequest) return;
+        if (error?.code === "DATAJUD_PROCESS_NOT_FOUND") {
+          setCaseDataJudStatus(
+            form,
+            `${error.message} O preenchimento manual foi liberado para este cadastro.`,
+            "manual",
+          );
+          setCaseDataJudGate(form, false);
+          return;
+        }
         setCaseDataJudStatus(
           form,
           error.message || "Não foi possível consultar o DataJud. Os campos permanecem bloqueados.",
@@ -3002,30 +3025,6 @@
       return;
     }
     scheduleCaseDataJudLookup(form);
-  }
-  function renderCaseParties(parties = []) {
-    const rows = $("#case-parties-rows");
-    rows.innerHTML = "";
-    (parties.length ? parties : [{ id: uid(), name: "", role: "Autor" }]).forEach((party) => {
-      const row = document.createElement("div");
-      row.className = "case-party-row";
-      row.dataset.partyId = party.id || uid();
-      row.innerHTML = `<input data-case-party="name" value="${escapeHtml(party.name || "")}" placeholder="Nome da parte" aria-label="Nome da parte"><select data-case-party="role" aria-label="Polo da parte"><option ${party.role === "Autor" ? "selected" : ""}>Autor</option><option ${party.role === "Réu" ? "selected" : ""}>Réu</option><option ${party.role === "Credor" ? "selected" : ""}>Credor</option><option ${party.role === "Devedor" ? "selected" : ""}>Devedor</option><option ${party.role === "Reclamante" ? "selected" : ""}>Reclamante</option><option ${party.role === "Reclamada" ? "selected" : ""}>Reclamada</option><option ${party.role === "Exequente" ? "selected" : ""}>Exequente</option><option ${party.role === "Executado" ? "selected" : ""}>Executado</option></select><button class="icon-btn" type="button" data-remove-case-party aria-label="Remover parte">×</button>`;
-      row.querySelector("[data-remove-case-party]").onclick = () => {
-        row.remove();
-        if (!$("#case-parties-rows").children.length) renderCaseParties([]);
-      };
-      rows.append(row);
-    });
-  }
-  function readCaseParties() {
-    return [...document.querySelectorAll("#case-parties-rows .case-party-row")]
-      .map((row) => ({
-        id: row.dataset.partyId,
-        name: row.querySelector('[data-case-party="name"]').value.trim(),
-        role: row.querySelector('[data-case-party="role"]').value,
-      }))
-      .filter((party) => party.name);
   }
   function openCase(clientId = "", caseId = "") {
     if (!data.clients.length) {
@@ -3073,7 +3072,6 @@
       $("#case-agreement-editor"),
       item?.agreement || blankAgreement(),
     );
-    renderCaseParties(item?.parties || []);
     updateCaseContractFields();
     renderCaseDataJud(caseDataJudDraft);
     syncCaseType();
@@ -3221,8 +3219,13 @@
   function detailField(label, value, icon = "fa-circle-info") {
     return `<div class="detail-field"><i class="fa-solid ${icon}"></i><span><small>${escapeHtml(label)}</small><strong>${escapeHtml(value || "Não informado")}</strong></span></div>`;
   }
-  function showDetail({ eyebrow, title, subtitle, body, links = "", onEdit }) {
+  function showDetail({ eyebrow, title, subtitle, body, links = "", onEdit, dataJudCaseId = "" }) {
     const dialog = $("#detail-dialog");
+    const previousDataJudCaseId = dialog.dataset.datajudCaseId;
+    if (previousDataJudCaseId && previousDataJudCaseId !== dataJudCaseId)
+      dataJudMovementsSession.delete(previousDataJudCaseId);
+    if (dataJudCaseId) dialog.dataset.datajudCaseId = dataJudCaseId;
+    else delete dialog.dataset.datajudCaseId;
     $("#detail-eyebrow").textContent = eyebrow;
     $("#detail-title").textContent = title;
     $("#detail-subtitle").textContent = subtitle || "";
@@ -3294,19 +3297,27 @@
       onEdit: () => openClient(id),
     });
   }
-  function caseDataJudTabs(info) {
+  function caseDataJudTabs(info, caseId = "") {
     if (!info)
       return '<div class="detail-note"><strong>Dados do DataJud</strong><p>Este processo ainda não possui uma consulta pública DataJud salva.</p></div>';
     const subjects = info.subjects?.map((subject) => subject.name).filter(Boolean).join(" · "),
-      movements = Array.isArray(info.movements) ? info.movements : [],
-      summary = `<div class="detail-grid">${detailField("Tipo de justiça", info.justiceType, "fa-scale-balanced")}${detailField("Tribunal", [info.tribunalName, info.tribunal].filter(Boolean).join(" · "), "fa-building-columns")}${detailField("Órgão julgador", info.court?.name, "fa-landmark")}${detailField("Sistema", info.system?.name, "fa-laptop-code")}${detailField("Classe processual", info.processClass?.name, "fa-file-lines")}${detailField("Grau", info.degree, "fa-layer-group")}${detailField("Formato", info.format?.name, "fa-file-circle-check")}${detailField("Data de ajuizamento", dateTime(info.filingDate), "fa-calendar-day")}${detailField("Assuntos", subjects, "fa-tags")}${detailField("Nível de sigilo", info.secrecyLevel === "" || info.secrecyLevel === undefined ? "Não informado" : String(info.secrecyLevel), "fa-user-shield")}${detailField("Atualização na origem", dateTime(info.sourceUpdatedAt), "fa-arrows-rotate")}</div>`,
+      movementSession = caseId ? dataJudMovementsSession.get(caseId) : null,
+      movements = Array.isArray(movementSession?.movements) ? movementSession.movements : [],
+      summary = `<div class="detail-grid">${detailField("Tipo de justiça", info.justiceType, "fa-scale-balanced")}${detailField("Tribunal", [info.tribunalName, info.tribunal].filter(Boolean).join(" · "), "fa-building-columns")}${detailField("Órgão julgador", info.court?.name, "fa-landmark")}${detailField("Município", dataJudMunicipalityLabel(info), "fa-city")}${detailField("Sistema", info.system?.name, "fa-laptop-code")}${detailField("Classe processual", info.processClass?.name, "fa-file-lines")}${detailField("Grau", info.degree, "fa-layer-group")}${detailField("Formato", info.format?.name, "fa-file-circle-check")}${detailField("Data de ajuizamento", dateTime(info.filingDate), "fa-calendar-day")}${detailField("Assuntos", subjects, "fa-tags")}${detailField("Nível de sigilo", info.secrecyLevel === "" || info.secrecyLevel === undefined ? "Não informado" : String(info.secrecyLevel), "fa-user-shield")}${detailField("Atualização na origem", dateTime(info.sourceUpdatedAt), "fa-arrows-rotate")}</div>`,
       movementRows = movements
         .map((movement) => `<article class="case-movement"><div class="case-movement-date">${escapeHtml(dateTime(movement.dateTime))}</div><div><strong>${escapeHtml(movement.name || "Movimentação sem descrição")}</strong>${movement.court?.name ? `<small>${escapeHtml(movement.court.name)}</small>` : ""}${movement.complements?.length ? `<small>${escapeHtml(movement.complements.map((item) => item.name || item.description).filter(Boolean).join(" · "))}</small>` : ""}</div></article>`)
         .join("") || '<p class="detail-empty">Nenhuma movimentação foi disponibilizada pelo DataJud.</p>',
-      movementPanel = `<div class="case-movements"><div class="case-movement-warning"><i class="fa-solid fa-triangle-exclamation"></i><span>As movimentações podem estar atrasadas e não necessariamente refletem o estado atual do processo.</span></div>${movementRows}</div>`;
-    return `<section class="case-detail-tabs" data-case-detail-tabs><div class="case-detail-tablist" role="tablist" aria-label="Informações públicas do processo"><button type="button" class="case-detail-tab active" data-case-tab="summary" role="tab" aria-selected="true">Dados do processo</button><button type="button" class="case-detail-tab" data-case-tab="movements" role="tab" aria-selected="false">Movimentações <span>${movements.length}</span></button></div><div data-case-panel="summary">${summary}</div><div data-case-panel="movements" hidden><div class="detail-note"><strong>Fonte e atualização</strong><p>Dados públicos retornados pela API DataJud. A última atualização informada pela origem é ${escapeHtml(dateTime(info.sourceUpdatedAt))}.</p></div>${movementPanel}</div></section>`;
+      movementContent = movementSession
+        ? movementRows
+        : '<p class="detail-empty">As movimentações ainda não foram consultadas nesta sessão.</p>',
+      movementButton = caseId
+        ? `<button class="btn ghost small" type="button" data-refresh-case-datajud-movements="${caseId}"><i class="fa-solid fa-rotate"></i> ${movementSession ? "Atualizar movimentações" : "Consultar movimentações"}</button>`
+        : "",
+      movementPanel = `<div class="case-movements"><div class="case-movement-warning"><i class="fa-solid fa-triangle-exclamation"></i><span>As movimentações podem estar atrasadas e não necessariamente refletem o estado atual do processo.</span></div><div class="case-movement-actions"><strong>Consulta sob demanda</strong>${movementButton}</div>${movementContent}</div>`,
+      movementCount = movementSession ? movements.length : "—";
+    return `<section class="case-detail-tabs" data-case-detail-tabs><div class="case-detail-tablist" role="tablist" aria-label="Informações públicas do processo"><button type="button" class="case-detail-tab active" data-case-tab="summary" role="tab" aria-selected="true">Dados do processo</button><button type="button" class="case-detail-tab" data-case-tab="movements" role="tab" aria-selected="false">Movimentações <span>${movementCount}</span></button></div><div data-case-panel="summary">${summary}</div><div data-case-panel="movements" hidden><div class="detail-note"><strong>Fonte e atualização</strong><p>Dados públicos retornados pela API DataJud. A última atualização informada pela origem é ${escapeHtml(dateTime(info.sourceUpdatedAt))}.</p></div>${movementPanel}</div></section>`;
   }
-  function viewCaseDataJud(id) {
+  function viewCaseDataJud(id, selectedTab = "summary") {
     const item = data.cases.find((candidate) => candidate.id === id);
     if (!item?.dataJud) return;
     const info = item.dataJud,
@@ -3315,10 +3326,14 @@
       eyebrow: "DADOS DO DATAJUD",
       title: item.title,
       subtitle: `${item.number}${tribunal ? ` · ${tribunal}` : ""}`,
-      body: caseDataJudTabs(info),
+      body: caseDataJudTabs(info, id),
       links: `<button class="btn secondary" type="button" data-refresh-case-datajud="${item.id}"><i class="fa-solid fa-rotate"></i> Atualizar dados</button>`,
       onEdit: () => openCase(item.clientId, id),
+      dataJudCaseId: id,
     });
+    const dialog = $("#detail-dialog");
+    const tab = dialog.querySelector(`[data-case-tab="${selectedTab}"]`);
+    if (tab) activateCaseTab(tab);
   }
   async function refreshCaseDataJud(id) {
     const item = data.cases.find((candidate) => candidate.id === id);
@@ -3337,11 +3352,17 @@
         proxyUrl: worker.apiUrl,
         proxyKey: worker.apiKey,
       });
-      const previousTitle = item.dataJud.title || "";
-      item.dataJud = { ...process, fetchedAt: now() };
-      item.number = maskCnj(process.number || item.number);
+      const enrichedProcess = await enrichDataJudMunicipality(process),
+        refreshedAt = now(),
+        previousTitle = item.dataJud.title || "";
+      dataJudMovementsSession.set(id, {
+        movements: Array.isArray(enrichedProcess.movements) ? enrichedProcess.movements : [],
+        fetchedAt: refreshedAt,
+      });
+      item.dataJud = sanitizeDataJudRecord({ ...enrichedProcess, fetchedAt: refreshedAt });
+      item.number = maskCnj(enrichedProcess.number || item.number);
       if (!item.title.trim() || item.title.trim() === previousTitle.trim())
-        item.title = process.title || item.title;
+        item.title = enrichedProcess.title || item.title;
       item.updatedAt = now();
       persist();
       viewCaseDataJud(id);
@@ -3352,6 +3373,37 @@
         button.innerHTML = '<i class="fa-solid fa-rotate"></i> Atualizar dados';
       }
       toast(error.message || "Não foi possível atualizar os dados do DataJud.");
+    }
+  }
+  async function refreshCaseDataJudMovements(id) {
+    const item = data.cases.find((candidate) => candidate.id === id);
+    if (!item?.dataJud) return;
+    if (!dataJudProxyReady())
+      return toast("Configure o proxy e a chave do Worker antes de consultar as movimentações.");
+    const button = [...document.querySelectorAll("[data-refresh-case-datajud-movements]")].find(
+      (candidate) => candidate.dataset.refreshCaseDatajudMovements === id,
+    );
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Consultando…';
+    }
+    try {
+      const process = await lookupProcess(item.number, {
+        proxyUrl: worker.apiUrl,
+        proxyKey: worker.apiKey,
+      });
+      dataJudMovementsSession.set(id, {
+        movements: Array.isArray(process.movements) ? process.movements : [],
+        fetchedAt: now(),
+      });
+      viewCaseDataJud(id, "movements");
+      toast("Movimentações consultadas temporariamente; nada foi salvo no caso.");
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = `<i class="fa-solid fa-rotate"></i> ${dataJudMovementsSession.has(id) ? "Atualizar movimentações" : "Consultar movimentações"}`;
+      }
+      toast(error.message || "Não foi possível consultar as movimentações do DataJud.");
     }
   }
   function activateCaseTab(button) {
@@ -3910,6 +3962,11 @@
   $("#open-people").onclick = () => showView("people");
   $("#back-to-clients").onclick = () => showView("clients");
   $("#close-detail").onclick = () => $("#detail-dialog").close();
+  $("#detail-dialog").addEventListener("close", () => {
+    const caseId = $("#detail-dialog").dataset.datajudCaseId;
+    if (caseId) dataJudMovementsSession.delete(caseId);
+    delete $("#detail-dialog").dataset.datajudCaseId;
+  });
   $("#entry-form [name=kind]").onchange = (e) => {
     fillCategories(e.target.value);
     renderAllocationPreview();
@@ -4403,7 +4460,6 @@
         notes: fd.notes.trim(),
         dataJud: fd.type === "judicial" ? caseDataJudDraft : null,
         assignments: old?.assignments || [],
-        parties: readCaseParties(),
         createdAt: old?.createdAt || now(),
         updatedAt: now(),
       };
@@ -4678,12 +4734,6 @@
     }
   });
   $("#case-form [name=contractScope]").onchange = updateCaseContractFields;
-  $("#add-case-party").onclick = () => {
-    const parties = readCaseParties();
-    parties.push({ id: uid(), name: "", role: "Autor" });
-    renderCaseParties(parties);
-    $("#case-parties-rows .case-party-row:last-child [data-case-party=name]").focus();
-  };
   function setPackagesExpanded(expanded) {
     const content = $("#packages-content"), button = $("#toggle-packages");
     content.hidden = !expanded;
@@ -4814,6 +4864,7 @@
       vx = e.target.closest("[data-view-case]"),
       vdatajud = e.target.closest("[data-view-case-datajud]"),
       refreshDataJud = e.target.closest("[data-refresh-case-datajud]"),
+      refreshDataJudMovements = e.target.closest("[data-refresh-case-datajud-movements]"),
       vp = e.target.closest("[data-view-package]"),
       vt = e.target.closest("[data-view-team]"),
       ve = e.target.closest("[data-view-entry]"),
@@ -4824,6 +4875,7 @@
     if (vx) viewCase(vx.dataset.viewCase);
     if (vdatajud) viewCaseDataJud(vdatajud.dataset.viewCaseDatajud);
     if (refreshDataJud) await refreshCaseDataJud(refreshDataJud.dataset.refreshCaseDatajud);
+    if (refreshDataJudMovements) await refreshCaseDataJudMovements(refreshDataJudMovements.dataset.refreshCaseDatajudMovements);
     if (vp) viewPackage(vp.dataset.viewPackage);
     if (vt) viewTeamMember(vt.dataset.viewTeam);
     if (ve) viewEntry(ve.dataset.viewEntry);

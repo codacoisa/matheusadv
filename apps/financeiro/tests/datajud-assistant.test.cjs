@@ -74,6 +74,7 @@ test("consultar pelo Worker e normalizar capa, assuntos e movimentações", asyn
   assert.equal(result.justiceType, "Justiça Federal");
   assert.equal(result.processClass.name, "Procedimento do Juizado Especial Cível");
   assert.equal(result.court.name, "JEF Adj - Tefé");
+  assert.equal(result.court.ibgeCode, 5128);
   assert.equal(result.subjects[0].name, "Concessão");
   assert.equal(result.title, "Procedimento do Juizado Especial Cível · Concessão");
   assert.equal(result.movements[0].name, "Distribuição");
@@ -96,13 +97,13 @@ test("exigir proxy do Worker para qualquer consulta", async () => {
   );
 });
 
-test("informar quando a API não encontra o processo", async () => {
+test("informar quando a API não encontra o processo e permitir tratamento manual", async () => {
   await assert.rejects(
     dataJud.lookupProcess(sampleNumber, {
       proxyUrl: "https://worker.example",
       proxyKey: "chave-do-servico",
       fetchImpl: async () => new Response(JSON.stringify({ hits: { hits: [] } }), { status: 200 }),
     }),
-    /Processo não encontrado/,
+    (error) => error.code === "DATAJUD_PROCESS_NOT_FOUND" && /Processo não encontrado/.test(error.message),
   );
 });
