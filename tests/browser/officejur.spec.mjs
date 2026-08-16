@@ -720,6 +720,18 @@ test('Financeiro filtra casos por tipo, área e disponibilidade no DataJud', asy
   await expect(page.locator('#case-status-filter')).toHaveValue('active');
 });
 
+test('Financeiro converte dois espaços em separador no título manual do caso', async ({ page }) => {
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="type"]').selectOption('extrajudicial');
+  const title = form.locator('[name="title"]');
+  await title.fill('Execução  Título e  outros assuntos');
+  await expect(title).toHaveValue('Execução · Título e · outros assuntos');
+});
+
 test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', async ({ page }) => {
   const processNumber = '00008323520184013202';
   await page.route('https://worker.example/datajud/search', async route => {

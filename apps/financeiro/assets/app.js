@@ -108,6 +108,20 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  function normalizeCaseTitleSeparators(field) {
+    const value = String(field.value || ""),
+      normalized = value.replace(/ {2,}/g, " · ");
+    if (normalized === value) return;
+    const start = field.selectionStart ?? value.length,
+      end = field.selectionEnd ?? start,
+      normalizedPosition = (position) =>
+        value.slice(0, position).replace(/ {2,}/g, " · ").length;
+    field.value = normalized;
+    field.setSelectionRange(
+      normalizedPosition(start),
+      normalizedPosition(end),
+    );
+  }
   const safeUrl = (value, protocols = ["https:"]) => {
     try {
       const url = new URL(String(value || ""), location.href);
@@ -4489,7 +4503,9 @@
     if (e.submitter?.value === "cancel") return;
     e.preventDefault();
     const f = e.currentTarget,
-      fd = Object.fromEntries(new FormData(f)),
+      titleField = f.elements.title;
+    normalizeCaseTitleSeparators(titleField);
+    const fd = Object.fromEntries(new FormData(f)),
       client = data.clients.find((c) => c.id === fd.clientId);
     if (!client) return toast("Selecione um cliente cadastrado.");
     if (!fd.title)
@@ -4800,6 +4816,9 @@
     updateCaseContractFields();
   };
   $("#case-form [name=type]").onchange = syncCaseType;
+  $("#case-form [name=title]").addEventListener("input", (event) => {
+    normalizeCaseTitleSeparators(event.currentTarget);
+  });
   $("#case-form [name=number]").addEventListener("input", (event) => {
     if (event.target.form.elements.type.value === "judicial") {
       event.target.value = maskCnj(event.target.value);
