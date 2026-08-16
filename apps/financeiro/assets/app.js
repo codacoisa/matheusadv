@@ -155,6 +155,26 @@
   const uid = () =>
     crypto.randomUUID?.() ||
     `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const randomUppercaseToken = (length = 8) => {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let values;
+    try {
+      values = globalThis.crypto?.getRandomValues(new Uint32Array(length));
+    } catch (_) {
+      values = null;
+    }
+    return Array.from({ length }, (_, index) => {
+      const value = values?.[index] ?? Math.floor(Math.random() * alphabet.length);
+      return alphabet[value % alphabet.length];
+    }).join("");
+  };
+  function generateInternalCaseReference(items) {
+    let reference = "";
+    do {
+      reference = `INT-${randomUppercaseToken()}`;
+    } while (hasDuplicateCaseReference(items, reference));
+    return reference;
+  }
   const iso = () => new Date().toISOString().slice(0, 10),
     now = () => new Date().toISOString();
   const timestamp = (item) =>
@@ -1977,8 +1997,11 @@
                 ? `${money(received)} recebidos em conjunto · saldo ${money(balance)} · ${packageCases} caso(s)`
                 : contracted
                   ? `${money(received)} de ${money(contracted)} recebidos · saldo ${money(balance)}${success ? ` · êxito de ${successAgreement.successRate}% à parte` : ""}`
-                  : `${money(ownReceived)} recebido neste caso`;
-            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button><button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}${item.dataJud?.tribunal ? ` · ${escapeHtml(item.dataJud.tribunal)}` : ""}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client ? clientDisplayName(client) : "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
+                  : `${money(ownReceived)} recebido neste caso`,
+              dataJudButton = item.dataJud
+                ? `<button class="link-btn" data-view-case-datajud="${item.id}" title="Ver dados do DataJud" aria-label="Ver dados do DataJud"><i class="fa-solid fa-database"></i></button>`
+                : "";
+            return `<article class="client-card case-card"><header><span class="case-type"><i class="fa-solid ${item.type === "judicial" ? "fa-scale-balanced" : item.type === "consulting" ? "fa-comments" : "fa-folder"}"></i>${escapeHtml(item.area)}</span><span><button class="link-btn" data-view-case="${item.id}" title="Visualizar caso"><i class="fa-solid fa-eye"></i></button>${dataJudButton}<button class="link-btn" data-manage-team="${item.clientId}:${item.id}" title="Equipe do caso"><i class="fa-solid fa-user-group"></i></button><button class="link-btn" data-edit-case="${item.clientId}:${item.id}" title="Editar caso"><i class="fa-solid fa-pen"></i></button></span></header><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.number)}${item.dataJud?.tribunal ? ` · ${escapeHtml(item.dataJud.tribunal)}` : ""}</p><a class="case-client-link" data-show-client="${item.clientId}" href="#clients"><i class="fa-solid fa-user"></i>${escapeHtml(client ? clientDisplayName(client) : "Cliente não encontrado")}</a><div class="package-line${statusClass}"><i class="fa-solid ${statusIcon}"></i><span><strong>${escapeHtml(statusTitle)}</strong><small>${escapeHtml(statusText)}</small></span></div><div class="case-team-summary"><span><i class="fa-solid fa-user-tie"></i>${escapeHtml(lead ? teamName(lead.personId) : "Sem responsável principal")}</span><strong>${item.assignments.length} pessoa(s) · ${teamShare}%</strong></div></article>`;
           })
           .join("")
       : '<div class="panel empty">Nenhum caso encontrado para os filtros selecionados.</div>';
@@ -2959,7 +2982,7 @@
     const form = $("#case-form"), judicial = form.elements.type.value === "judicial";
     $("#case-number-help").textContent = judicial
       ? "Para processos judiciais, informe a numeração única CNJ com 20 dígitos."
-      : "Para casos não judiciais, use uma referência interna ou o número do procedimento.";
+      : "Opcional para casos não judiciais. Se ficar em branco, uma referência interna será gerada automaticamente.";
     form.elements.number.placeholder = judicial
       ? "0000000-00.0000.0.00.0000"
       : "Número do procedimento ou referência interna";
@@ -3283,6 +3306,54 @@
       movementPanel = `<div class="case-movements"><div class="case-movement-warning"><i class="fa-solid fa-triangle-exclamation"></i><span>As movimentações podem estar atrasadas e não necessariamente refletem o estado atual do processo.</span></div>${movementRows}</div>`;
     return `<section class="case-detail-tabs" data-case-detail-tabs><div class="case-detail-tablist" role="tablist" aria-label="Informações públicas do processo"><button type="button" class="case-detail-tab active" data-case-tab="summary" role="tab" aria-selected="true">Dados do processo</button><button type="button" class="case-detail-tab" data-case-tab="movements" role="tab" aria-selected="false">Movimentações <span>${movements.length}</span></button></div><div data-case-panel="summary">${summary}</div><div data-case-panel="movements" hidden><div class="detail-note"><strong>Fonte e atualização</strong><p>Dados públicos retornados pela API DataJud. A última atualização informada pela origem é ${escapeHtml(dateTime(info.sourceUpdatedAt))}.</p></div>${movementPanel}</div></section>`;
   }
+  function viewCaseDataJud(id) {
+    const item = data.cases.find((candidate) => candidate.id === id);
+    if (!item?.dataJud) return;
+    const info = item.dataJud,
+      tribunal = [info.tribunalName, info.tribunal].filter(Boolean).join(" · ");
+    showDetail({
+      eyebrow: "DADOS DO DATAJUD",
+      title: item.title,
+      subtitle: `${item.number}${tribunal ? ` · ${tribunal}` : ""}`,
+      body: caseDataJudTabs(info),
+      links: `<button class="btn secondary" type="button" data-refresh-case-datajud="${item.id}"><i class="fa-solid fa-rotate"></i> Atualizar dados</button>`,
+      onEdit: () => openCase(item.clientId, id),
+    });
+  }
+  async function refreshCaseDataJud(id) {
+    const item = data.cases.find((candidate) => candidate.id === id);
+    if (!item?.dataJud) return;
+    if (!dataJudProxyReady())
+      return toast("Configure o proxy e a chave do Worker antes de atualizar o DataJud.");
+    const button = [...document.querySelectorAll("[data-refresh-case-datajud]")].find(
+      (candidate) => candidate.dataset.refreshCaseDatajud === id,
+    );
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Atualizando…';
+    }
+    try {
+      const process = await lookupProcess(item.number, {
+        proxyUrl: worker.apiUrl,
+        proxyKey: worker.apiKey,
+      });
+      const previousTitle = item.dataJud.title || "";
+      item.dataJud = { ...process, fetchedAt: now() };
+      item.number = maskCnj(process.number || item.number);
+      if (!item.title.trim() || item.title.trim() === previousTitle.trim())
+        item.title = process.title || item.title;
+      item.updatedAt = now();
+      persist();
+      viewCaseDataJud(id);
+      toast("Dados do DataJud atualizados.");
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = '<i class="fa-solid fa-rotate"></i> Atualizar dados';
+      }
+      toast(error.message || "Não foi possível atualizar os dados do DataJud.");
+    }
+  }
   function activateCaseTab(button) {
     const tabs = button.closest("[data-case-detail-tabs]");
     if (!tabs) return;
@@ -3321,8 +3392,8 @@
       eyebrow: "PROCESSO / CASO",
       title: x.title,
       subtitle: `${x.number} · ${x.area} · ${{ active: "Ativo", suspended: "Suspenso", closed: "Encerrado" }[x.status] || x.status}`,
-      body: `<div class="detail-grid">${detailField("Cliente", client ? clientDisplayName(client) : "Cliente não encontrado", "fa-user")}${detailField("Tipo", { judicial: "Judicial", administrative: "Administrativo", extrajudicial: "Extrajudicial", consulting: "Consultivo" }[x.type], "fa-folder")}${detailField("Contratação", packageItem ? `Pacote · ${packageItem.name}` : x.contractScope === "own" ? agreementLabel(agreement) : "Não informada", "fa-file-invoice-dollar")}${detailField("Parte fixa", stats.contracted ? money(stats.contracted) : "Não informada", "fa-coins")}${detailField("Situação financeira", financialStatus, balance < 0.005 && stats.contracted ? "fa-circle-check" : "fa-chart-line")}${detailField("Êxito", ["success", "mixed"].includes(agreement.mode) ? `${agreement.successRate}% · ${agreement.successBase || "base não informada"}` : "Não aplicável", "fa-percent")}${detailField("Responsável", teamName(assignments.find((a) => a.isLead)?.personId), "fa-user-tie")}</div>${x.type === "judicial" ? caseDataJudTabs(x.dataJud) : ""}${x.notes ? `<div class="detail-note"><strong>Observações</strong><p>${x.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Equipe e participações</strong><span>${assignments.reduce((s, a) => s + Number(a.sharePercent || 0), 0)}%</span></header>${assignments.map((a) => `<button class="detail-list-row" data-view-team="${a.personId}"><span><strong>${teamName(a.personId)}${a.isLead ? " · Responsável" : ""}</strong><small>${assignmentRoleLabel(a.assignmentRole)}${a.notes ? ` · ${a.notes}` : ""}</small></span><b>${a.sharePercent || 0}%</b></button>`).join("") || '<p class="detail-empty">Nenhuma pessoa atribuída.</p>'}</div><div class="detail-totals"><span><small>Receitas deste caso</small><strong>${money(t.income)}</strong></span><span><small>Recebido neste caso</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
-      links: `<button class="btn ghost" type="button" data-view-client="${x.clientId}"><i class="fa-solid fa-user"></i> Ver cliente</button><button class="btn ghost" type="button" data-manage-team="${x.clientId}:${x.id}"><i class="fa-solid fa-user-group"></i> Equipe</button>`,
+      body: `<div class="detail-grid">${detailField("Cliente", client ? clientDisplayName(client) : "Cliente não encontrado", "fa-user")}${detailField("Tipo", { judicial: "Judicial", administrative: "Administrativo", extrajudicial: "Extrajudicial", consulting: "Consultivo" }[x.type], "fa-folder")}${detailField("Contratação", packageItem ? `Pacote · ${packageItem.name}` : x.contractScope === "own" ? agreementLabel(agreement) : "Não informada", "fa-file-invoice-dollar")}${detailField("Parte fixa", stats.contracted ? money(stats.contracted) : "Não informada", "fa-coins")}${detailField("Situação financeira", financialStatus, balance < 0.005 && stats.contracted ? "fa-circle-check" : "fa-chart-line")}${detailField("Êxito", ["success", "mixed"].includes(agreement.mode) ? `${agreement.successRate}% · ${agreement.successBase || "base não informada"}` : "Não aplicável", "fa-percent")}${detailField("Responsável", teamName(assignments.find((a) => a.isLead)?.personId), "fa-user-tie")}</div>${x.notes ? `<div class="detail-note"><strong>Observações</strong><p>${x.notes}</p></div>` : ""}<div class="detail-section"><header><strong>Equipe e participações</strong><span>${assignments.reduce((s, a) => s + Number(a.sharePercent || 0), 0)}%</span></header>${assignments.map((a) => `<button class="detail-list-row" data-view-team="${a.personId}"><span><strong>${teamName(a.personId)}${a.isLead ? " · Responsável" : ""}</strong><small>${assignmentRoleLabel(a.assignmentRole)}${a.notes ? ` · ${a.notes}` : ""}</small></span><b>${a.sharePercent || 0}%</b></button>`).join("") || '<p class="detail-empty">Nenhuma pessoa atribuída.</p>'}</div><div class="detail-totals"><span><small>Receitas deste caso</small><strong>${money(t.income)}</strong></span><span><small>Recebido neste caso</small><strong>${money(t.incomePaid)}</strong></span><span><small>Despesas</small><strong>${money(t.expense)}</strong></span></div>`,
+      links: `<button class="btn ghost" type="button" data-view-client="${x.clientId}"><i class="fa-solid fa-user"></i> Ver cliente</button><button class="btn ghost" type="button" data-manage-team="${x.clientId}:${x.id}"><i class="fa-solid fa-user-group"></i> Equipe</button>${x.dataJud ? `<button class="btn ghost" type="button" data-view-case-datajud="${x.id}"><i class="fa-solid fa-database"></i> Dados do DataJud</button>` : ""}`,
       onEdit: () => openCase(x.clientId, id),
     });
   }
@@ -4289,13 +4360,20 @@
       fd = Object.fromEntries(new FormData(f)),
       client = data.clients.find((c) => c.id === fd.clientId);
     if (!client) return toast("Selecione um cliente cadastrado.");
-    if (!fd.number || !fd.title)
-      return toast("Informe a referência e o objeto do caso.");
+    if (!fd.title)
+      return toast("Informe o objeto do caso.");
+    if (fd.type === "judicial" && !fd.number)
+      return toast("Informe o número CNJ do processo judicial.");
     if (fd.type === "judicial" && !validCnj(fd.number))
       return toast("Informe um número CNJ válido com 20 dígitos.");
     if (fd.type === "judicial" && f.dataset.datajudGate === "locked")
       return toast("Aguarde a consulta do DataJud antes de salvar o processo.");
-    if (hasDuplicateCaseReference(data.cases, fd.number, fd.id))
+    const old = data.cases.find((x) => x.id === fd.id),
+      generatedInternalReference = fd.type !== "judicial" && !fd.number.trim(),
+      caseNumber = fd.type === "judicial"
+        ? maskCnj(fd.number)
+        : fd.number.trim() || generateInternalCaseReference(data.cases);
+    if (hasDuplicateCaseReference(data.cases, caseNumber, fd.id))
       return toast(
         "Já existe um caso ou processo cadastrado com este número ou referência.",
       );
@@ -4311,13 +4389,12 @@
         : blankAgreement();
     const errors = scope === "own" ? validateAgreement(agreement) : [];
     if (errors.length) return toast(errors[0]);
-    const old = data.cases.find((x) => x.id === fd.id),
-      obj = {
+    const obj = {
         id: fd.id || uid(),
         clientId: client.id,
         type: fd.type,
         area: fd.area,
-        number: fd.type === "judicial" ? maskCnj(fd.number) : fd.number.trim(),
+        number: caseNumber,
         title: fd.title.trim(),
         status: fd.status,
         contractScope: scope,
@@ -4333,6 +4410,7 @@
     data.cases = old
       ? data.cases.map((x) => (x.id === obj.id ? obj : x))
       : [...data.cases, obj];
+    f.elements.number.value = caseNumber;
     if (scope === "own")
       syncContractEntries({
         source: "case",
@@ -4345,12 +4423,15 @@
     else clearPendingContractEntries("case", obj.id);
     $("#case-dialog").close();
     persist();
+    const savedMessage = scope === "own"
+      ? "Caso salvo e recebíveis atualizados."
+      : scope === "package"
+        ? "Caso salvo e vinculado ao pacote."
+        : "Caso salvo com contratação em branco.";
     toast(
-      scope === "own"
-        ? "Caso salvo e recebíveis atualizados."
-        : scope === "package"
-          ? "Caso salvo e vinculado ao pacote."
-          : "Caso salvo com contratação em branco.",
+      generatedInternalReference
+        ? `${savedMessage} Referência interna gerada: ${caseNumber}.`
+        : savedMessage,
     );
   });
   $("#package-form").addEventListener("submit", (event) => {
@@ -4731,6 +4812,8 @@
       promotePerson = e.target.closest("[data-promote-person]"),
       vc = e.target.closest("[data-view-client]"),
       vx = e.target.closest("[data-view-case]"),
+      vdatajud = e.target.closest("[data-view-case-datajud]"),
+      refreshDataJud = e.target.closest("[data-refresh-case-datajud]"),
       vp = e.target.closest("[data-view-package]"),
       vt = e.target.closest("[data-view-team]"),
       ve = e.target.closest("[data-view-entry]"),
@@ -4739,6 +4822,8 @@
     if (vperson) viewPerson(vperson.dataset.viewPerson);
     if (vc) viewClient(vc.dataset.viewClient);
     if (vx) viewCase(vx.dataset.viewCase);
+    if (vdatajud) viewCaseDataJud(vdatajud.dataset.viewCaseDatajud);
+    if (refreshDataJud) await refreshCaseDataJud(refreshDataJud.dataset.refreshCaseDatajud);
     if (vp) viewPackage(vp.dataset.viewPackage);
     if (vt) viewTeamMember(vt.dataset.viewTeam);
     if (ve) viewEntry(ve.dataset.viewEntry);
