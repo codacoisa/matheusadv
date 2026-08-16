@@ -44,7 +44,7 @@ test('Central reflete os polos resumidos e mantém o vencimento legível', () =>
   const styles = read('apps/lab/tools/central-guias/assets/styles.css');
   const app = read('apps/lab/tools/central-guias/assets/app.js');
 
-  assert.match(index, /Polo Ativo, Polo Passivo/);
+  assert.match(index, /Buscar processo, polo, CNJ/);
   assert.match(app, /Polo Ativo:/);
   assert.match(app, /Polo Passivo:/);
   assert.match(index, /file-invoice-dollar/);
@@ -54,6 +54,8 @@ test('Central reflete os polos resumidos e mantém o vencimento legível', () =>
   assert.match(app, /function lastPathSegment/);
   assert.match(app, /cell-truncate/);
   assert.match(app, /function getProcessOpenUrl/);
+  assert.match(app, /function formatDateTimeCompact/);
+  assert.match(app, /process-card-details/);
   assert.match(app, /target="_blank"/);
   assert.match(app, /arrow-up-right-from-square/);
   assert.match(app, /function formatDateOnly/);
@@ -61,5 +63,6 @@ test('Central reflete os polos resumidos e mantém o vencimento legível', () =>
   assert.match(styles, /\.table-wrap table\s*\{[\s\S]*table-layout: fixed/);
   assert.match(styles, /\.party-summary/);
   assert.match(styles, /\.process-meta-line/);
+  assert.match(styles, /\.sync-meta/);
   assert.match(styles, /\.due-date/);
 });

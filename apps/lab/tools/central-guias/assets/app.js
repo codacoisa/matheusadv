@@ -857,8 +857,27 @@
       return segments[segments.length - 1] || text;
     }
 
+    function getProcessNumber(processRecord) {
+      return processRecord.shortNumber || processRecord.cnj || '';
+    }
+
+    function getProcessDisplayLabel(processRecord) {
+      return getProcessNumber(processRecord) || 'Sem número';
+    }
+
+    function getProcessCopyValue(processRecord) {
+      return getProcessNumber(processRecord) || processRecord.processId || '';
+    }
+
+    function compactIdentifier(value) {
+      const text = String(value || '').trim();
+      if (text.length <= 24) return text;
+      return `${text.slice(0, 14)}…${text.slice(-7)}`;
+    }
+
     function renderRow(row) {
-      const processLabel = row.processRecord.shortNumber || row.processRecord.cnj || row.processRecord.processId || 'Sem número';
+      const processLabel = getProcessDisplayLabel(row.processRecord);
+      const processCopyValue = getProcessCopyValue(row.processRecord);
       const cnj = row.processRecord.cnj && row.processRecord.cnj !== processLabel ? row.processRecord.cnj : '';
       const classLabel = lastPathSegment(row.processRecord.classe);
       const subjectLabel = lastPathSegment(row.processRecord.assunto);
@@ -867,8 +886,11 @@
       const processUrl = getProcessOpenUrl(row.processRecord);
       const tone = getStatusTone(row.status);
       const dueDate = row.guide.dueDate ? formatDateOnly(row.guide.dueDate) : '--';
-      const syncDate = getEffectiveSyncAt(row.processRecord) ? formatDateTime(getEffectiveSyncAt(row.processRecord)) : '--';
+      const syncAt = getEffectiveSyncAt(row.processRecord);
+      const syncDate = syncAt ? formatDateTimeCompact(syncAt) : '--';
       const syncLabel = row.processRecord.lastGuidesSyncAt ? 'Última sync' : 'Backup exportado';
+      const lastSeenDate = row.guide.lastSeenAt ? formatDateTimeCompact(row.guide.lastSeenAt) : '--';
+      const syncTitle = `${syncLabel}: ${syncDate} | Último avistamento: ${lastSeenDate}`;
 
       return `
         <tr>
@@ -877,6 +899,7 @@
               <div class="process-number">${escapeHtml(processLabel)}</div>
               <div class="process-meta">
                 ${cnj ? `<span class="process-meta-line">CNJ: ${escapeHtml(cnj)}</span>` : ''}
+                ${!cnj && row.processRecord.processId ? `<span class="process-meta-line" title="ID interno completo: ${escapeHtml(row.processRecord.processId)}">ID interno: ${escapeHtml(compactIdentifier(row.processRecord.processId))}</span>` : ''}
                 ${classLabel ? `<span class="process-meta-line" title="Classe completa: ${escapeHtml(row.processRecord.classe)}">Classe: ${escapeHtml(classLabel)}</span>` : ''}
                 ${subjectLabel ? `<span class="process-meta-line" title="Assunto completo: ${escapeHtml(row.processRecord.assunto)}">Assunto: ${escapeHtml(subjectLabel)}</span>` : ''}
               </div>
@@ -908,14 +931,14 @@
             <span class="pill pill-${tone}">${escapeHtml(getStatusLabel(row.status))}</span>
           </td>
           <td>
-            <div class="guide-meta">
-              ${escapeHtml(syncLabel)}: ${escapeHtml(syncDate)}<br>
-              Último avistamento: ${escapeHtml(row.guide.lastSeenAt ? formatDateTime(row.guide.lastSeenAt) : '--')}
+            <div class="sync-meta" title="${escapeHtml(syncTitle)}">
+              <strong class="sync-time">${escapeHtml(syncDate)}</strong>
+              <span class="guide-meta">${escapeHtml(syncLabel === 'Última sync' ? 'Sincronização' : 'Backup')}</span>
             </div>
           </td>
           <td>
             <div class="row-actions">
-              <button type="button" class="copy-btn copy-btn--icon" data-copy="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
+              <button type="button" class="copy-btn copy-btn--icon" data-copy="${escapeHtml(processCopyValue)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
               ${renderOpenProcessAction(processUrl)}
             </div>
           </td>
@@ -938,16 +961,21 @@
           const rightCritical = right.summary.overdue + right.summary.dueToday + right.summary.dueSoon;
           if (leftCritical !== rightCritical) return rightCritical - leftCritical;
           return (left.processRecord.shortNumber || left.processRecord.cnj || '').localeCompare(right.processRecord.shortNumber || right.processRecord.cnj || '', 'pt-BR', { numeric: true });
-        });
+      });
 
       nodes.processGrid.innerHTML = sorted.map(({ processRecord, summary }) => {
-        const processLabel = processRecord.shortNumber || processRecord.cnj || processRecord.processId || 'Sem número';
+        const processLabel = getProcessDisplayLabel(processRecord);
+        const processCopyValue = getProcessCopyValue(processRecord);
         const processContext = lastPathSegment(processRecord.assunto || processRecord.classe || processRecord.serventia || 'Sem metadados adicionais');
         const processUrl = getProcessOpenUrl(processRecord);
+        const processReference = processRecord.cnj || (processRecord.processId ? compactIdentifier(processRecord.processId) : '');
+        const processReferenceTitle = processRecord.cnj ? `CNJ: ${processRecord.cnj}` : `ID interno: ${processRecord.processId || 'não informado'}`;
+        const syncAt = getEffectiveSyncAt(processRecord);
+        const syncLabel = processRecord.lastGuidesSyncAt ? 'Sincronização' : 'Backup';
         return `
           <article class="process-card">
             <div class="process-card-head">
-              <div>
+              <div class="process-card-main">
                 <h3 class="process-card-title">${escapeHtml(processLabel)}</h3>
                 <div class="panel-subtitle">
                   ${escapeHtml(processContext)}
@@ -955,7 +983,7 @@
                 ${renderPartySummary(processRecord)}
               </div>
               <div class="process-card-actions">
-                <button type="button" class="copy-btn copy-btn--icon" data-copy-process="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
+                <button type="button" class="copy-btn copy-btn--icon" data-copy-process="${escapeHtml(processCopyValue)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
                 ${renderOpenProcessAction(processUrl)}
               </div>
             </div>
@@ -967,11 +995,10 @@
               <span class="pill pill-paid">${summary.paid} paga(s)</span>
             </div>
 
-            <div class="guide-meta">
-              Processo ID: ${escapeHtml(processRecord.processId || '--')}<br>
-              CNJ: ${escapeHtml(processRecord.cnj || '--')}<br>
-              ${escapeHtml(processRecord.lastGuidesSyncAt ? 'Última sincronização' : 'Backup exportado')}: ${escapeHtml(getEffectiveSyncAt(processRecord) ? formatDateTime(getEffectiveSyncAt(processRecord)) : '--')}<br>
-              Próximo vencimento: ${escapeHtml(summary.nearestDueDate ? formatDateTime(summary.nearestDueDate) : '--')}
+            <div class="process-card-details">
+              ${processReference ? `<span class="process-detail" title="${escapeHtml(processReferenceTitle)}"><strong>${processRecord.cnj ? 'CNJ' : 'ID interno'}:</strong> ${escapeHtml(processReference)}</span>` : ''}
+              <span class="process-detail"><strong>${escapeHtml(syncLabel)}:</strong> ${escapeHtml(syncAt ? formatDateTimeCompact(syncAt) : '--')}</span>
+              <span class="process-detail"><strong>Próximo:</strong> ${escapeHtml(summary.nearestDueDate ? formatDateOnly(summary.nearestDueDate) : '--')}</span>
             </div>
           </article>
         `;
@@ -979,7 +1006,7 @@
     }
 
     function getProcessOpenUrl(processRecord) {
-      const processNumber = processRecord.shortNumber || processRecord.cnj || '';
+      const processNumber = getProcessNumber(processRecord);
       if (processNumber) {
         const url = new URL('BuscaProcesso', PROJUDI_BASE_URL);
         url.searchParams.set('PaginaAtual', '2');
@@ -1033,6 +1060,10 @@
         hour: '2-digit',
         minute: '2-digit'
       });
+    }
+
+    function formatDateTimeCompact(value) {
+      return formatDateTime(value).replace(', ', ' ');
     }
 
     function formatDateOnly(value) {
