@@ -973,6 +973,35 @@ dialog form {
   border-radius: 9px;
   background: #fffaf0;
 }
+.case-datajud-panel .section-heading.compact {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 11px;
+}
+.case-datajud-panel .section-heading.compact > div {
+  min-width: 0;
+}
+.case-datajud-panel .section-heading.compact strong,
+.case-datajud-panel .section-heading.compact small {
+  display: block;
+}
+.case-datajud-panel .section-heading.compact strong {
+  color: var(--navy);
+  font-size: 13px;
+}
+.case-datajud-panel .section-heading.compact small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.case-datajud-panel .section-heading.compact > i {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--gold);
+  font-size: 16px;
+}
 .datajud-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
