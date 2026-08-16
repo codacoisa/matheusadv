@@ -692,6 +692,18 @@ test('Financeiro filtra casos por tipo, área e disponibilidade no DataJud', asy
   await form.locator('[name="title"]').fill('Inventário extrajudicial');
   await form.getByRole('button', { name: 'Salvar caso' }).click();
   await expect(page.locator('.case-card')).toHaveCount(2);
+  const cardLayout = await page.locator('.case-card').evaluateAll(cards => cards.map(card => {
+    const rect = selector => Math.round(card.querySelector(selector).getBoundingClientRect().top);
+    return {
+      height: Math.round(card.getBoundingClientRect().height),
+      client: rect('.case-client-link'),
+      package: rect('.package-line'),
+      team: rect('.case-team-summary'),
+    };
+  }));
+  for (const key of ['height', 'client', 'package', 'team']) {
+    expect(new Set(cardLayout.map(layout => layout[key])).size).toBe(1);
+  }
 
   await page.locator('#case-type-filter').selectOption('extrajudicial');
   await expect(page.locator('.case-card')).toHaveCount(1);

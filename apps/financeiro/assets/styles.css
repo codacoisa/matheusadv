@@ -2010,24 +2010,54 @@ dialog form {
   gap: 2px;
 }
 .case-card h3 {
-  min-height: 3.45em;
+  height: 4.6em;
+  min-height: 4.6em;
   line-height: 1.15;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.case-card > p {
+  height: 2.8em;
+  min-height: 2.8em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .case-card > .case-client-link {
-  min-height: 38px;
+  height: 58px;
+  min-height: 58px;
+  overflow: hidden;
 }
 .case-card > .package-line {
-  min-height: 58px;
+  height: 78px;
+  min-height: 78px;
+  overflow: hidden;
 }
 .case-card > .package-line > span {
   min-width: 0;
 }
+.case-card > .package-line strong,
+.case-card > .package-line small {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .case-card > .case-team-summary {
   align-items: flex-start;
+  height: 42px;
+  min-height: 42px;
   margin-top: auto;
+  overflow: hidden;
 }
 .case-card > .case-team-summary span {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .case-card > .case-team-summary strong {
   flex: 0 0 auto;
@@ -2035,11 +2065,40 @@ dialog form {
 }
 @media (max-width: 720px) {
   .case-card h3 {
+    height: auto;
     min-height: 0;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  .case-card > p {
+    height: auto;
+    min-height: 0;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
   }
   .case-card > .case-client-link,
   .case-card > .package-line {
+    height: auto;
     min-height: 0;
+    overflow: visible;
+  }
+  .case-card > .package-line strong,
+  .case-card > .package-line small {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  .case-card > .case-team-summary {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .case-card > .case-team-summary span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
 }
 .team-card header {
