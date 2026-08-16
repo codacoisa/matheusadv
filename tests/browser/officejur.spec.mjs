@@ -728,7 +728,7 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
   await form.getByRole('button', { name: 'Salvar caso' }).click();
 
   const card = page.locator('.case-card').filter({ hasText: 'Procedimento do Juizado Especial Cível · Concessão e outros assuntos' });
-  await card.locator('[data-view-case]').click();
+  await card.locator('[data-view-case-datajud]').click();
   await expect(page.locator('#detail-dialog')).toBeVisible();
   await page.getByRole('tab', { name: /Movimentações/ }).click();
   await expect(page.locator('[data-case-panel="movements"]')).toContainText('Distribuição');
