@@ -11,6 +11,7 @@
     const STALE_SYNC_DAYS = 10;
     const BACKUP_SCHEMA = 'projudi-central-guias-backup-v1';
     const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
+    const PROJUDI_BASE_URL = 'https://projudi.tjgo.jus.br/';
 
     const state = {
       gistId: '',
@@ -863,6 +864,7 @@
       const subjectLabel = lastPathSegment(row.processRecord.assunto);
       const guideType = String(row.guide.type || 'Tipo não informado').trim();
       const guideNature = String(row.guide.nature || 'Natureza não informada').trim();
+      const processUrl = getProcessOpenUrl(row.processRecord);
       const tone = getStatusTone(row.status);
       const dueDate = row.guide.dueDate ? formatDateOnly(row.guide.dueDate) : '--';
       const syncDate = getEffectiveSyncAt(row.processRecord) ? formatDateTime(getEffectiveSyncAt(row.processRecord)) : '--';
@@ -912,7 +914,10 @@
             </div>
           </td>
           <td>
-            <button type="button" class="copy-btn copy-btn--icon" data-copy="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
+            <div class="row-actions">
+              <button type="button" class="copy-btn copy-btn--icon" data-copy="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
+              ${renderOpenProcessAction(processUrl)}
+            </div>
           </td>
         </tr>
       `;
@@ -938,6 +943,7 @@
       nodes.processGrid.innerHTML = sorted.map(({ processRecord, summary }) => {
         const processLabel = processRecord.shortNumber || processRecord.cnj || processRecord.processId || 'Sem número';
         const processContext = lastPathSegment(processRecord.assunto || processRecord.classe || processRecord.serventia || 'Sem metadados adicionais');
+        const processUrl = getProcessOpenUrl(processRecord);
         return `
           <article class="process-card">
             <div class="process-card-head">
@@ -948,7 +954,10 @@
                 </div>
                 ${renderPartySummary(processRecord)}
               </div>
-              <button type="button" class="copy-btn copy-btn--icon" data-copy-process="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
+              <div class="process-card-actions">
+                <button type="button" class="copy-btn copy-btn--icon" data-copy-process="${escapeHtml(processLabel)}" title="Copiar processo" aria-label="Copiar processo"><i class="fa-regular fa-copy" aria-hidden="true"></i><span class="sr-only">Copiar processo</span></button>
+                ${renderOpenProcessAction(processUrl)}
+              </div>
             </div>
 
             <div class="process-card-summary">
@@ -967,6 +976,39 @@
           </article>
         `;
       }).join('');
+    }
+
+    function getProcessOpenUrl(processRecord) {
+      const processNumber = processRecord.shortNumber || processRecord.cnj || '';
+      if (processNumber) {
+        const url = new URL('BuscaProcesso', PROJUDI_BASE_URL);
+        url.searchParams.set('PaginaAtual', '2');
+        url.searchParams.set('TipoConsultaProcesso', '24');
+        url.searchParams.set('ProcessoNumero', processNumber);
+        return url.href;
+      }
+
+      if (processRecord.processId) {
+        const url = new URL('BuscaProcesso', PROJUDI_BASE_URL);
+        url.searchParams.set('Id_Processo', processRecord.processId);
+        return url.href;
+      }
+
+      try {
+        const url = new URL(processRecord.processUrl || '', PROJUDI_BASE_URL);
+        if (url.protocol !== 'https:' || url.hostname !== 'projudi.tjgo.jus.br') return '';
+        return url.href;
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function renderOpenProcessAction(processUrl) {
+      if (!processUrl) {
+        return '<button type="button" class="copy-btn copy-btn--icon action-disabled" disabled title="Link do processo não disponível" aria-label="Link do processo não disponível"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only">Link do processo não disponível</span></button>';
+      }
+
+      return `<a class="copy-btn copy-btn--icon action-link" href="${escapeHtml(processUrl)}" target="_blank" rel="noopener noreferrer" title="Abrir processo no Projudi" aria-label="Abrir processo no Projudi"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span class="sr-only">Abrir processo no Projudi</span></a>`;
     }
 
     function statCard(value, label, help, tone) {
