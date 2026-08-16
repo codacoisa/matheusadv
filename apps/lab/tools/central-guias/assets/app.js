@@ -849,9 +849,20 @@
       `;
     }
 
+    function lastPathSegment(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      const segments = text.split(/\s*(?:->|→)\s*/).map((segment) => segment.trim()).filter(Boolean);
+      return segments[segments.length - 1] || text;
+    }
+
     function renderRow(row) {
       const processLabel = row.processRecord.shortNumber || row.processRecord.cnj || row.processRecord.processId || 'Sem número';
       const cnj = row.processRecord.cnj && row.processRecord.cnj !== processLabel ? row.processRecord.cnj : '';
+      const classLabel = lastPathSegment(row.processRecord.classe);
+      const subjectLabel = lastPathSegment(row.processRecord.assunto);
+      const guideType = String(row.guide.type || 'Tipo não informado').trim();
+      const guideNature = String(row.guide.nature || 'Natureza não informada').trim();
       const tone = getStatusTone(row.status);
       const dueDate = row.guide.dueDate ? formatDateOnly(row.guide.dueDate) : '--';
       const syncDate = getEffectiveSyncAt(row.processRecord) ? formatDateTime(getEffectiveSyncAt(row.processRecord)) : '--';
@@ -863,9 +874,9 @@
             <div class="process-main">
               <div class="process-number">${escapeHtml(processLabel)}</div>
               <div class="process-meta">
-                ${cnj ? `CNJ: ${escapeHtml(cnj)}<br>` : ''}
-                ${row.processRecord.classe ? `Classe: ${escapeHtml(row.processRecord.classe)}<br>` : ''}
-                ${row.processRecord.assunto ? `Assunto: ${escapeHtml(row.processRecord.assunto)}` : ''}
+                ${cnj ? `<span class="process-meta-line">CNJ: ${escapeHtml(cnj)}</span>` : ''}
+                ${classLabel ? `<span class="process-meta-line" title="Classe completa: ${escapeHtml(row.processRecord.classe)}">Classe: ${escapeHtml(classLabel)}</span>` : ''}
+                ${subjectLabel ? `<span class="process-meta-line" title="Assunto completo: ${escapeHtml(row.processRecord.assunto)}">Assunto: ${escapeHtml(subjectLabel)}</span>` : ''}
               </div>
               ${renderPartySummary(row.processRecord)}
             </div>
@@ -881,8 +892,8 @@
           </td>
           <td>
             <div class="stack">
-              <strong>${escapeHtml(row.guide.type || 'Tipo não informado')}</strong>
-              <div class="guide-meta">${escapeHtml(row.guide.nature || 'Natureza não informada')}</div>
+              <strong class="cell-truncate" title="${escapeHtml(guideType)}">${escapeHtml(guideType)}</strong>
+              <div class="guide-meta cell-truncate" title="${escapeHtml(guideNature)}">${escapeHtml(guideNature)}</div>
             </div>
           </td>
           <td>
@@ -926,13 +937,14 @@
 
       nodes.processGrid.innerHTML = sorted.map(({ processRecord, summary }) => {
         const processLabel = processRecord.shortNumber || processRecord.cnj || processRecord.processId || 'Sem número';
+        const processContext = lastPathSegment(processRecord.assunto || processRecord.classe || processRecord.serventia || 'Sem metadados adicionais');
         return `
           <article class="process-card">
             <div class="process-card-head">
               <div>
                 <h3 class="process-card-title">${escapeHtml(processLabel)}</h3>
                 <div class="panel-subtitle">
-                  ${escapeHtml(processRecord.assunto || processRecord.classe || processRecord.serventia || 'Sem metadados adicionais')}
+                  ${escapeHtml(processContext)}
                 </div>
                 ${renderPartySummary(processRecord)}
               </div>

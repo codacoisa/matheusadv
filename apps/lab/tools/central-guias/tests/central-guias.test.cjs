@@ -51,9 +51,12 @@ test('Central reflete os polos resumidos e mantém o vencimento legível', () =>
   assert.match(app, /activeParty/);
   assert.match(app, /passiveParty/);
   assert.match(app, /function renderPartySummary/);
+  assert.match(app, /function lastPathSegment/);
+  assert.match(app, /cell-truncate/);
   assert.match(app, /function formatDateOnly/);
   assert.match(app, /fa-regular fa-copy/);
   assert.match(styles, /\.table-wrap table\s*\{[\s\S]*table-layout: fixed/);
   assert.match(styles, /\.party-summary/);
+  assert.match(styles, /\.process-meta-line/);
   assert.match(styles, /\.due-date/);
 });
