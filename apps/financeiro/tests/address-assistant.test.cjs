@@ -13,6 +13,24 @@ test("formatar CEP e construir somente URLs oficiais", () => {
     address.municipalitiesUrl("go"),
     "https://servicodados.ibge.gov.br/api/v1/localidades/estados/GO/municipios?orderBy=nome",
   );
+  assert.equal(
+    address.municipalityUrl("5208707"),
+    "https://servicodados.ibge.gov.br/api/v1/localidades/municipios/5208707",
+  );
+});
+
+test("resolver município pelo código IBGE", async (t) => {
+  const originalFetch = global.fetch;
+  t.after(() => { global.fetch = originalFetch; });
+  global.fetch = async () => ({
+    ok: true,
+    json: async () => ({ id: 5208707, nome: "Goiânia" }),
+  });
+  assert.deepEqual(await address.lookupMunicipality("5208707"), {
+    code: "5208707",
+    name: "Goiânia",
+  });
+  assert.equal(await address.lookupMunicipality(""), null);
 });
 
 test("normalizar a resposta do ViaCEP", async (t) => {

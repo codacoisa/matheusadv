@@ -27,6 +27,8 @@
   };
   const municipalitiesUrl = (state) =>
     `${IBGE_BASE}/estados/${encodeURIComponent(String(state || "").toUpperCase())}/municipios?orderBy=nome`;
+  const municipalityUrl = (code) =>
+    `${IBGE_BASE}/municipios/${encodeURIComponent(String(code || "").trim())}`;
   const zipUrl = (zip) => `${VIACEP_BASE}/${digits(zip)}/json/`;
 
   async function requestJson(url) {
@@ -92,6 +94,17 @@
       neighborhood: String(result.bairro || "").trim(),
       city: String(result.localidade || "").trim(),
       state: String(result.uf || "").trim().toUpperCase(),
+    };
+  }
+
+  async function lookupMunicipality(code) {
+    const normalized = String(code || "").trim();
+    if (!/^\d+$/.test(normalized)) return null;
+    const result = await requestJson(municipalityUrl(normalized));
+    if (!result?.nome) throw new Error("Município IBGE não encontrado.");
+    return {
+      code: String(result.id || normalized),
+      name: String(result.nome).trim(),
     };
   }
 
@@ -234,7 +247,7 @@
     return controllers.get(form)?.fillFromZip() || Promise.resolve();
   }
 
-  const api = { STATES, citiesFor, fillFromZip, lookupZip, maskZip, municipalitiesUrl, refresh, setup, zipUrl };
+  const api = { STATES, citiesFor, fillFromZip, lookupMunicipality, lookupZip, maskZip, municipalitiesUrl, municipalityUrl, refresh, setup, zipUrl };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   globalThis.OfficeJurAddressAssistant = api;
 })();
