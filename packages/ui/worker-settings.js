@@ -6,7 +6,6 @@
   "use strict";
 
   const STORAGE_KEY = "officejur-worker-settings";
-  const SESSION_KEY = "officejur-worker-session-key";
   const VERSION = 1;
 
   function normalize(value) {
@@ -28,40 +27,30 @@
 
   function load(options) {
     const local = (options && options.storage) || localStorage;
-    const session = (options && options.sessionStorage) || sessionStorage;
-    const persisted = normalize(read(local, STORAGE_KEY));
-    let apiKey = "";
-    try {
-      apiKey = String(session.getItem(SESSION_KEY) || "").trim();
-    } catch (_) {
-      apiKey = "";
-    }
-    return { ...persisted, apiKey };
+    return normalize(read(local, STORAGE_KEY));
   }
 
   function save(value, options) {
     const local = (options && options.storage) || localStorage;
-    const session = (options && options.sessionStorage) || sessionStorage;
     const settings = normalize(value);
     local.setItem(STORAGE_KEY, JSON.stringify({
       version: settings.version,
       apiUrl: settings.apiUrl,
+      apiKey: settings.apiKey,
     }));
-    session.setItem(SESSION_KEY, settings.apiKey);
     return settings;
   }
 
   function clear(options) {
     const local = (options && options.storage) || localStorage;
-    const session = (options && options.sessionStorage) || sessionStorage;
     const settings = normalize({});
     local.setItem(STORAGE_KEY, JSON.stringify({
       version: settings.version,
       apiUrl: settings.apiUrl,
+      apiKey: settings.apiKey,
     }));
-    session.removeItem(SESSION_KEY);
     return settings;
   }
 
-  return { STORAGE_KEY, SESSION_KEY, VERSION, clear, load, normalize, save };
+  return { STORAGE_KEY, VERSION, clear, load, normalize, save };
 });

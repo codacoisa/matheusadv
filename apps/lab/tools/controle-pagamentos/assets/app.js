@@ -1,8 +1,8 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'officejur::controle-pagamentos::data';
-  const SYNC_STATE_KEY = 'officejur::controle-pagamentos::sync-state';
+  const STORAGE_KEY = 'officejur-controle-pagamentos-data';
+  const SYNC_STATE_KEY = 'officejur-controle-pagamentos-sync-state';
   const FILE_NAME = 'controle-pagamentos.json';
   const SCHEMA = 'officejur/controle-pagamentos-data';
   const VERSION = 1;

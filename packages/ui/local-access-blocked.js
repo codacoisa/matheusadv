@@ -7,7 +7,7 @@
 
   function descriptionForLease() {
     try {
-      const lease = JSON.parse(localStorage.getItem("officejur::gist-access-lease") || "{}");
+      const lease = JSON.parse(localStorage.getItem("officejur-gist-access-lease") || "{}");
       return ["stale", "unverified"].includes(lease.phase) ? PENDING_DESCRIPTION : DESCRIPTION;
     } catch (_) { return DESCRIPTION; }
   }

@@ -73,16 +73,14 @@ incorporado.
   CNJ e exibição opcional das movimentações retornadas.
 - **Endpoint:** `https://api-publica.datajud.cnj.jus.br/api_publica_<tribunal>/_search`.
   O tribunal é identificado pelos campos `J` e `TR` da numeração CNJ.
-- **Autenticação:** o CNJ publica uma chave pública para o cabeçalho
-  `Authorization: APIKey ...`; ela não é um segredo do escritório, pode ser
-  alterada pelo CNJ. Como a API não libera CORS para a aplicação estática, a
-  consulta no navegador passa pelo endpoint `/datajud/search` do Worker, que
-  mantém essa chave apenas no serviço.
+- **Autenticação:** o Worker usa `DATAJUD_API_KEY` como segredo para autenticar
+  a chamada perante o CNJ. Como a API não libera CORS para a aplicação estática,
+  o navegador conversa somente com o endpoint `/datajud/search` do Worker.
 - **Proxy:** publique `worker/src/index.js`, cadastre `DATAJUD_API_KEY` como
   segredo e informe a URL e a chave do Worker na área global
   **Configurações → Cloudflare Workers**. A chave `OFFICEJUR_API_KEY` usada pelo
-  Worker é enviada somente na sessão do navegador; o token do Mercado Pago não
-  é necessário para a rota DataJud.
+  Worker fica salva localmente neste navegador; o token do Mercado Pago não é
+  necessário para a rota DataJud.
 - **Dados utilizados:** tribunal, segmento de Justiça, classe, sistema,
   formato, grau, data de ajuizamento, órgão julgador, assuntos, nível de sigilo,
   atualização da origem e movimentações. O retorno normalizado e a resposta
@@ -106,7 +104,7 @@ incorporado.
 - **Credencial privada:** `MP_ACCESS_TOKEN`, armazenada como segredo no serviço
   protegido e nunca na página estática.
 - **Chave do serviço:** `OFFICEJUR_API_KEY`, armazenada como segredo no Worker
-  e informada somente na sessão ativa do navegador pela configuração global.
+  e informada na configuração global, que a mantém localmente neste navegador.
 - **Referências:** [Visão geral do Checkout Pro](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/overview),
   [criação da aplicação](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/create-application),
   [testes da integração](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro/integration-test)

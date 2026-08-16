@@ -18,7 +18,7 @@ test("expiração vira stale sem apagar configuração ou dados", async () => {
   let time = 0;
   const storage = memoryStorage();
   storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
-  storage.setItem("officejur::calculos-juridicos::data", "segredo");
+  storage.setItem("officejur-calculos-juridicos-data", "segredo");
   const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 } });
   lease.renew("gist-a");
   assert.equal(lease.state().phase, "active");
@@ -26,7 +26,7 @@ test("expiração vira stale sem apagar configuração ou dados", async () => {
   assert.equal(lease.state().phase, "stale");
   assert.equal(await lease.guard("calculos", () => {}), false);
   assert.equal(storage.getItem("officejur-gist-settings") !== null, true);
-  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), "segredo");
+  assert.equal(storage.getItem("officejur-calculos-juridicos-data"), "segredo");
 });
 
 test("401 inicia graça, rate limit e rede não", () => {
@@ -61,7 +61,7 @@ test("revalidação autenticada após expiração libera dados sem expô-los ant
   let time = 0;
   const storage = memoryStorage();
   storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
-  storage.setItem("officejur::calculos-juridicos::data", "calculo");
+  storage.setItem("officejur-calculos-juridicos-data", "calculo");
   let calls = 0;
   const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3 }, client: { gist: async () => { calls += 1; } } });
   lease.renew("gist-a");
@@ -70,13 +70,13 @@ test("revalidação autenticada após expiração libera dados sem expô-los ant
   assert.equal(await lease.guard("financeiro", () => {}), true);
   assert.equal(calls, 1);
   assert.equal(lease.state().phase, "active");
-  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), "calculo");
+  assert.equal(storage.getItem("officejur-calculos-juridicos-data"), "calculo");
 });
 
 test("instalação vinculada sem lease revalida antes de liberar dados", async () => {
   const storage = memoryStorage();
   storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
-  storage.setItem("officejur::calculos-juridicos::data", "segredo");
+  storage.setItem("officejur-calculos-juridicos-data", "segredo");
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
   const lease = leaseApi.create({ storage, client: { gist: () => pending } });
@@ -86,7 +86,7 @@ test("instalação vinculada sem lease revalida antes de liberar dados", async (
   release({});
   assert.equal(await guarded, true);
   assert.equal(lease.state().phase, "active");
-  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), "segredo");
+  assert.equal(storage.getItem("officejur-calculos-juridicos-data"), "segredo");
 });
 
 test("falhas transitórias mantêm bloqueio e configuração para retry", async () => {
@@ -108,13 +108,13 @@ test("401 após vencimento inicia purga e nunca libera por graça", async () => 
   let time = 0;
   const storage = memoryStorage();
   storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
-  storage.setItem("officejur::calculos-juridicos::data", "segredo");
+  storage.setItem("officejur-calculos-juridicos-data", "segredo");
   const lease = leaseApi.create({ storage, clock: { now: () => time }, policy: { leaseHours: 3, graceMinutes: 180 }, client: { gist: async () => { throw { category: "auth", status: 401 }; } } });
   lease.renew("gist-a");
   time = 4 * 60 * 60 * 1000;
   assert.equal(await lease.guard("calculos", () => {}), false);
   assert.equal(lease.state().phase, "purged");
-  assert.equal(storage.getItem("officejur::calculos-juridicos::data"), null);
+  assert.equal(storage.getItem("officejur-calculos-juridicos-data"), null);
 });
 
 test("instalação sem Gist continua local durante heartbeat", async () => {
@@ -172,8 +172,8 @@ test("heartbeat e duas abas compartilham uma única revalidação", async () => 
 
 test("troca concorrente de Gist preserva o novo vínculo e limpa rascunhos derivados", async () => {
   const storage = memoryStorage();
-  storage.setItem("officejur::documentos::procuracao::draft", JSON.stringify({ __officejurGistProtected: true, person: "cliente" }));
-  storage.setItem("officejur::documentos::honorarios::draft", JSON.stringify({ people: [{ name: "Rascunho local" }] }));
+  storage.setItem("officejur-documentos-procuracao-draft", JSON.stringify({ __officejurGistProtected: true, person: "cliente" }));
+  storage.setItem("officejur-documentos-honorarios-draft", JSON.stringify({ people: [{ name: "Rascunho local" }] }));
   const first = leaseApi.create({ storage });
   const second = leaseApi.create({ storage });
   first.renew("gist-a");
@@ -184,18 +184,18 @@ test("troca concorrente de Gist preserva o novo vínculo e limpa rascunhos deriv
   ]);
   assert.equal(first.state().phase, "active");
   assert.equal(first.state().gistId, "gist-b");
-  assert.equal(storage.getItem("officejur::documentos::procuracao::draft"), null);
-  assert.notEqual(storage.getItem("officejur::documentos::honorarios::draft"), null);
+  assert.equal(storage.getItem("officejur-documentos-procuracao-draft"), null);
+  assert.notEqual(storage.getItem("officejur-documentos-honorarios-draft"), null);
 });
 
 test("revogação explícita remove configurações e dados protegidos", async () => {
   const storage = memoryStorage();
   storage.setItem("officejur-gist-settings", JSON.stringify({ gistId: "gist-a", token: "token" }));
-  storage.setItem("officejur::controle-pagamentos::data", "segredo");
+  storage.setItem("officejur-controle-pagamentos-data", "segredo");
   const lease = leaseApi.create({ storage });
   lease.renew("gist-a");
   await lease.revoke();
   assert.equal(lease.state().phase, "purged");
   assert.equal(storage.getItem("officejur-gist-settings"), null);
-  assert.equal(storage.getItem("officejur::controle-pagamentos::data"), null);
+  assert.equal(storage.getItem("officejur-controle-pagamentos-data"), null);
 });

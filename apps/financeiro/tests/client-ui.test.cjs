@@ -165,6 +165,7 @@ assert.match(app, /function caseDataJudTabs/);
 assert.match(app, /data-case-tab="movements"/);
 assert.match(datajudAssistant, /https:\/\/api-publica\.datajud\.cnj\.jus\.br/);
 assert.match(datajudAssistant, /DATAJUD_PROXY_PATH/);
+assert.doesNotMatch(datajudAssistant, /APIKey\s/);
 assert.match(app, /error\.message \|\| "Não foi possível consultar o DataJud\. Os campos permanecem bloqueados\."/);
   assert.match(datajudAssistant, /numeroProcesso/);
   assert.match(styles, /\.case-detail-tab\s*\{/);
@@ -179,6 +180,14 @@ test("usar a configuração global atual do Worker", () => {
   assert.match(help, /<code>financeiro-officejur<\/code>/);
   assert.doesNotMatch(help, /Ajuda do Mercado Pago/);
   assert.match(workerConfig, /name = "financeiro-officejur"/);
+});
+
+test("manter o Mercado Pago sem credenciais ou ambiente no navegador", () => {
+  assert.doesNotMatch(html, /name="publicKey"/);
+  assert.doesNotMatch(html, /name="environment"/);
+  assert.doesNotMatch(app, /publicKey|mp\.environment/);
+  assert.doesNotMatch(help, /Public Key/);
+  assert.match(help, /Voltar às configurações/);
 });
 
 test("listar pessoas como subpágina de clientes e permitir promoção", () => {

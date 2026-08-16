@@ -14,16 +14,16 @@
   const addressAssistant = window.OfficeJurAddressAssistant;
   const cnpjAssistant = window.OfficeJurCnpjAssistant;
   const dataJudAssistant = window.OfficeJurDataJud;
-  const SYNC_STATE_KEY = "officejur::financeiro::sync-state",
-    MP_SETTINGS_KEY = "officejur::financeiro::mercado-pago::settings",
-    MP_REQUEST_PREFIX = "officejur::financeiro::mercado-pago::request:",
+  const SYNC_STATE_KEY = "officejur-financeiro-sync-state",
+    MP_SETTINGS_KEY = "officejur-financeiro-mercado-pago-settings",
+    MP_REQUEST_PREFIX = "officejur-financeiro-mercado-pago-request-",
     FILES_FILE = "financeiro-documentos.json",
     FILES_DB = "officejur-financeiro-documentos",
     FILES_STORE = "state",
     FILES_CONTENT_STORE = "content",
     FILES_META_RECORD = "officejur/financeiro-documentos-data",
     GIST_RAW_MAX_SIZE = 10 * 1024 * 1024;
-  const DOCUMENT_HANDOFF_PREFIX = "officejur::documentos::handoff:",
+  const DOCUMENT_HANDOFF_PREFIX = "officejur-documentos-handoff-",
     DOCUMENT_HANDOFF_TTL = 5 * 60 * 1000;
   const DOCUMENT_ROUTES = {
     procuracao: "../documentos/procuracao/",
@@ -866,12 +866,12 @@
       persisted = {};
     }
     return {
-      environment: "test",
-      publicKey: "",
       returnUrl: location.href.split("#")[0],
-      statementDescriptor,
-      autoReturn: true,
-      ...persisted,
+      statementDescriptor:
+        typeof persisted.statementDescriptor === "string"
+          ? persisted.statementDescriptor
+          : statementDescriptor,
+      autoReturn: persisted.autoReturn !== false,
     };
   }
   function loadWorker() {
@@ -2064,7 +2064,7 @@
   function renderCharges() {
     const configured = Boolean(resolveProxyUrl(worker.apiUrl) && worker.apiKey);
     $("#mp-alert").innerHTML = configured
-      ? `<div class="integration-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Integração configurada em ${mp.environment === "production" ? "produção" : "testes"}</strong><p>As preferências são criadas pelo serviço seguro, sem expor o Access Token.</p></div></div>`
+      ? `<div class="integration-alert success"><i class="fa-solid fa-circle-check"></i><div><strong>Integração configurada</strong><p>As preferências são criadas pelo serviço seguro, sem expor o Access Token.</p></div></div>`
       : `<div class="integration-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Configure o Cloudflare Worker antes de cobrar</strong><p>Informe a URL e a chave do serviço na área global <a href="../configuracoes/">Configurações</a>.</p></div></div>`;
     const charges = data.charges || [],
       paid = charges
@@ -2094,9 +2094,9 @@
       ) +
       metric(
         "fa-plug-circle-check",
-        "Ambiente",
-        mp.environment === "production" ? "Produção" : "Testes",
-        configured ? "Serviço configurado" : "Configuração pendente",
+        "Serviço",
+        configured ? "Conectado" : "Pendente",
+        configured ? "Cloudflare Worker" : "Configuração pendente",
       );
     const labels = {
       pending: "Aguardando",
@@ -2187,7 +2187,6 @@
         returnUrl: mp.returnUrl,
         statementDescriptor: mp.statementDescriptor,
         autoReturn: mp.autoReturn,
-        environment: mp.environment,
       }),
     });
   }
@@ -4853,8 +4852,6 @@
     e.preventDefault();
     const f = e.currentTarget;
     mp = {
-      environment: f.environment.value,
-      publicKey: f.publicKey.value.trim(),
       returnUrl: f.returnUrl.value.trim(),
       statementDescriptor: f.statementDescriptor.value.trim().toUpperCase(),
       autoReturn: f.autoReturn.checked,
@@ -4906,10 +4903,7 @@
         description: payload.description,
         externalReference: payload.externalReference,
         preferenceId: result.preferenceId,
-        checkoutUrl:
-          mp.environment === "test"
-            ? result.sandboxUrl || result.checkoutUrl
-            : result.checkoutUrl,
+        checkoutUrl: result.checkoutUrl || result.sandboxUrl,
         status: "pending",
         createdAt: now(),
         updatedAt: now(),

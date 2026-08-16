@@ -47,8 +47,7 @@ async function prepareCalculationPage(page, path = 'calculos/') {
 
 async function configureDataJudWorker(page) {
   await page.evaluate(() => {
-    localStorage.setItem('officejur-worker-settings', JSON.stringify({ version: 1, apiUrl: 'https://worker.example' }));
-    sessionStorage.setItem('officejur-worker-session-key', 'chave-do-servico');
+    localStorage.setItem('officejur-worker-settings', JSON.stringify({ version: 1, apiUrl: 'https://worker.example', apiKey: 'chave-do-servico' }));
   });
   await page.reload({ waitUntil: 'networkidle' });
 }
@@ -241,19 +240,19 @@ test('headers com sincronização automática não exibem ação manual', async 
 test('lease expirado bloqueia Cálculos antes de expor os dados e preserva a cópia para revalidação', async ({ page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {
-    localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
+    localStorage.setItem('officejur-calculos-juridicos-data', JSON.stringify({
       schema: 'officejur/calculos-juridicos-data', version: 1, updatedAt: new Date().toISOString(),
       records: [{ id: 'segredo', name: 'Cálculo confidencial', updatedAt: new Date().toISOString() }], deleted: []
     }));
-    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+    localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
       version: 1, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1, graceExpiresAt: 0, clearedModules: {}
     }));
   });
   await page.reload({ waitUntil: 'networkidle' });
   await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado');
   await expect(page.locator('body')).not.toContainText('Cálculo confidencial');
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::gist-access-lease'))).toContain('"stale"');
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur-gist-access-lease'))).toContain('"stale"');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur-calculos-juridicos-data'))).not.toBeNull();
 });
 
 const localAccessBlockedRoutes = [
@@ -276,7 +275,7 @@ for (const route of localAccessBlockedRoutes) {
     });
     await page.goto(route, { waitUntil: 'networkidle' });
     await page.evaluate(() => {
-      localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
         version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1,
         graceExpiresAt: 0, resetForGistId: '', purgeId: 0,
       }));
@@ -340,7 +339,7 @@ test('estado bloqueado permanece responsivo nas referências visuais', async ({ 
       await page.setViewportSize(viewport);
       await page.goto(route, { waitUntil: 'networkidle' });
       await page.evaluate(() => {
-        localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+        localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
           version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1,
           graceExpiresAt: 0, resetForGistId: '', purgeId: 0,
         }));
@@ -383,7 +382,7 @@ test('estado bloqueado permanece responsivo nas referências visuais', async ({ 
 
 test('retry recarrega a página e o seletor continua operável no bloqueio', async ({ page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
-  await page.evaluate(() => localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+  await page.evaluate(() => localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
     version: 2, phase: 'purged', gistId: 'gist-teste', expiresAt: 0,
     graceExpiresAt: 0, resetForGistId: '', purgeId: 1,
   })));
@@ -402,10 +401,10 @@ test('retry recarrega a página e o seletor continua operável no bloqueio', asy
 
 test('guard stale bloqueia antes de cada aplicativo ler ou remover o armazenamento protegido', async ({ page }) => {
   const cases = [
-    ['calculos/', 'officejur::calculos-juridicos::data'],
-    ['financeiro/', 'officejur::financeiro::sync-state'],
-    ['lab/controle-pagamentos/', 'officejur::controle-pagamentos::data'],
-    ['lab/controle-pagamentos/', 'officejur::controle-pagamentos::sync-state'],
+    ['calculos/', 'officejur-calculos-juridicos-data'],
+    ['financeiro/', 'officejur-financeiro-sync-state'],
+    ['lab/controle-pagamentos/', 'officejur-controle-pagamentos-data'],
+    ['lab/controle-pagamentos/', 'officejur-controle-pagamentos-sync-state'],
   ];
   await page.addInitScript(({ protectedKeys }) => {
     const originalGetItem = Storage.prototype.getItem;
@@ -425,7 +424,7 @@ test('guard stale bloqueia antes de cada aplicativo ler ou remover o armazenamen
     await page.goto(route, { waitUntil: 'networkidle' });
     await page.evaluate(({ key }) => {
       localStorage.setItem(key, JSON.stringify({ secret: 'não deve ser lido' }));
-      localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+      localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
         version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1,
         graceExpiresAt: 0, resetForGistId: '', purgeId: 0,
       }));
@@ -440,11 +439,11 @@ test('guard stale bloqueia antes de cada aplicativo ler ou remover o armazenamen
 });
 
 test('revogação definitiva remove o armazenamento protegido', async ({ page }) => {
-  const protectedKey = 'officejur::calculos-juridicos::data';
+  const protectedKey = 'officejur-calculos-juridicos-data';
   await page.goto('calculos/', { waitUntil: 'networkidle' });
   await page.evaluate((key) => {
     localStorage.setItem(key, JSON.stringify({ secret: 'deve ser removido' }));
-    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+    localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
       version: 3, phase: 'purged', gistId: 'gist-teste', expiresAt: 0,
       graceExpiresAt: 0, resetForGistId: '', purgeId: 1,
     }));
@@ -457,11 +456,11 @@ test('revogação definitiva remove o armazenamento protegido', async ({ page })
 test('calculadora interna usa o guard antes de carregar um registro protegido', async ({ page }) => {
   await page.goto('calculos/pensao/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {
-    localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
+    localStorage.setItem('officejur-calculos-juridicos-data', JSON.stringify({
       schema: 'officejur/calculos-juridicos-data', version: 1, updatedAt: new Date().toISOString(),
       records: [{ id: 'segredo', type: 'pension', name: 'Pensão confidencial', updatedAt: new Date().toISOString() }], deleted: []
     }));
-    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+    localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
       version: 2, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() - 1, graceExpiresAt: 0, resetForGistId: '', purgeId: 0
     }));
   });
@@ -473,11 +472,11 @@ test('calculadora interna usa o guard antes de carregar um registro protegido', 
 test('abas abertas convergem para stale sem remover a cópia local', async ({ context, page }) => {
   await page.goto('calculos/', { waitUntil: 'networkidle' });
   await page.evaluate(() => {
-    localStorage.setItem('officejur::calculos-juridicos::data', JSON.stringify({
+    localStorage.setItem('officejur-calculos-juridicos-data', JSON.stringify({
       schema: 'officejur/calculos-juridicos-data', version: 1, updatedAt: new Date().toISOString(),
       records: [{ id: 'segredo', name: 'Cálculo confidencial', updatedAt: new Date().toISOString() }], deleted: []
     }));
-    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+    localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
       version: 3, phase: 'active', gistId: 'gist-teste', expiresAt: Date.now() + 60_000, graceExpiresAt: 0, resetForGistId: '', purgeId: 0
     }));
   });
@@ -487,16 +486,16 @@ test('abas abertas convergem para stale sem remover a cópia local', async ({ co
     second.goto('calculos/', { waitUntil: 'networkidle' }),
   ]);
   await page.evaluate(() => {
-    const lease = JSON.parse(localStorage.getItem('officejur::gist-access-lease'));
+    const lease = JSON.parse(localStorage.getItem('officejur-gist-access-lease'));
     lease.expiresAt = Date.now() - 1;
-    localStorage.setItem('officejur::gist-access-lease', JSON.stringify(lease));
-    window.dispatchEvent(new StorageEvent('storage', { key: 'officejur::gist-access-lease', newValue: JSON.stringify(lease) }));
+    localStorage.setItem('officejur-gist-access-lease', JSON.stringify(lease));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'officejur-gist-access-lease', newValue: JSON.stringify(lease) }));
   });
   await expect(page.getByRole('alert')).toContainText('Acesso local bloqueado', { timeout: 5_000 });
   await expect(second.getByRole('alert')).toContainText('Acesso local bloqueado', { timeout: 5_000 });
   await expect(page.locator('body')).not.toContainText('Cálculo confidencial');
   await expect(second.locator('body')).not.toContainText('Cálculo confidencial');
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur::calculos-juridicos::data'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('officejur-calculos-juridicos-data'))).not.toBeNull();
   await second.close();
 });
 
@@ -975,7 +974,7 @@ test('Financeiro cadastra pessoa jurídica com representante reutilizável', asy
   await expect(generator.locator('[name="people.0.companyName"]')).toHaveValue('Empresa Exemplo LTDA');
   await expect(generator.locator('.representatives-summary')).toContainText('Maria da Silva; João de Souza');
   const transferredRepresentatives = await generator.evaluate(() => {
-    const draft = JSON.parse(localStorage.getItem('officejur::documentos::procuracao::draft') || '{}');
+    const draft = JSON.parse(localStorage.getItem('officejur-documentos-procuracao-draft') || '{}');
     return draft.people?.[0]?.representatives || [];
   });
   expect(transferredRepresentatives).toHaveLength(2);
@@ -989,7 +988,7 @@ test('Financeiro cadastra pessoa jurídica com representante reutilizável', asy
   await expect(contract.locator('[name="people.0.companyName"]')).toHaveValue('Empresa Exemplo LTDA');
   await expect(contract.locator('.representatives-summary')).toContainText('Maria da Silva; João de Souza');
   const contractRepresentatives = await contract.evaluate(() => {
-    const draft = JSON.parse(localStorage.getItem('officejur::documentos::honorarios::draft') || '{}');
+    const draft = JSON.parse(localStorage.getItem('officejur-documentos-honorarios-draft') || '{}');
     return draft.people?.[0]?.representatives || [];
   });
   expect(contractRepresentatives).toHaveLength(2);
@@ -1738,7 +1737,7 @@ test('cálculo trabalhista usa a sincronização compartilhada do Gist', async (
       token: 'token-de-teste',
       autoSync: true,
     }));
-    localStorage.setItem('officejur::gist-access-lease', JSON.stringify({
+    localStorage.setItem('officejur-gist-access-lease', JSON.stringify({
       version: 2,
       phase: 'active',
       gistId: 'test-gist',
@@ -1807,12 +1806,12 @@ test('configuração global salva o Worker para os módulos', async ({ page }) =
   await expect(page.locator('#worker-title')).toHaveText('Cloudflare Worker configurado');
   const settings = await page.evaluate(() => ({
     local: JSON.parse(localStorage.getItem('officejur-worker-settings')),
-    session: sessionStorage.getItem('officejur-worker-session-key'),
   }));
   expect(settings).toEqual({
-    local: { version: 1, apiUrl: 'https://worker.example' },
-    session: 'chave-do-servico',
+    local: { version: 1, apiUrl: 'https://worker.example', apiKey: 'chave-do-servico' },
   });
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByLabel(/Chave de acesso do serviço/i)).toHaveValue('chave-do-servico');
 });
 
 test('componentes compartilhados rejeitam URLs com protocolos inseguros', async ({ page }) => {
