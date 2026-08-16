@@ -842,9 +842,9 @@
       const activeParty = partyValue(processRecord.activeParty);
       const passiveParty = partyValue(processRecord.passiveParty);
       return `
-        <div class="party-summary" title="Autor: ${escapeHtml(activeParty)} | Réu: ${escapeHtml(passiveParty)}">
-          <span class="party-line party-line--active"><strong>Autor:</strong> ${escapeHtml(activeParty)}</span>
-          <span class="party-line party-line--passive"><strong>Réu:</strong> ${escapeHtml(passiveParty)}</span>
+        <div class="party-summary" title="Polo Ativo: ${escapeHtml(activeParty)} | Polo Passivo: ${escapeHtml(passiveParty)}">
+          <span class="party-line party-line--active"><strong>Polo Ativo:</strong> ${escapeHtml(activeParty)}</span>
+          <span class="party-line party-line--passive"><strong>Polo Passivo:</strong> ${escapeHtml(passiveParty)}</span>
         </div>
       `;
     }

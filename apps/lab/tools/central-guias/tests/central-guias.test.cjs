@@ -44,7 +44,9 @@ test('Central reflete os polos resumidos e mantém o vencimento legível', () =>
   const styles = read('apps/lab/tools/central-guias/assets/styles.css');
   const app = read('apps/lab/tools/central-guias/assets/app.js');
 
-  assert.match(index, /Autor, Réu/);
+  assert.match(index, /Polo Ativo, Polo Passivo/);
+  assert.match(app, /Polo Ativo:/);
+  assert.match(app, /Polo Passivo:/);
   assert.match(index, /file-invoice-dollar/);
   assert.match(app, /activeParty/);
   assert.match(app, /passiveParty/);
