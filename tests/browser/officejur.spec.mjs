@@ -731,6 +731,7 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
   await card.locator('[data-view-case-datajud]').click();
   await expect(page.locator('#detail-dialog')).toBeVisible();
   await page.getByRole('tab', { name: /Movimentações/ }).click();
+  await page.locator('[data-case-panel="movements"]').getByRole('button', { name: /Consultar movimentações/ }).click();
   await expect(page.locator('[data-case-panel="movements"]')).toContainText('Distribuição');
   await expect(page.locator('[data-case-panel="movements"]')).toContainText('podem estar atrasadas');
 });
