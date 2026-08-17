@@ -25,6 +25,7 @@ test('Arquivos integra o editor OnlyOffice sem se misturar aos geradores', () =>
   assert.doesNotMatch(index, /documentos\/procuracao|documentos\/honorarios/);
   assert.doesNotMatch(labCatalog, /id: 'documentos'/);
   assert.match(index, /id="office-editor-frame"/);
+  assert.match(index, /src="\.\/editor\/editor\.html\?embed=1&amp;locale=pt-BR"/);
   assert.match(index, /locale=pt-BR/);
   assert.match(app, /document:open-file/);
   assert.match(app, /document:save/);
@@ -91,25 +92,26 @@ test('Arquivos oferece o modelo institucional definido pela implantação', () =
 test('o build publica o submódulo e a licença AGPL do editor', () => {
   const build = read('scripts/build-site.sh');
   const patch = read('third_party/ranuts-document.patch');
+  const editor = read('third_party/ranuts-document/lib/onlyoffice-editor.ts');
+  const vendor = read('third_party/ranuts-document/public/web-apps/apps/documenteditor/main/app.js');
   const validator = read('scripts/validate-site.mjs');
 
-  assert.match(build, /RANUTS_EDITOR_BASE="fcaa66e/);
+  assert.match(build, /RANUTS_EDITOR_BASE="90c3ca2672e998ee68073eaacf51246d676d8570"/);
   assert.match(build, /third_party\/ranuts-document\.patch/);
   assert.match(build, /pnpm --dir "\$RANUTS_EDITOR_SOURCE" run build/);
   assert.match(build, /AGPL-3\.0\.LICENSE/);
   assert.match(build, /config\/document-templates/);
+  assert.match(vendor, /Version: 9\.3\.0\.133/);
+  assert.match(editor, /onlyoffice-file-stream/);
   assert.match(patch, /packages\/shared\/src\/document-utils\.ts/);
-  assert.match(patch, /ranuts:document-native-save/);
   assert.match(patch, /ranuts:document-native-print/);
   assert.match(patch, /requestNativeBrowserPrint/);
   assert.match(patch, /document:print-fallback/);
   assert.match(patch, /document:print-native/);
+  assert.match(patch, /installPrintBridge/);
   assert.match(patch, /grabFocus/);
-  assert.match(patch, /ranutsFocusRecovery/);
   assert.match(patch, /contentWindow\?\.focus/);
-  assert.match(patch, /documenteditor\/main\/locale\/en\.json/);
-  assert.match(patch, /pt-br\.json/);
-  assert.match(patch, /"DE\.Views\.Toolbar\.capBtnInsImage": "Imagem"/);
-  assert.match(patch, /"DE\.Views\.Toolbar\.capBtnDateTime": "Data e Hora"/);
   assert.match(validator, /thirdPartyHtmlPrefixes = \["arquivos\/editor\/"\]/);
+  assert.match(validator, /sdkjs\/common\/wasm\/x2t\/x2t\.wasm\.gz/);
+  assert.match(validator, /arquivos\/editor\/assets\/editor-\*\.js/);
 });

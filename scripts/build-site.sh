@@ -66,7 +66,7 @@ for source in "$ROOT_DIR/apps/lab/tools/"*; do
 done
 
 RANUTS_EDITOR_SOURCE="$ROOT_DIR/third_party/ranuts-document"
-RANUTS_EDITOR_BASE="fcaa66eb92d1759c1ec695f668e7adf2e4c8150b"
+RANUTS_EDITOR_BASE="90c3ca2672e998ee68073eaacf51246d676d8570"
 RANUTS_EDITOR_PATCH="$ROOT_DIR/third_party/ranuts-document.patch"
 RANUTS_PATCH_APPLIED=0
 if [[ ! -d "$RANUTS_EDITOR_SOURCE" ]]; then

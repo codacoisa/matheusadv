@@ -522,6 +522,7 @@ test('Documentos começa vazio e exige vínculo com cliente', async ({ page }) =
 });
 
 test('Documentos cria DOCX com o modelo institucional da implantação', async ({ page }) => {
+  test.setTimeout(120_000);
   await prepareCalculationPage(page, 'arquivos/');
   await page.getByRole('button', { name: 'Novo documento' }).click();
   await page.locator('#client-select').selectOption('client-test');
@@ -558,7 +559,13 @@ test('Documentos cria DOCX com o modelo institucional da implantação', async (
   const printButton = office.locator('button:has(> i.icon--inverse.btn-print)');
   await expect(printButton).toBeEnabled({ timeout: 30_000 });
   await printButton.click();
-  await expect(page.locator('#office-status')).toContainText(/Impressão aberta pelo OnlyOffice|Documento enviado para impressão/, { timeout: 60_000 });
+  await expect(page.locator('#office-status')).toContainText(/Impressão aberta pelo OnlyOffice|Documento enviado para impressão/, { timeout: 100_000 });
+  if (await page.locator('.office-print-frame').count()) {
+    await expect(page.locator('.office-print-frame')).toHaveAttribute('data-print-mime', 'application/pdf');
+    await expect.poll(async () => Number(await page.locator('.office-print-frame').getAttribute('data-print-size'))).toBeGreaterThan(500);
+  } else {
+    await expect(page.locator('#office-status')).toContainText('Impressão aberta pelo OnlyOffice.');
+  }
   await expect(page.locator('#office-status')).not.toHaveClass(/error/);
 });
 

@@ -111,6 +111,8 @@
     officePrintFrame = document.createElement('iframe');
     officePrintFrame.className = 'office-print-frame';
     officePrintFrame.title = 'Documento preparado para impressão';
+    officePrintFrame.dataset.printMime = file.type || 'application/pdf';
+    officePrintFrame.dataset.printSize = String(file.size || 0);
     officePrintFrame.addEventListener('load', () => {
       window.setTimeout(() => {
         try {

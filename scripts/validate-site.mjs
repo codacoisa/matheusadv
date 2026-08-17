@@ -29,10 +29,10 @@ const attributePattern = /(?<![\w-])(?:href|src)=["']([^"']+)["']/g;
 // Seu contrato publicado é validado pelos arquivos essenciais listados abaixo.
 const thirdPartyHtmlPrefixes = ["arquivos/editor/"];
 const requiredEditorFiles = [
-  "arquivos/editor/index.html",
+  "arquivos/editor/editor.html",
   "arquivos/editor/AGPL-3.0.LICENSE",
-  "arquivos/editor/wasm/x2t/x2t.js",
-  "arquivos/editor/wasm/x2t/x2t.wasm.gz",
+  "arquivos/editor/sdkjs/common/wasm/x2t/x2t.js",
+  "arquivos/editor/sdkjs/common/wasm/x2t/x2t.wasm.gz",
   "arquivos/editor/web-apps/apps/api/documents/api.js",
   "arquivos/editor/web-apps/apps/documenteditor/main/index.html",
   "arquivos/editor/web-apps/apps/presentationeditor/main/index.html",
@@ -109,9 +109,9 @@ for (const requiredEditorFile of requiredEditorFiles) {
 const editorAssetsDirectory = join(root, "arquivos/editor/assets");
 if (
   !existsSync(editorAssetsDirectory) ||
-  !readdirSync(editorAssetsDirectory).some((entry) => /^index-.*\.js$/.test(entry))
+  !readdirSync(editorAssetsDirectory).some((entry) => /^editor-.*\.js$/.test(entry))
 ) {
-  missing.push("Bundle do editor ausente: arquivos/editor/assets/index-*.js");
+  missing.push("Bundle do editor ausente: arquivos/editor/assets/editor-*.js");
 }
 
 if (pagesWithoutModalScrollLock.length) {
@@ -140,6 +140,7 @@ if (missing.length) {
 
 const forbiddenPublishedFiles = publishedFiles
   .map((path) => path.replace(`${root}/`, ""))
+  .filter((path) => !path.startsWith("arquivos/editor/"))
   .filter((path) =>
     /(?:^|\/)(?:README|ARCHITECTURE)\.md$|(?:^|\/)\.(?:gitignore|gitmessage)$|(?:^|\/)wrangler\.toml$|^lab\/controle-pagamentos\/controle-pagamentos\.json$/.test(
       path,

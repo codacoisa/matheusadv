@@ -28,21 +28,24 @@ pelos PDFs do Financeiro.
 ## Editor Office
 
 O editor é incorporado por um iframe same-origin construído a partir do
-submódulo `third_party/ranuts-document`, baseado na camada web do OnlyOffice.
-O build fixa o submódulo no commit público `fcaa66e` e aplica o patch
-`third_party/ranuts-document.patch` para o caminho do GitHub Pages e o idioma
-português, sem depender de commits privados ou locais.
+submódulo `third_party/ranuts-document`, baseado na camada web do OnlyOffice
+v9.3.0.133. O build fixa o submódulo no commit público
+`90c3ca2672e998ee68073eaacf51246d676d8570` e aplica o patch
+`third_party/ranuts-document.patch` para o caminho de qualquer subdiretório
+estático e para a ponte de integração do OfficeJur, sem depender de commits
+privados ou locais.
 O aplicativo principal envia o arquivo por `postMessage` e recebe os eventos
 `document:ready`, `document:opened`, `document:saved` e `document:error`.
 Também usa `document:rename`, `document:focus` e `document:changed` para
 sincronizar o título, devolver o foco ao documento e acionar o salvamento
 automático somente quando houver alterações. O comando Salvar da faixa nativa
 do OnlyOffice publica o arquivo editado pela mesma ponte usada pelo botão do
-pop-up. O comando Imprimir usa a impressão nativa do OnlyOffice para DOCX,
-preservando documentos complexos com timbre, cabeçalhos e imagens sem depender
-da conversão WASM para PDF. Nos demais formatos, o conversor gera o PDF e o
-entrega a um quadro temporário que abre a caixa de impressão do navegador; se
-essa conversão falhar, a impressão nativa também é usada como alternativa.
+pop-up. Para DOCX e DOTX, o comando Imprimir usa a impressão nativa do
+OnlyOffice v9, preservando timbre, cabeçalhos e imagens. Para os demais
+formatos, usa o canal `onlyoffice-file-stream` para exportar um PDF, entrega o
+arquivo a um quadro temporário e abre a caixa de impressão do navegador. Se a
+exportação não for compatível, a impressão nativa do OnlyOffice é usada como
+alternativa.
 
 No Safari, a recuperação de foco ativa primeiro o iframe interno e depois a
 área editável do OnlyOffice. Ela é repetida por um quadro de animação e após
