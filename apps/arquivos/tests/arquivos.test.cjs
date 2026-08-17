@@ -108,9 +108,17 @@ test('o build publica o submódulo e a licença AGPL do editor', () => {
   assert.match(patch, /requestNativeBrowserPrint/);
   assert.match(patch, /document:print-fallback/);
   assert.match(patch, /document:print-native/);
+  assert.match(patch, /serviceCommand\(params\.command, params\.data\)/);
+  assert.match(patch, /setMetaData\(\{ title: nextName \}\)/);
+  assert.match(patch, /onSaveDocument: handlePersonalSaveDocument/);
+  assert.match(patch, /SetDocumentModified\?\.\(false\)/);
+  assert.match(patch, /typeof api\.SetDocumentModified === 'function'/);
+  assert.match(patch, /markPersonalDocumentSaved/);
+  assert.match(patch, /document-saved-file/);
   assert.match(patch, /installPrintBridge/);
   assert.match(patch, /grabFocus/);
   assert.match(patch, /contentWindow\?\.focus/);
+  assert.match(patch, /data-ranuts-focus-recovery/);
   assert.match(validator, /thirdPartyHtmlPrefixes = \["arquivos\/editor\/"\]/);
   assert.match(validator, /sdkjs\/common\/wasm\/x2t\/x2t\.wasm\.gz/);
   assert.match(validator, /arquivos\/editor\/assets\/editor-\*\.js/);

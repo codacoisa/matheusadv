@@ -1,8 +1,10 @@
 diff --git a/lib/embed-api.ts b/lib/embed-api.ts
-index 8d8be3e..4fab3c5 100644
+index 8d8be3e..0b8e051 100644
 --- a/lib/embed-api.ts
 +++ b/lib/embed-api.ts
-@@ -3,3 +3,11 @@ import { handleDocumentOperation, loadEditorApi } from './converter';
+@@ -1,7 +1,15 @@
+ import { getDocmentObj, setDocmentObj } from '@ranuts/shared/store';
+ import { handleDocumentOperation, loadEditorApi } from './converter';
  import { openDocumentFromUrl } from './document';
 -import { getReadonlyMode, requestSaveDocument, setReadonlyMode } from './onlyoffice-editor';
 +import {
@@ -15,17 +17,29 @@ index 8d8be3e..4fab3c5 100644
 +  setReadonlyMode,
 +} from './onlyoffice-editor';
  
-@@ -11,2 +19,5 @@ type EmbedMessageType =
+ type EmbedMessageType =
+   | 'document:open'
+@@ -9,6 +17,9 @@ type EmbedMessageType =
+   | 'document:open-file'
+   | 'document:open-buffer'
    | 'document:set-readonly'
 +  | 'document:rename'
 +  | 'document:blur'
 +  | 'document:focus'
    | 'document:save'
-@@ -27,2 +38,3 @@ let parentOrigin = '*';
+   | 'document:get-state';
+ 
+@@ -25,6 +36,7 @@ const EMBED_QUERY_KEYS = ['embed', 'embedded'];
+ let initialized = false;
+ let parentOrigin = '*';
  let isEmbedMode = false;
 +let printRequestInProgress = false;
  
-@@ -71,2 +83,48 @@ function postToParent(type: string, payload: EmbedResponsePayload = {}, id?: str
+ function getQueryValue(key: string): string | null {
+   return new URLSearchParams(window.location.search).get(key);
+@@ -69,6 +81,52 @@ function postToParent(type: string, payload: EmbedResponsePayload = {}, id?: str
+   );
+ }
  
 +async function handleNativePrintRequest(): Promise<void> {
 +  if (printRequestInProgress) {
@@ -74,7 +88,11 @@ index 8d8be3e..4fab3c5 100644
 +}
 +
  // Some hosts (e.g. a Qt WebEngine app driving the page via
-@@ -182,2 +240,19 @@ async function handleMessage(event: MessageEvent): Promise<void> {
+ // QWebEngineView.page().runJavaScript()) can only inject JSON-serializable
+ // literals -- there is no way to hand over a real ArrayBuffer from the host
+@@ -180,6 +238,23 @@ async function handleMessage(event: MessageEvent): Promise<void> {
+         postToParent('document:readonly-changed', { readonly: getReadonlyMode() }, message.id);
+         break;
  
 +      case 'document:rename': {
 +        const fileName = String(payload.fileName || payload.name || '').trim();
@@ -94,13 +112,21 @@ index 8d8be3e..4fab3c5 100644
 +        break;
 +
        case 'document:save': {
-@@ -242,2 +317,5 @@ export function initEmbedApi(): void {
+         // Default to the open document's own format: a bare document:save on
+         // a docx/pptx used to ask x2t for XLSX, which fails (code 88) and
+@@ -240,6 +315,9 @@ export function initEmbedApi(): void {
+   }
+ 
    document.body.classList.add('embed-mode');
 +  window.addEventListener('ranuts:document-native-print', () => {
 +    void handleNativePrintRequest();
 +  });
    window.addEventListener('message', (event) => {
-@@ -249,2 +327,8 @@ export function initEmbedApi(): void {
+     void handleMessage(event);
+   });
+@@ -247,4 +325,21 @@ export function initEmbedApi(): void {
+   window.addEventListener('load', () => {
+     postToParent('document:ready');
    });
 +
 +  window.addEventListener('ranuts:document-state-change', (event) => {
@@ -108,32 +134,156 @@ index 8d8be3e..4fab3c5 100644
 +      modified: Boolean((event as CustomEvent<boolean>).detail),
 +    });
 +  });
++
++  window.addEventListener('ranuts:document-saved-file', (event) => {
++    const file = (event as CustomEvent<File>).detail;
++    if (!(file instanceof File)) return;
++    postToParent('document:saved', {
++      file,
++      fileName: file.name,
++      mimeType: file.type,
++      size: file.size,
++    });
++  });
  }
 diff --git a/lib/onlyoffice-editor.ts b/lib/onlyoffice-editor.ts
-index 5660f05..6d10684 100644
+index 5660f05..f343018 100644
 --- a/lib/onlyoffice-editor.ts
 +++ b/lib/onlyoffice-editor.ts
-@@ -1,3 +1,3 @@
+@@ -1,5 +1,5 @@
  import 'ranui/message';
 -import { getDocmentObj } from '@ranuts/shared/store';
 +import { getDocmentObj, setDocmentObj } from '@ranuts/shared/store';
  import { getOnlyOfficeLang, t } from '@ranuts/shared/i18n';
-@@ -9,3 +9,3 @@ import { X2TConverter, saveFileToDisk } from '@ranuts/converter';
+ import { oAscFileType } from './file-types';
+ import { installEditorThemeFollow, resolveEditorUiTheme } from './editor-theme';
+@@ -7,11 +7,11 @@ import { DOCUMENT_TYPE_MAP, getDocumentMimeType } from '@ranuts/shared/document-
+ import { X2TConverter, saveFileToDisk } from '@ranuts/converter';
+ 
  // v9.3.0 renamed sendCommand -> serviceCommand; keep the fallback for safety.
 -function editorSendCommand(params: { command: string; data: Record<string, any> }): void {
 +function editorSendCommand(params: { command: string; data: Record<string, any> | string }): void {
    const editor = window.editor as any;
-@@ -22,2 +22,5 @@ let editorOperationQueue: Promise<void> = Promise.resolve();
+   if (!editor) return;
+   if (typeof editor.serviceCommand === 'function') {
+-    editor.serviceCommand(params);
++    editor.serviceCommand(params.command, params.data);
+   } else if (typeof editor.sendCommand === 'function') {
+     editor.sendCommand(params);
+   }
+@@ -20,6 +20,9 @@ function editorSendCommand(params: { command: string; data: Record<string, any>
+ // Editor operation queue to prevent concurrent operations
+ let editorOperationQueue: Promise<void> = Promise.resolve();
  let isReadonlyMode = false;
 +let nativePrintBypass = false;
 +let focusAnimationFrame = 0;
 +let focusTimeout = 0;
  
-@@ -1048,2 +1051,3 @@ function createPersonalEditorInstance(config: {
+ type EmbeddedSaveRequest = {
+   targetExt?: string;
+@@ -184,20 +187,60 @@ interface FileStreamMessage {
+ // lib/converter's singleton.
+ let sheetJsConverter: X2TConverter | null = null;
+ 
+-function routeSavedFile(file: File): void {
++function routeSavedFile(file: File): boolean {
+   if (embeddedSaveRequest) {
+     const request = embeddedSaveRequest;
+     cleanupEmbeddedSaveRequest(request);
+     resolveEmbeddedSaveRequest(request, file);
+-    return;
++    return false;
+   }
+ 
+   if (isEmbedMode()) {
+-    console.warn('Local save is disabled in iframe embed mode. Use document:save from the parent page.');
+-    return;
++    window.dispatchEvent(new CustomEvent('ranuts:document-saved-file', { detail: file }));
++    return true;
+   }
+ 
+   saveFileToDisk(file, file.name).catch(notifyOperationFailed);
++  return true;
++}
++
++function markPersonalDocumentSaved(): void {
++  const reset = () => getSdkEditorApi()?.SetDocumentModified?.(false);
++  reset();
++  // The Personal save callback can run while the editor still has its
++  // composition input active; retry on the next task so v9 accepts the
++  // transition after the stream has been handed to the host.
++  window.setTimeout(reset, 0);
++}
++
++function handlePersonalSaveDocument(event: unknown): void {
++  const candidates = [
++    (event as { data?: unknown } | null)?.data,
++    (event as { data?: { data?: unknown } } | null)?.data?.data,
++    (event as { buffer?: unknown } | null)?.buffer,
++  ];
++  let bytes: Uint8Array | null = null;
++  for (const candidate of candidates) {
++    if (candidate === undefined || candidate === null) continue;
++    try {
++      bytes = toUint8Array(candidate as BlobPart);
++      break;
++    } catch {
++      // Try the next shape used by the v9 gateway callback.
++    }
++  }
++  if (!bytes) {
++    notifyOperationFailed(new Error('O OnlyOffice não retornou os bytes do arquivo salvo.'));
++    return;
++  }
++  const fileName = getDocmentObj()?.fileName || 'document.docx';
++  const fileBuffer = bytes.slice().buffer as ArrayBuffer;
++  if (routeSavedFile(new File([fileBuffer], fileName, { type: getSavedFileMimeType(fileName) }))) {
++    markPersonalDocumentSaved();
++  }
++  // Personal v9 invokes onSaveDocument after producing the bytes, but it
++  // does not complete the normal co-authoring save handshake. Reset the SDK
++  // state explicitly so the next edit emits a fresh modified transition.
+ }
+ 
+ function handleFileStreamMessage(event: MessageEvent): void {
+@@ -227,17 +270,23 @@ function handleFileStreamMessage(event: MessageEvent): void {
+       try {
+         sheetJsConverter ??= new X2TConverter();
+         const csvBytes = await sheetJsConverter.xlsxToCsvBytes(new Uint8Array(buffer));
+-        routeSavedFile(new File([csvBytes], `${baseName}.csv`, { type: 'text/csv' }));
++        if (routeSavedFile(new File([csvBytes], `${baseName}.csv`, { type: 'text/csv' }))) {
++          markPersonalDocumentSaved();
++        }
+       } catch (error) {
+         console.error('Failed to convert saved XLSX back to CSV, keeping XLSX:', error);
+-        routeSavedFile(new File([buffer], `${baseName}.xlsx`, { type: getSavedFileMimeType('a.xlsx') }));
++        if (routeSavedFile(new File([buffer], `${baseName}.xlsx`, { type: getSavedFileMimeType('a.xlsx') }))) {
++          markPersonalDocumentSaved();
++        }
+       }
+     })();
+     return;
+   }
+ 
+   const savedName = `${baseName}.${ext}`;
+-  routeSavedFile(new File([buffer], savedName, { type: getSavedFileMimeType(savedName) }));
++  if (routeSavedFile(new File([buffer], savedName, { type: getSavedFileMimeType(savedName) }))) {
++    markPersonalDocumentSaved();
++  }
+ }
+ 
+ if (typeof window !== 'undefined') {
+@@ -1046,6 +1095,7 @@ function createPersonalEditorInstance(config: {
+         markDocumentContentReady();
+         // Re-apply in case the header rendered after onAppReady.
          prepareEditorIframe();
 +        installPrintBridge();
          // Readonly opens mount with full edit permissions and get locked
-@@ -1057,2 +1061,9 @@ function createPersonalEditorInstance(config: {
+         // here instead (asc_setRestriction only works once the document is
+         // loaded). Read the live flag rather than the captured config value:
+@@ -1055,6 +1105,14 @@ function createPersonalEditorInstance(config: {
+         }
+         console.log(`${t('documentLoaded')}${fileName}`);
        },
 +      onDocumentStateChange: (event: { data?: boolean }) => {
 +        window.dispatchEvent(
@@ -142,8 +292,33 @@ index 5660f05..6d10684 100644
 +          }),
 +        );
 +      },
++      onSaveDocument: handlePersonalSaveDocument,
        // Must be declared even as a no-op: the api layer only runs downloadAs
-@@ -1197,2 +1208,100 @@ export function setReadonlyMode(readonly: boolean): void {
+       // when this callback exists. Actual bytes arrive via the
+       // onlyoffice-file-stream message, not through this event.
+@@ -1144,6 +1202,7 @@ const ASC_RESTRICTION_VIEW = 128;
+ type SdkEditorApi = {
+   asc_setRestriction?: (value: number) => void;
+   asc_removeRestriction?: (value: number) => void;
++  SetDocumentModified?: (modified: boolean) => void;
+ };
+ 
+ // Locate the SDK API instance inside the (same-origin) editor iframe. The
+@@ -1157,7 +1216,10 @@ function getSdkEditorApi(): SdkEditorApi | null {
+         editor?: SdkEditorApi;
+       };
+       const api = win.Asc?.editor || win.editor;
+-      if (api && typeof api.asc_setRestriction === 'function') {
++      if (
++        api &&
++        (typeof api.asc_setRestriction === 'function' || typeof api.SetDocumentModified === 'function')
++      ) {
+         return api;
+       }
+     } catch {
+@@ -1195,6 +1257,110 @@ export function setReadonlyMode(readonly: boolean): void {
+   });
+ }
  
 +function getEditorFrame(): HTMLIFrameElement | null {
 +  return document.querySelector<HTMLIFrameElement>('#iframe iframe, iframe[name="frameEditor"]');
@@ -197,10 +372,15 @@ index 5660f05..6d10684 100644
 +    fileName: nextName,
 +    file,
 +  });
-+  editorSendCommand({
-+    command: 'asc_setDocumentName',
-+    data: nextName,
-+  });
++  const editor = window.editor as any;
++  if (typeof editor?.setMetaData === 'function') {
++    editor.setMetaData({ title: nextName });
++  } else {
++    editorSendCommand({
++      command: 'asc_setDocumentName',
++      data: nextName,
++    });
++  }
 +  focusOpenDocument();
 +}
 +
@@ -224,6 +404,7 @@ index 5660f05..6d10684 100644
 +    editorFrame?.focus({ preventScroll: true });
 +    editorFrame?.contentWindow?.focus();
 +    (window.editor as any)?.grabFocus?.();
++    editorFrame?.contentDocument?.querySelector<HTMLElement>('#editor_sdk')?.setAttribute('data-ranuts-focus-recovery', 'ready');
 +  };
 +
 +  applyFocus();
@@ -244,11 +425,15 @@ index 5660f05..6d10684 100644
 +}
 +
  export function getReadonlyMode(): boolean {
+   return isReadonlyMode;
+ }
 diff --git a/packages/shared/src/document-utils.ts b/packages/shared/src/document-utils.ts
 index f87a1a3..ec9d1dd 100644
 --- a/packages/shared/src/document-utils.ts
 +++ b/packages/shared/src/document-utils.ts
-@@ -4,5 +4,5 @@ import type { DocumentType } from './document-types';
+@@ -2,22 +2,15 @@ import { getMime } from 'ranuts/utils';
+ import type { DocumentType } from './document-types';
+ 
  /**
 - * Get base path based on deployment environment
 - * - GitHub Pages: uses /document/ path
@@ -257,7 +442,9 @@ index f87a1a3..ec9d1dd 100644
 + * editor embeddable below an arbitrary static-site subdirectory, including
 + * GitHub Pages project sites and same-origin iframes.
   */
-@@ -12,10 +12,3 @@ export const getBasePath = (): string => {
+ export const getBasePath = (): string => {
+   if (typeof window === 'undefined') {
+     return '/';
    }
 -
 -  const pathname = window.location.pathname;
@@ -269,3 +456,5 @@ index f87a1a3..ec9d1dd 100644
 -  return '/';
 +  return new URL('./', window.document.baseURI).pathname;
  };
+ 
+ export const BASE_PATH = getBasePath();
