@@ -984,6 +984,7 @@ dialog form {
   line-height: 1.4;
 }
 .case-title-ai-status[data-kind="success"] { color: var(--success); }
+.case-title-ai-status[data-kind="warning"] { color: #9a6700; }
 .case-title-ai-status[data-kind="error"] { color: var(--danger); }
 .case-title-ai-status:empty { min-height: 0; }
 .form-grid .field-warning { color: var(--danger); }

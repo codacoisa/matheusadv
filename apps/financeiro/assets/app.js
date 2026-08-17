@@ -3027,7 +3027,7 @@
       setCaseTitleAiStatus(
         form,
         `${error.message || "Não foi possível gerar a sugestão."} O título atual foi mantido.`,
-        "error",
+        error.code === "UNCHANGED_TITLE" ? "warning" : "error",
       );
     } finally {
       if (request === caseTitleAiRequest) {

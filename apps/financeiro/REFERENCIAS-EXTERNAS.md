@@ -109,10 +109,12 @@ incorporado.
   partes, observações, movimentações ou o retorno bruto do DataJud.
 - **Persistência e revisão:** somente o título aceito pela pessoa usuária é
   salvo no caso; a resposta da IA não é registrada separadamente. O módulo
-  rejeita sugestões que omitam a classe principal ou termos informativos dos
-  assuntos e mantém o título-base nesses casos. Qualificadores de procedimento
-  podem ser resumidos para melhorar a redação. A sugestão aceita é opcional,
-  editável e nunca substitui a revisão profissional.
+  rejeita sugestões que omitam a classe principal, termos informativos dos
+  assuntos ou que apenas troquem separadores/pontuação, mantendo o título-base
+  nesses casos. Se o modelo de raciocínio esgotar o limite sem texto final, o
+  módulo repete a chamada com limite maior. Qualificadores de procedimento podem
+  ser resumidos para melhorar a redação. A sugestão aceita é opcional, editável
+  e nunca substitui a revisão profissional.
 - **Privacidade:** não use a sugestão anônima para informações que o escritório
   não possa compartilhar com um serviço externo. Consulte os termos e a política
   do provedor antes de uso em produção.

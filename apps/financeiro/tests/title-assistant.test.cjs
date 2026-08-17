@@ -37,7 +37,34 @@ test("gerar título sem credencial e normalizar resposta do modelo", async () =>
   assert.equal(request.url, "https://api.llm7.io/v1/chat/completions");
   assert.equal(request.options.method, "POST");
   assert.equal(request.options.headers.Authorization, undefined);
-  assert.equal(JSON.parse(request.options.body).model, "default");
+  const body = JSON.parse(request.options.body);
+  assert.equal(body.model, "default");
+  assert.equal(body.max_tokens, 512);
+  assert.match(body.messages[0].content, /Não revele o raciocínio/);
+});
+
+test("refazer consulta quando o modelo esgota o raciocínio sem texto final", async () => {
+  const requests = [];
+  const result = await assistant.generateTitle(
+    {
+      className: "Divórcio Litigioso",
+      subjects: [{ name: "Partilha de Bens" }, { name: "Dissolução" }],
+    },
+    {
+      fetchImpl: async (_url, options) => {
+        const body = JSON.parse(options.body);
+        requests.push(body);
+        return requests.length === 1
+          ? new Response(JSON.stringify({ choices: [{ message: { content: "" }, finish_reason: "length" }] }), { status: 200 })
+          : new Response(JSON.stringify({ choices: [{ message: { content: "Divórcio Litigioso por Partilha de Bens e Dissolução" }, finish_reason: "stop" }] }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(result.title, "Divórcio Litigioso por Partilha de Bens e Dissolução");
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].max_tokens, 512);
+  assert.equal(requests[1].max_tokens, 2048);
 });
 
 test("rejeitar título que omite parte dos metadados processuais", async () => {
@@ -54,6 +81,23 @@ test("rejeitar título que omite parte dos metadados processuais", async () => {
       },
     ),
     /título incompleto.*omitiu a classe principal ou parte/i,
+  );
+});
+
+test("rejeitar sugestão que só troca o separador", async () => {
+  await assert.rejects(
+    assistant.generateTitle(
+      {
+        className: "Execução de Título Extrajudicial",
+        subjects: [{ name: "Direitos e Títulos de Crédito" }],
+      },
+      {
+        fetchImpl: async () => new Response(JSON.stringify({
+          choices: [{ message: { content: "Execução de Título Extrajudicial - Direitos e Títulos de Crédito" } }],
+        }), { status: 200 }),
+      },
+    ),
+    (error) => error.code === "UNCHANGED_TITLE" && /melhoria real/i.test(error.message),
   );
 });
 

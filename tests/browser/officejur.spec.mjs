@@ -890,6 +890,48 @@ test('Financeiro mantém o título atual quando a IA omite metadados processuais
   await expect(form.locator('[data-case-title-ai-status]')).toContainText('omitiu a classe principal ou parte dos assuntos');
 });
 
+test('Financeiro mantém o título atual quando a IA só troca o separador', async ({ page }) => {
+  const processNumber = '00008323520184013202';
+  await page.route('https://worker.example/datajud/search', async route => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        hits: {
+          hits: [{
+            _source: {
+              numeroProcesso: processNumber,
+              tribunal: 'TRF1',
+              classe: { codigo: 436, nome: 'Execução de Título Extrajudicial' },
+              assuntos: [{ codigo: 6177, nome: 'Direitos e Títulos de Crédito' }],
+            },
+          }],
+        },
+      }),
+    });
+  });
+  await page.route('https://api.llm7.io/v1/chat/completions', async route => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: 'Execução de Título Extrajudicial - Direitos e Títulos de Crédito' } }],
+      }),
+    });
+  });
+  await prepareCalculationPage(page, 'financeiro/');
+  await configureDataJudWorker(page);
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="number"]').fill(processNumber);
+  await expect(form.locator('[data-case-datajud-status]')).toContainText('Dados públicos carregados', { timeout: 10_000 });
+  const originalTitle = 'Execução de Título Extrajudicial · Direitos e Títulos de Crédito';
+  await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
+  await form.getByRole('button', { name: 'Sugerir com IA' }).click();
+  await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
+  await expect(form.locator('[data-case-title-ai-status]')).toContainText('não encontrou uma melhoria real');
+});
+
 test('Financeiro libera edição manual quando o Worker não está configurado', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
   await page.locator('[data-view="cases"]').click();
