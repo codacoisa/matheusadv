@@ -97,24 +97,29 @@ incorporado.
 
 ### LLM7.io
 
-- **Uso:** sugestão opcional de título interno para processos judiciais, após a
+- **Uso:** melhoria ou sugestão opcional de título interno para processos
+  judiciais e casos administrativos, extrajudiciais ou consultivos, com ou sem
   consulta do DataJud.
 - **Endpoint:** `https://api.llm7.io/v1/chat/completions`, compatível com o
   formato de chat da OpenAI e acessado diretamente pelo navegador.
 - **Autenticação:** o modo anônimo não usa conta, token ou chave no OfficeJur.
   O limite público é aplicado pelo provedor e pode mudar; um token gratuito do
   provedor não é armazenado nem solicitado pelo módulo.
-- **Dados enviados:** somente área, nome da classe processual e até seis
-  assuntos normalizados. O módulo não envia cliente, CPF/CNPJ, número CNJ,
-  partes, observações, movimentações ou o retorno bruto do DataJud.
+- **Dados enviados:** somente o título atual/rascunho, tipo do caso, área, nome
+  da classe processual e até seis assuntos normalizados. O módulo não envia
+  cliente, partes fora do título, CPF/CNPJ, número CNJ, observações,
+  movimentações ou o retorno bruto do DataJud.
 - **Persistência e revisão:** somente o título aceito pela pessoa usuária é
   salvo no caso; a resposta da IA não é registrada separadamente. O módulo
-  rejeita sugestões que omitam a classe principal, termos informativos dos
-  assuntos ou que apenas troquem separadores/pontuação, mantendo o título-base
-  nesses casos. Se o modelo de raciocínio esgotar o limite sem texto final, o
-  módulo repete a chamada com limite maior. Qualificadores de procedimento podem
-  ser resumidos para melhorar a redação. A sugestão aceita é opcional, editável
-  e nunca substitui a revisão profissional.
+- **Qualidade e revisão:** o módulo rejeita sugestões sem melhoria real, que
+  apenas troquem separadores/pontuação ou reduzam excessivamente o sentido,
+  mantendo o título atual nesses casos. Se o modelo de raciocínio esgotar o
+  limite sem texto final, o módulo repete a chamada com limite maior.
+  Qualificadores de procedimento podem ser resumidos para melhorar a redação.
+  A sugestão aceita é opcional, editável e nunca substitui a revisão
+  profissional. Como o título atual é enviado ao provedor, ele pode conter
+  dados pessoais; não use o modo anônimo para conteúdo que o escritório não
+  possa compartilhar externamente.
 - **Privacidade:** não use a sugestão anônima para informações que o escritório
   não possa compartilhar com um serviço externo. Consulte os termos e a política
   do provedor antes de uso em produção.

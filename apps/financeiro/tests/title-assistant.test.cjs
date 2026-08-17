@@ -5,11 +5,15 @@ const assistant = require("../assets/title-assistant.js");
 
 test("montar prompt somente com metadados processuais", () => {
   const prompt = assistant.buildPrompt({
+    currentTitle: "Ação Penal - Procedimento Ordinário · Crimes de Trânsito",
+    caseType: "Judicial",
     area: "Criminal",
     className: "Ação Penal - Procedimento Ordinário",
     subjects: [{ name: "Crimes de Trânsito" }, { name: "Crimes de Trânsito" }],
   });
 
+  assert.match(prompt, /Título atual ou rascunho: Ação Penal/);
+  assert.match(prompt, /Tipo do caso: Judicial/);
   assert.match(prompt, /Ação Penal - Procedimento Ordinário/);
   assert.match(prompt, /Crimes de Trânsito/);
   assert.doesNotMatch(prompt, /0000832|Cliente|CPF|CNPJ|número CNJ/i);
@@ -71,6 +75,7 @@ test("rejeitar título que omite parte dos metadados processuais", async () => {
   await assert.rejects(
     assistant.generateTitle(
       {
+        currentTitle: "Ação Penal - Procedimento Ordinário · Crimes de Trânsito",
         className: "Ação Penal - Procedimento Ordinário",
         subjects: [{ name: "Crimes de Trânsito" }],
       },
@@ -80,8 +85,42 @@ test("rejeitar título que omite parte dos metadados processuais", async () => {
         }), { status: 200 }),
       },
     ),
-    /título incompleto.*omitiu a classe principal ou parte/i,
+    (error) => error.code === "LOSSY_TITLE" && /reduzido demais o sentido/i.test(error.message),
   );
+});
+
+test("melhorar título manual de caso sem DataJud", async () => {
+  const result = await assistant.generateTitle(
+    {
+      currentTitle: "cobranca de honorarios em contrato",
+      caseType: "Extrajudicial",
+      area: "Cível",
+    },
+    {
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: "cobrança contratual de honorários" }, finish_reason: "stop" }],
+      }), { status: 200 }),
+    },
+  );
+
+  assert.equal(result.title, "Cobrança contratual de honorários");
+});
+
+test("aceitar normalização de acentuação como melhoria real", async () => {
+  const result = await assistant.generateTitle(
+    {
+      currentTitle: "cobranca de honorarios em contrato",
+      caseType: "Extrajudicial",
+      area: "Cível",
+    },
+    {
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: "Cobrança de honorários em contrato" }, finish_reason: "stop" }],
+      }), { status: 200 }),
+    },
+  );
+
+  assert.equal(result.title, "Cobrança de honorários em contrato");
 });
 
 test("rejeitar sugestão que só troca o separador", async () => {
@@ -98,6 +137,34 @@ test("rejeitar sugestão que só troca o separador", async () => {
       },
     ),
     (error) => error.code === "UNCHANGED_TITLE" && /melhoria real/i.test(error.message),
+  );
+});
+
+test("rejeitar sugestão que altera a relação jurídica", async () => {
+  await assert.rejects(
+    assistant.generateTitle(
+      { currentTitle: "Indenização contra Hospital X", caseType: "Judicial", area: "Cível" },
+      {
+        fetchImpl: async () => new Response(JSON.stringify({
+          choices: [{ message: { content: "Indenização por Hospital X" } }],
+        }), { status: 200 }),
+      },
+    ),
+    (error) => error.code === "LOSSY_TITLE" && /reduzido demais o sentido/i.test(error.message),
+  );
+});
+
+test("preservar qualificadores que vieram entre parênteses", async () => {
+  await assert.rejects(
+    assistant.generateTitle(
+      { currentTitle: "Defesa em Processo Criminal (Lei X)", caseType: "Judicial", area: "Criminal" },
+      {
+        fetchImpl: async () => new Response(JSON.stringify({
+          choices: [{ message: { content: "Defesa em processo criminal" } }],
+        }), { status: 200 }),
+      },
+    ),
+    (error) => error.code === "LOSSY_TITLE" && /reduzido demais o sentido/i.test(error.message),
   );
 });
 

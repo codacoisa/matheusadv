@@ -8,10 +8,13 @@
   const API_BASE = "https://api.llm7.io/v1";
   const MODEL = "default";
   const MAX_CONTEXT_LENGTH = 140;
+  const MAX_CURRENT_TITLE_LENGTH = 240;
   const MAX_SUBJECTS = 6;
   const MAX_TITLE_LENGTH = 120;
   const MAX_OUTPUT_TOKENS = 512;
   const RETRY_OUTPUT_TOKENS = 2048;
+  const MIN_PRESERVATION_SCORE = 0.65;
+  const MIN_COMPONENT_SCORE = 0.6;
   const MATCH_STOPWORDS = new Set([
     "a",
     "ao",
@@ -37,6 +40,20 @@
     "sem",
     "sobre",
   ]);
+  const RELATION_VARIANTS = [
+    {
+      source: /\bcontra\b/i,
+      alternatives: [/\bcontra\b/i, /\bem desfavor de\b/i, /\bem face de\b/i],
+    },
+    {
+      source: /\bem desfavor de\b/i,
+      alternatives: [/\bcontra\b/i, /\bem desfavor de\b/i, /\bem face de\b/i],
+    },
+    {
+      source: /\bem face de\b/i,
+      alternatives: [/\bcontra\b/i, /\bem desfavor de\b/i, /\bem face de\b/i],
+    },
+  ];
 
   function cleanText(value, maxLength = MAX_CONTEXT_LENGTH) {
     return String(value ?? "")
@@ -60,12 +77,14 @@
 
   function normalizeInput(input = {}) {
     const normalized = {
+      currentTitle: cleanText(input.currentTitle, MAX_CURRENT_TITLE_LENGTH),
+      caseType: cleanText(input.caseType, 40),
       area: cleanText(input.area, 60),
       className: cleanText(input.className),
       subjects: normalizeSubjects(input.subjects),
     };
-    if (!normalized.className && !normalized.subjects.length)
-      throw new Error("Não há classe ou assunto processual para sugerir um título.");
+    if (!normalized.currentTitle && !normalized.className && !normalized.subjects.length)
+      throw new Error("Digite um título ou carregue classe/assuntos para sugerir uma redação.");
     return normalized;
   }
 
@@ -78,6 +97,17 @@
       .trim()
       .split(/\s+/)
       .filter((token) => token.length > 2 && !MATCH_STOPWORDS.has(token));
+  }
+
+  function comparisonTokens(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter((token) => token && !MATCH_STOPWORDS.has(token));
   }
 
   function tokenIsPreserved(sourceToken, titleToken) {
@@ -94,35 +124,75 @@
 
   function comparableTitle(value) {
     return String(value || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLocaleLowerCase("pt-BR")
-      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
       .trim();
   }
 
   function baseTitles(input) {
+    const current = input.currentTitle || "";
     const complete = [input.className, ...input.subjects].filter(Boolean).join(" · ");
     const firstSubject = input.subjects[0] || "";
     const deterministic = [input.className, firstSubject].filter(Boolean).join(" · ") +
       (input.subjects.length > 1 ? " e outros assuntos" : "");
-    return [...new Set([complete, deterministic].filter(Boolean))];
+    return [...new Set([current, complete, deterministic].filter(Boolean))];
   }
 
-  function missingMetadataTokens(title, input) {
+  function preservationScore(source, title) {
+    const sourceTokens = [...new Set(matchingTokens(source))];
+    if (!sourceTokens.length) return 1;
     const titleTokens = matchingTokens(title);
-    const sourceTokens = [
-      ...matchingTokens(mainClassName(input.className)),
-      ...input.subjects.flatMap((subject) => matchingTokens(subject)),
-    ];
-    return [...new Set(sourceTokens)].filter(
-      (sourceToken) => !titleTokens.some((titleToken) => tokenIsPreserved(sourceToken, titleToken)),
+    const preserved = sourceTokens.filter(
+      (sourceToken) => titleTokens.some((titleToken) => tokenIsPreserved(sourceToken, titleToken)),
     );
+    return preserved.length / sourceTokens.length;
   }
 
-  function assertTitlePreservesMetadata(title, input) {
-    if (missingMetadataTokens(title, input).length)
-      throw new Error("A IA retornou um título incompleto e omitiu a classe principal ou parte dos assuntos processuais.");
+  function lossyTitleError() {
+    const error = new Error("A sugestão parece ter reduzido demais o sentido do título.");
+    error.code = "LOSSY_TITLE";
+    return error;
+  }
+
+  function assertSemanticRelations(source, title) {
+    const sourceText = String(source || "");
+    const titleText = String(title || "");
+    for (const relation of RELATION_VARIANTS) {
+      if (relation.source.test(sourceText) && !relation.alternatives.some((pattern) => pattern.test(titleText)))
+        throw lossyTitleError();
+    }
+  }
+
+  function assertParentheticalContent(source, title) {
+    const titleTokens = comparisonTokens(title);
+    const segments = [...String(source || "").matchAll(/\(([^()]*)\)/g)].map((match) => match[1]);
+    for (const segment of segments) {
+      const missing = comparisonTokens(segment).filter(
+        (sourceToken) => !titleTokens.some((titleToken) => tokenIsPreserved(sourceToken, titleToken)),
+      );
+      if (missing.length) throw lossyTitleError();
+    }
+  }
+
+  function assertSemanticContent(source, title) {
+    assertSemanticRelations(source, title);
+    assertParentheticalContent(source, title);
+  }
+
+  function assertTitlePreservesMeaning(title, input) {
+    if (input.currentTitle) {
+      if (preservationScore(input.currentTitle, title) < MIN_PRESERVATION_SCORE)
+        throw lossyTitleError();
+      assertSemanticContent(input.currentTitle, title);
+      return title;
+    }
+    const classScore = preservationScore(mainClassName(input.className), title);
+    if (input.className && classScore < MIN_COMPONENT_SCORE) throw lossyTitleError();
+    if (input.subjects.some((subject) => preservationScore(subject, title) < MIN_COMPONENT_SCORE))
+      throw lossyTitleError();
+    if (preservationScore([mainClassName(input.className), ...input.subjects].join(" · "), title) < MIN_PRESERVATION_SCORE)
+      throw lossyTitleError();
+    assertSemanticContent(input.className, title);
+    input.subjects.forEach((subject) => assertSemanticContent(subject, title));
     return title;
   }
 
@@ -141,20 +211,21 @@
   function buildPrompt(input) {
     const normalized = normalizeInput(input);
     const lines = [
+      "Tipo do caso: " + (normalized.caseType || "não informado"),
       "Área: " + (normalized.area || "não informada"),
+      "Título atual ou rascunho: " + (normalized.currentTitle || "não informado"),
       "Classe processual: " + (normalized.className || "não informada"),
       "Assuntos processuais: " + (normalized.subjects.join("; ") || "não informados"),
-      "Título-base completo: " +
-        ([normalized.className, ...normalized.subjects].filter(Boolean).join(" · ") || "não informado"),
     ];
     return [
-      "Você é um assistente de nomenclatura de processos jurídicos no Brasil.",
+      "Você é um assistente de redação de títulos de processos e casos jurídicos no Brasil.",
       "Crie um único título curto, claro e profissional, em português brasileiro, para uso interno em um escritório.",
-      "Baseie-se exclusivamente nos metadados abaixo. Não faça um resumo excessivo: a classe principal e cada assunto processual são obrigatórios no resultado.",
-      "Preserve a classe principal e todos os termos informativos dos assuntos. O qualificador de procedimento depois de um separador pode ser omitido ou reorganizado se isso deixar o título mais natural, mas não troque a classe ou os assuntos por categorias genéricas ou palavras mais curtas.",
-      "Não retorne apenas uma troca de separador, hífen, pontuação, maiúsculas ou espaços: isso não é uma melhoria. Se não houver melhoria real sem perda de informação, retorne exatamente SEM_MELHORIA.",
+      "Se houver título atual, melhore sua redação e normatize ortografia, capitalização, conectores e ordem; se não houver, crie um título a partir do contexto disponível.",
+      "Use classe e assuntos como contexto para corrigir a terminologia, mas não é necessário copiar todos os campos literalmente. Preserve o núcleo do objeto e o sentido do título atual; qualificadores de procedimento podem ser resumidos quando não forem essenciais.",
+      "Não retorne apenas uma troca de separador, hífen, pontuação ou espaços: isso não é uma melhoria. Correções reais de ortografia, acentuação e capitalização são melhorias válidas. Se não houver melhoria real sem perda de informação, retorne exatamente SEM_MELHORIA.",
       "Exemplo: 'Ação Penal - Procedimento Ordinário · Crimes de Trânsito' pode virar 'Ação Penal por crime de trânsito', mas nunca 'Ação Penal - Trânsito'.",
-      "Não invente partes, fatos, pedidos, valores, tribunal, número, resultado ou fase processual.",
+      "Não invente nem remova partes, fatos, pedidos, valores, tribunal, número, resultado ou fase processual que sejam relevantes no título atual. Não use dados que não estejam no contexto abaixo.",
+      "Use capitalização normal em português, sem colocar a inicial de todas as palavras em maiúscula.",
       "Retorne somente o título, sem aspas, sem explicação, sem prefixo e sem ponto final.",
       "O título deve ter entre 3 e 120 caracteres.",
       "",
@@ -173,21 +244,25 @@
     return String(content || "");
   }
 
+  function normalizeSentenceCase(title) {
+    return title.replace(/^\p{Ll}/u, (letter) => letter.toLocaleUpperCase("pt-BR"));
+  }
+
   function normalizeTitle(value, input) {
-    const title = String(value || "")
+    const title = normalizeSentenceCase(String(value || "")
       .replace(/[\r\n]+/g, " ")
       .replace(/^\s*(?:título|titulo)\s*:\s*/i, "")
       .replace(/^['"“”]+|['"“”]+$/g, "")
       .replace(/\s+/g, " ")
       .trim()
       .replace(/[.!?]+$/g, "")
-      .trim();
+      .trim());
     if (title.length < 3) throw new Error("O serviço de IA respondeu sem um título utilizável.");
     if (/^sem[_ -]?melhoria$/i.test(title)) throw unchangedTitleError();
     if (title.length > MAX_TITLE_LENGTH)
       throw new Error("A IA retornou um título longo demais para preservar os metadados processuais.");
     if (!input) return title;
-    assertTitlePreservesMetadata(title, input);
+    assertTitlePreservesMeaning(title, input);
     return assertTitleImprovesWording(title, input);
   }
 
@@ -269,8 +344,8 @@
     normalizeInput,
     normalizeSubjects,
     normalizeTitle,
-    missingMetadataTokens,
-    assertTitlePreservesMetadata,
+    preservationScore,
+    assertTitlePreservesMeaning,
     assertTitleImprovesWording,
     comparableTitle,
   };

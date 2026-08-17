@@ -2973,9 +2973,14 @@
     status.dataset.kind = kind;
     status.hidden = !message;
   }
+  function selectedOptionLabel(field) {
+    return field?.options?.[field.selectedIndex]?.textContent?.trim() || field?.value || "";
+  }
   function caseTitleAiInput(form) {
     const info = caseDataJudDraft;
     return {
+      currentTitle: form.elements.title.value,
+      caseType: selectedOptionLabel(form.elements.type),
       area: form.elements.area.value,
       className: info?.processClass?.name || "",
       subjects: info?.subjects || [],
@@ -2987,16 +2992,16 @@
       input = caseTitleAiInput(form),
       ready = Boolean(
         titleAssistant?.generateTitle &&
-          (input.className || input.subjects.length) &&
+          (input.currentTitle || input.className || input.subjects.length) &&
           form.dataset.datajudGate !== "locked",
       );
     if (!button) return;
     button.disabled = !ready || button.dataset.busy === "true";
     button.title = ready
-      ? "Sugerir título com IA"
-      : "Disponível depois que a classe ou os assuntos do DataJud forem carregados";
+      ? "Melhorar ou sugerir título com IA"
+      : "Digite um título ou aguarde os dados processuais para habilitar a IA";
     if (ready && status && !status.textContent && button.dataset.busy !== "true")
-      status.textContent = "A sugestão usa somente classe, assuntos e área, e deve ser conferida antes de salvar.";
+      status.textContent = "A IA recebe o título atual, tipo, área e, quando houver, classe/assuntos. Confira antes de salvar.";
     if (ready && status && status.textContent) status.hidden = false;
   }
   async function suggestCaseTitle() {
@@ -3027,7 +3032,7 @@
       setCaseTitleAiStatus(
         form,
         `${error.message || "Não foi possível gerar a sugestão."} O título atual foi mantido.`,
-        error.code === "UNCHANGED_TITLE" ? "warning" : "error",
+        ["UNCHANGED_TITLE", "LOSSY_TITLE"].includes(error.code) ? "warning" : "error",
       );
     } finally {
       if (request === caseTitleAiRequest) {
@@ -3209,6 +3214,7 @@
     caseDataJudDraft = null;
     f.reset();
     delete f.querySelector("#suggest-case-title")?.dataset.busy;
+    setCaseTitleAiStatus(f);
     f.elements.id.value = caseId;
     f.elements.clientId.innerHTML =
       '<option value="">Selecione o cliente</option>' +
@@ -4901,7 +4907,9 @@
   $("#case-form [name=type]").onchange = syncCaseType;
   $("#case-form [name=title]").addEventListener("input", (event) => {
     normalizeCaseTitleSeparators(event.currentTarget);
+    updateCaseTitleAi(event.currentTarget.form);
   });
+  $("#case-form [name=area]").addEventListener("change", (event) => updateCaseTitleAi(event.currentTarget.form));
   $("#suggest-case-title").onclick = suggestCaseTitle;
   $("#case-form [name=number]").addEventListener("input", (event) => {
     if (event.target.form.elements.type.value === "judicial") {

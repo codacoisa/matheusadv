@@ -887,7 +887,7 @@ test('Financeiro mantém o título atual quando a IA omite metadados processuais
   await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
   await form.getByRole('button', { name: 'Sugerir com IA' }).click();
   await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
-  await expect(form.locator('[data-case-title-ai-status]')).toContainText('omitiu a classe principal ou parte dos assuntos');
+  await expect(form.locator('[data-case-title-ai-status]')).toContainText('reduzido demais o sentido do título');
 });
 
 test('Financeiro mantém o título atual quando a IA só troca o separador', async ({ page }) => {
@@ -930,6 +930,34 @@ test('Financeiro mantém o título atual quando a IA só troca o separador', asy
   await form.getByRole('button', { name: 'Sugerir com IA' }).click();
   await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
   await expect(form.locator('[data-case-title-ai-status]')).toContainText('não encontrou uma melhoria real');
+});
+
+test('Financeiro melhora título manual de caso extrajudicial', async ({ page }) => {
+  let aiRequest;
+  await page.route('https://api.llm7.io/v1/chat/completions', async route => {
+    const request = route.request();
+    aiRequest = request.postDataJSON();
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: 'Cobrança contratual de honorários' }, finish_reason: 'stop' }],
+      }),
+    });
+  });
+  await prepareCalculationPage(page, 'financeiro/');
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="type"]').selectOption('extrajudicial');
+  await form.locator('[name="title"]').fill('cobranca de honorarios em contrato');
+  await expect(form.getByRole('button', { name: 'Sugerir com IA' })).toBeEnabled();
+  await form.getByRole('button', { name: 'Sugerir com IA' }).click();
+  await expect(form.locator('[name="title"]')).toHaveValue('Cobrança contratual de honorários');
+  await expect(form.locator('[data-case-title-ai-status]')).toContainText('Sugestão aplicada');
+  expect(aiRequest.messages[1].content).toContain('Tipo do caso: Extrajudicial');
+  expect(aiRequest.messages[1].content).toContain('Título atual ou rascunho: cobranca de honorarios em contrato');
+  expect(aiRequest.messages[1].content).not.toContain('Cliente de teste');
 });
 
 test('Financeiro libera edição manual quando o Worker não está configurado', async ({ page }) => {
