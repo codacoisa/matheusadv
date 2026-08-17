@@ -10,6 +10,31 @@
   const MAX_CONTEXT_LENGTH = 140;
   const MAX_SUBJECTS = 6;
   const MAX_TITLE_LENGTH = 120;
+  const MATCH_STOPWORDS = new Set([
+    "a",
+    "ao",
+    "aos",
+    "as",
+    "com",
+    "contra",
+    "da",
+    "das",
+    "de",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "na",
+    "nas",
+    "no",
+    "nos",
+    "o",
+    "os",
+    "para",
+    "por",
+    "sem",
+    "sobre",
+  ]);
 
   function cleanText(value, maxLength = MAX_CONTEXT_LENGTH) {
     return String(value ?? "")
@@ -42,17 +67,62 @@
     return normalized;
   }
 
+  function matchingTokens(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter((token) => token.length > 2 && !MATCH_STOPWORDS.has(token));
+  }
+
+  function tokenIsPreserved(sourceToken, titleToken) {
+    return (
+      sourceToken === titleToken ||
+      sourceToken.startsWith(titleToken) ||
+      titleToken.startsWith(sourceToken)
+    );
+  }
+
+  function mainClassName(className) {
+    return String(className || "").split(/\s+[-–—]\s+/, 1)[0];
+  }
+
+  function missingMetadataTokens(title, input) {
+    const titleTokens = matchingTokens(title);
+    const sourceTokens = [
+      ...matchingTokens(mainClassName(input.className)),
+      ...input.subjects.flatMap((subject) => matchingTokens(subject)),
+    ];
+    return [...new Set(sourceTokens)].filter(
+      (sourceToken) => !titleTokens.some((titleToken) => tokenIsPreserved(sourceToken, titleToken)),
+    );
+  }
+
+  function assertTitlePreservesMetadata(title, input) {
+    if (missingMetadataTokens(title, input).length)
+      throw new Error("A IA retornou um título incompleto e omitiu a classe principal ou parte dos assuntos processuais.");
+    return title;
+  }
+
   function buildPrompt(input) {
     const normalized = normalizeInput(input);
     const lines = [
       "Área: " + (normalized.area || "não informada"),
       "Classe processual: " + (normalized.className || "não informada"),
       "Assuntos processuais: " + (normalized.subjects.join("; ") || "não informados"),
+      "Título-base completo: " +
+        ([normalized.className, ...normalized.subjects].filter(Boolean).join(" · ") || "não informado"),
     ];
     return [
       "Você é um assistente de nomenclatura de processos jurídicos no Brasil.",
       "Crie um único título curto, claro e profissional, em português brasileiro, para uso interno em um escritório.",
-      "Baseie-se exclusivamente nos metadados abaixo. Preserve a classe processual quando ela for relevante e traduza o assunto técnico para uma descrição natural somente quando isso não exigir inferência.",
+      "Baseie-se exclusivamente nos metadados abaixo. Não faça um resumo excessivo: a classe principal e cada assunto processual são obrigatórios no resultado.",
+      "Preserve a classe principal e todos os termos informativos dos assuntos. O qualificador de procedimento depois de um separador pode ser omitido ou reorganizado se isso deixar o título mais natural, mas não troque a classe ou os assuntos por categorias genéricas ou palavras mais curtas.",
+      "Se não puder melhorar a redação sem perder informação, retorne exatamente o título-base completo.",
+      "Exemplo: 'Ação Penal - Procedimento Ordinário · Crimes de Trânsito' pode virar 'Ação Penal por crime de trânsito', mas nunca 'Ação Penal - Trânsito'.",
       "Não invente partes, fatos, pedidos, valores, tribunal, número, resultado ou fase processual.",
       "Retorne somente o título, sem aspas, sem explicação, sem prefixo e sem ponto final.",
       "O título deve ter entre 3 e 120 caracteres.",
@@ -62,15 +132,17 @@
   }
 
   function responseText(payload) {
-    const content = payload?.choices?.[0]?.message?.content;
+    const choice = payload?.choices?.[0] || {};
+    const content = choice?.message?.content ?? choice?.text ?? payload?.output_text ?? payload?.text;
     if (Array.isArray(content))
       return content
         .map((part) => (typeof part === "string" ? part : part?.text || ""))
         .join(" ");
+    if (content && typeof content === "object") return String(content.text || content.value || "");
     return String(content || "");
   }
 
-  function normalizeTitle(value) {
+  function normalizeTitle(value, input) {
     const title = String(value || "")
       .replace(/[\r\n]+/g, " ")
       .replace(/^\s*(?:título|titulo)\s*:\s*/i, "")
@@ -79,8 +151,10 @@
       .trim()
       .replace(/[.!?]+$/g, "")
       .trim();
-    if (title.length < 3) throw new Error("A API não retornou um título utilizável.");
-    return title.slice(0, MAX_TITLE_LENGTH).trim();
+    if (title.length < 3) throw new Error("O serviço de IA respondeu sem um título utilizável.");
+    if (title.length > MAX_TITLE_LENGTH)
+      throw new Error("A IA retornou um título longo demais para preservar os metadados processuais.");
+    return input ? assertTitlePreservesMetadata(title, input) : title;
   }
 
   async function generateTitle(
@@ -119,7 +193,7 @@
       if (!response.ok)
         throw new Error(payload?.error?.message || `Serviço de IA indisponível (${response.status}).`);
       return {
-        title: normalizeTitle(responseText(payload)),
+        title: normalizeTitle(responseText(payload), normalized),
         model: MODEL,
         provider: "LLM7.io",
       };
@@ -142,5 +216,7 @@
     normalizeInput,
     normalizeSubjects,
     normalizeTitle,
+    missingMetadataTokens,
+    assertTitlePreservesMetadata,
   };
 });

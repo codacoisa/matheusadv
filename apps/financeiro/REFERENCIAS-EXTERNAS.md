@@ -108,8 +108,11 @@ incorporado.
   assuntos normalizados. O módulo não envia cliente, CPF/CNPJ, número CNJ,
   partes, observações, movimentações ou o retorno bruto do DataJud.
 - **Persistência e revisão:** somente o título aceito pela pessoa usuária é
-  salvo no caso; a resposta da IA não é registrada separadamente. A sugestão é
-  opcional, sempre editável e nunca substitui a revisão profissional.
+  salvo no caso; a resposta da IA não é registrada separadamente. O módulo
+  rejeita sugestões que omitam a classe principal ou termos informativos dos
+  assuntos e mantém o título-base nesses casos. Qualificadores de procedimento
+  podem ser resumidos para melhorar a redação. A sugestão aceita é opcional,
+  editável e nunca substitui a revisão profissional.
 - **Privacidade:** não use a sugestão anônima para informações que o escritório
   não possa compartilhar com um serviço externo. Consulte os termos e a política
   do provedor antes de uso em produção.

@@ -40,6 +40,23 @@ test("gerar título sem credencial e normalizar resposta do modelo", async () =>
   assert.equal(JSON.parse(request.options.body).model, "default");
 });
 
+test("rejeitar título que omite parte dos metadados processuais", async () => {
+  await assert.rejects(
+    assistant.generateTitle(
+      {
+        className: "Ação Penal - Procedimento Ordinário",
+        subjects: [{ name: "Crimes de Trânsito" }],
+      },
+      {
+        fetchImpl: async () => new Response(JSON.stringify({
+          choices: [{ message: { content: "Ação Penal - Trânsito" } }],
+        }), { status: 200 }),
+      },
+    ),
+    /título incompleto.*omitiu a classe principal ou parte/i,
+  );
+});
+
 test("tratar erro de cota pública", async () => {
   await assert.rejects(
     assistant.generateTitle(

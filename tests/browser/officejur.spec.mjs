@@ -848,6 +848,48 @@ test('Financeiro sugere título de processo com IA sem enviar identificadores', 
   expect(aiRequest.body.messages[1].content).not.toContain('Cliente de teste');
 });
 
+test('Financeiro mantém o título atual quando a IA omite metadados processuais', async ({ page }) => {
+  const processNumber = '00008323520184013202';
+  await page.route('https://worker.example/datajud/search', async route => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        hits: {
+          hits: [{
+            _source: {
+              numeroProcesso: processNumber,
+              tribunal: 'TRF1',
+              classe: { codigo: 436, nome: 'Ação Penal - Procedimento Ordinário' },
+              assuntos: [{ codigo: 6177, nome: 'Crimes de Trânsito' }],
+            },
+          }],
+        },
+      }),
+    });
+  });
+  await page.route('https://api.llm7.io/v1/chat/completions', async route => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: 'Ação Penal - Trânsito' } }],
+      }),
+    });
+  });
+  await prepareCalculationPage(page, 'financeiro/');
+  await configureDataJudWorker(page);
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="number"]').fill(processNumber);
+  await expect(form.locator('[data-case-datajud-status]')).toContainText('Dados públicos carregados', { timeout: 10_000 });
+  const originalTitle = 'Ação Penal - Procedimento Ordinário · Crimes de Trânsito';
+  await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
+  await form.getByRole('button', { name: 'Sugerir com IA' }).click();
+  await expect(form.locator('[name="title"]')).toHaveValue(originalTitle);
+  await expect(form.locator('[data-case-title-ai-status]')).toContainText('omitiu a classe principal ou parte dos assuntos');
+});
+
 test('Financeiro libera edição manual quando o Worker não está configurado', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
   await page.locator('[data-view="cases"]').click();
