@@ -175,6 +175,27 @@ test('agenda exige cadastros financeiros e grava atendimento por horário', asyn
   await expect(page.locator('#app').getByText('Advogada de teste')).toBeVisible();
 });
 
+test('agenda cria lembrete persistente no dia seguinte e permite finalizar', async ({ page }) => {
+  await prepareAgendaPage(page);
+  await page.evaluate(() => {
+    const previous = new Date();
+    previous.setDate(previous.getDate() - 1);
+    const date = [previous.getFullYear(), String(previous.getMonth() + 1).padStart(2, '0'), String(previous.getDate()).padStart(2, '0')].join('-');
+    const now = new Date().toISOString();
+    localStorage.setItem('officejur-agendamentos-data', JSON.stringify({
+      schema: 'officejur/agendamentos-data', version: 1, updatedAt: now,
+      records: [{ id: 'atendimento-pendente', date, startTime: '09:00', endTime: '10:00', kind: 'atendimento', subjectType: 'client', clientId: 'client-test', personId: '', teamIds: ['team-test'], channel: 'presencial', status: 'scheduled', notes: '', createdAt: now, updatedAt: now }],
+      deleted: [], reminders: [],
+    }));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'Finalizações pendentes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Finalizar atendimento' })).toBeVisible();
+  await page.getByRole('button', { name: 'Finalizar atendimento' }).click();
+  await expect(page.getByRole('heading', { name: 'Finalizações pendentes' })).not.toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('officejur-agendamentos-data')).records[0].status)).toBe('done');
+});
+
 const pages = [
   '',
   'configuracoes/',

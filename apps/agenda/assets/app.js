@@ -146,6 +146,17 @@
     return data.records.filter((item) => item.date.startsWith(`${month}-`));
   }
 
+  function pendingRemindersForDate(date) {
+    return data.reminders
+      .filter((reminder) => reminder.status === "pending" && reminder.dueDate <= date)
+      .map((reminder) => ({
+        reminder,
+        record: data.records.find((item) => item.id === reminder.appointmentId),
+      }))
+      .filter(({ record }) => record && !["done", "cancelled"].includes(record.status))
+      .sort((left, right) => `${left.reminder.dueDate}${left.record.startTime}`.localeCompare(`${right.reminder.dueDate}${right.record.startTime}`));
+  }
+
   function countsForMonth(month) {
     return appointmentsForMonth(month).reduce((counts, item) => {
       counts[item.date] = (counts[item.date] || 0) + 1;
@@ -207,11 +218,29 @@
     return `<div class="day-list">${records.map((record) => `<article class="appointment-card status-${escape(record.status)}"><div class="appointment-time"><strong>${escape(record.startTime || "Sem horário")}</strong>${record.endTime ? `<span>até ${escape(record.endTime)}</span>` : ""}</div><div class="appointment-main"><div class="appointment-title"><span class="kind">${escape(KIND_LABELS[record.kind] || record.kind)}</span><span class="status-badge">${escape(STATUS_LABELS[record.status])}</span></div><h3>${escape(subjectLabel(record))}</h3><p>${escape(subjectCaption(record))} · ${escape(CHANNEL_LABELS[record.channel] || record.channel)}</p><p class="team-line"><i class="fa-solid fa-user-group" aria-hidden="true"></i>${escape(teamLabel(record))}</p>${record.notes ? `<p class="notes">${escape(record.notes)}</p>` : ""}</div><div class="appointment-actions"><button class="icon-button" type="button" data-edit-appointment="${escape(record.id)}" aria-label="Editar atendimento de ${escape(subjectLabel(record))}" title="Editar atendimento"><i class="fa-solid fa-pen" aria-hidden="true"></i></button><button class="icon-button danger-icon" type="button" data-delete-appointment="${escape(record.id)}" aria-label="Excluir atendimento de ${escape(subjectLabel(record))}" title="Excluir atendimento"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></div></article>`).join("")}</div>`;
   }
 
+  function renderReminderPanel() {
+    const reminders = pendingRemindersForDate(selectedDate);
+    if (!reminders.length) return "";
+    return `<section class="reminders-panel" aria-labelledby="reminders-heading"><div class="panel-heading"><div><p class="eyebrow">LEMBRETES PERSISTENTES</p><h2 id="reminders-heading">Finalizações pendentes</h2></div><span class="day-count">${reminders.length} ${reminders.length === 1 ? "pendência" : "pendências"}</span></div><div class="reminder-list">${reminders.map(({ reminder, record }) => `<article class="reminder-card"><div class="reminder-icon"><i class="fa-solid fa-bell" aria-hidden="true"></i></div><div class="reminder-main"><strong>Finalizar ${escape(subjectLabel(record))}</strong><p>${escape(KIND_LABELS[record.kind] || record.kind)} de ${escape(formatDate(record.date))}${record.startTime ? ` às ${escape(record.startTime)}` : ""} · criada para ${escape(formatDate(reminder.dueDate))}</p><p class="team-line"><i class="fa-solid fa-user-group" aria-hidden="true"></i>${escape(teamLabel(record))}</p></div><div class="reminder-actions"><button class="primary compact" type="button" data-complete-appointment="${escape(record.id)}">Finalizar atendimento</button><button class="secondary compact" type="button" data-dismiss-reminder="${escape(reminder.id)}">Dispensar</button></div></article>`).join("")}</div></section>`;
+  }
+
   function render() {
     const monthRecords = appointmentsForMonth(selectedMonth);
     const dayRecords = appointmentsForDate(selectedDate);
     const canCreate = clientList().length + peopleWithoutClient().length > 0 && teamList().length > 0;
-    app.innerHTML = `<section class="hero"><div><p class="eyebrow">OPERAÇÃO DO ESCRITÓRIO</p><h1>Agenda de atendimentos</h1><p>Organize os atendimentos do dia, com horário, pessoa atendida e equipe responsável.</p></div><div class="hero-actions"><button class="secondary" type="button" data-go-today><i class="fa-regular fa-calendar" aria-hidden="true"></i> Hoje</button><button class="primary" type="button" data-new-appointment ${canCreate ? "" : "disabled"}><i class="fa-solid fa-plus" aria-hidden="true"></i> Novo atendimento</button></div></section>${financeNotice()}<section class="summary"><div class="metric"><span>Atendimentos no mês</span><strong>${monthRecords.length}</strong></div><div class="metric"><span>No dia selecionado</span><strong>${dayRecords.length}</strong></div><div class="metric"><span>Integrantes disponíveis</span><strong>${teamList().length}</strong></div></section><section class="agenda-layout"><article class="panel calendar-panel"><div class="panel-heading"><div><p class="eyebrow">CALENDÁRIO</p><h2>Visão mensal</h2></div><input id="selected-date" type="date" value="${escape(selectedDate)}" aria-label="Escolher dia da agenda"></div>${renderCalendar()}</article><article class="panel day-panel"><div class="panel-heading"><div><p class="eyebrow">AGENDA DO DIA</p><h2>${escape(dateLabel(selectedDate))}</h2></div><span class="day-count">${dayRecords.length} ${dayRecords.length === 1 ? "atendimento" : "atendimentos"}</span></div>${renderDayList()}</article></section>`;
+    app.innerHTML = `<section class="hero"><div><p class="eyebrow">OPERAÇÃO DO ESCRITÓRIO</p><h1>Agenda de atendimentos</h1><p>Organize os atendimentos do dia, com horário, pessoa atendida e equipe responsável.</p></div><div class="hero-actions"><button class="secondary" type="button" data-go-today><i class="fa-regular fa-calendar" aria-hidden="true"></i> Hoje</button><button class="primary" type="button" data-new-appointment ${canCreate ? "" : "disabled"}><i class="fa-solid fa-plus" aria-hidden="true"></i> Novo atendimento</button></div></section>${financeNotice()}<section class="summary"><div class="metric"><span>Atendimentos no mês</span><strong>${monthRecords.length}</strong></div><div class="metric"><span>No dia selecionado</span><strong>${dayRecords.length}</strong></div><div class="metric"><span>Integrantes disponíveis</span><strong>${teamList().length}</strong></div></section><section class="agenda-layout"><article class="panel calendar-panel"><div class="panel-heading"><div><p class="eyebrow">CALENDÁRIO</p><h2>Visão mensal</h2></div><input id="selected-date" type="date" value="${escape(selectedDate)}" aria-label="Escolher dia da agenda"></div>${renderCalendar()}</article><article class="panel day-panel"><div class="panel-heading"><div><p class="eyebrow">AGENDA DO DIA</p><h2>${escape(dateLabel(selectedDate))}</h2></div><span class="day-count">${dayRecords.length} ${dayRecords.length === 1 ? "atendimento" : "atendimentos"}</span></div>${renderDayList()}${renderReminderPanel()}</article></section>`;
+  }
+
+  function persistData(nextData) {
+    data = storage.save(storage.ensureReminders(nextData));
+    return data;
+  }
+
+  function reconcileReminders() {
+    const next = storage.ensureReminders(data);
+    if (storage.signature(next) === storage.signature(data)) return false;
+    data = storage.save(next);
+    return true;
   }
 
   function setSubjectValue(record) {
@@ -277,7 +306,7 @@
       notify(issues[0], true);
       return;
     }
-    data = storage.save({
+    persistData({
       ...data,
       records: [...data.records.filter((item) => item.id !== record.id), record],
       deleted: data.deleted.filter((item) => item.id !== record.id),
@@ -302,6 +331,35 @@
     render();
     void sync.toGist().catch((error) => notify(error.message, true));
     notify("Atendimento excluído.");
+  }
+
+  function completeAppointment(id) {
+    const record = data.records.find((item) => item.id === id);
+    if (!record) return;
+    const updatedAt = now();
+    persistData({
+      ...data,
+      records: data.records.map((item) => item.id === id
+        ? storage.normalizeRecord({ ...item, status: "done", updatedAt })
+        : item),
+    });
+    render();
+    void sync.toGist().catch((error) => notify(error.message, true));
+    notify(`Atendimento de ${subjectLabel(record)} finalizado.`);
+  }
+
+  function dismissReminder(id) {
+    const reminder = data.reminders.find((item) => item.id === id);
+    if (!reminder) return;
+    data = storage.save({
+      ...data,
+      reminders: data.reminders.map((item) => item.id === id
+        ? { ...item, status: "dismissed", updatedAt: now() }
+        : item),
+    });
+    render();
+    void sync.toGist().catch((error) => notify(error.message, true));
+    notify("Lembrete dispensado.");
   }
 
   function showBlocked() {
@@ -357,6 +415,10 @@
       openDialog(target.dataset.editAppointment);
     } else if (target.dataset.deleteAppointment) {
       deleteAppointment(target.dataset.deleteAppointment);
+    } else if (target.dataset.completeAppointment) {
+      completeAppointment(target.dataset.completeAppointment);
+    } else if (target.dataset.dismissReminder) {
+      dismissReminder(target.dataset.dismissReminder);
     }
   });
 
@@ -391,6 +453,8 @@
     }
     await sync.fromGist();
     if (!localAccessAllowed) { showBlocked(); return; }
+    const remindersChanged = reconcileReminders();
+    if (remindersChanged) void sync.toGist();
     try { access?.canSync(gistSettings.load().gistId); } catch (_) { showBlocked(); return; }
     render();
   }

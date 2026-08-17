@@ -58,3 +58,45 @@ test("mescla alterações pelo timestamp e respeita exclusões posteriores", () 
   assert.equal(merged.records.some((item) => item.id === "2"), false);
   assert.equal(merged.deleted[0].id, "2");
 });
+
+test("cria lembrete persistente no dia seguinte e resolve ao concluir", () => {
+  const record = storage.normalizeRecord({
+    id: "atendimento-pendente",
+    date: "2026-08-16",
+    startTime: "09:00",
+    endTime: "10:00",
+    subjectType: "client",
+    clientId: "cliente-1",
+    teamIds: ["equipe-1"],
+    status: "scheduled",
+    updatedAt: "2026-08-16T10:00:00.000Z",
+  });
+  const pending = storage.ensureReminders(
+    { records: [record] },
+    new Date("2026-08-17T12:00:00-03:00"),
+  );
+  assert.equal(pending.reminders.length, 1);
+  assert.equal(pending.reminders[0].appointmentId, record.id);
+  assert.equal(pending.reminders[0].dueDate, "2026-08-17");
+  assert.equal(pending.reminders[0].status, "pending");
+
+  const resolved = storage.ensureReminders({
+    ...pending,
+    records: [{ ...record, status: "done", updatedAt: "2026-08-17T13:00:00.000Z" }],
+  }, new Date("2026-08-17T13:00:00-03:00"));
+  assert.equal(resolved.reminders[0].status, "resolved");
+});
+
+test("não cria lembrete para evento futuro ou já concluído", () => {
+  const base = {
+    id: "atendimento-futuro",
+    date: "2026-08-18",
+    startTime: "09:00",
+    endTime: "10:00",
+    subjectType: "client",
+    clientId: "cliente-1",
+    teamIds: ["equipe-1"],
+  };
+  assert.equal(storage.ensureReminders({ records: [base] }, new Date("2026-08-17T12:00:00-03:00")).reminders.length, 0);
+  assert.equal(storage.ensureReminders({ records: [{ ...base, status: "done" }] }, new Date("2026-08-19T12:00:00-03:00")).reminders.length, 0);
+});

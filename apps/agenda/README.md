@@ -16,3 +16,8 @@ IndexedDB local e a mesma política de proteção da nuvem.
 
 Não há dados demonstrativos. O módulo só exibe e permite selecionar cadastros
 que existam nos dados financeiros locais ou sincronizados.
+
+Quando um atendimento passa da data ou do horário final sem estar marcado como
+realizado ou cancelado, a agenda cria um lembrete persistente para o dia
+seguinte. A pendência permanece visível nos dias posteriores até o atendimento
+ser finalizado ou o lembrete ser dispensado.

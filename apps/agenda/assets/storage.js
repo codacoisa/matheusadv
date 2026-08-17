@@ -10,6 +10,7 @@
   const SCHEMA = "officejur/agendamentos-data";
   const VERSION = 1;
   const STATUS = new Set(["scheduled", "confirmed", "done", "cancelled"]);
+  const REMINDER_STATUS = new Set(["pending", "resolved", "dismissed"]);
   const stamp = (item) =>
     String(item?.updatedAt || item?.createdAt || item?.deletedAt || "");
 
@@ -36,6 +37,32 @@
       createdAt: String(item.createdAt || ""),
       updatedAt: String(item.updatedAt || ""),
     };
+  }
+
+  function normalizeReminder(item = {}) {
+    return {
+      id: String(item.id || ""),
+      appointmentId: String(item.appointmentId || ""),
+      dueDate: String(item.dueDate || ""),
+      status: REMINDER_STATUS.has(item.status) ? item.status : "pending",
+      createdAt: String(item.createdAt || ""),
+      updatedAt: String(item.updatedAt || ""),
+      resolvedAt: String(item.resolvedAt || ""),
+    };
+  }
+
+  function normalizeReminders(list) {
+    const reminders = new Map();
+    (Array.isArray(list) ? list : []).forEach((item) => {
+      const normalized = normalizeReminder(item);
+      if (!normalized.id || !normalized.appointmentId || !normalized.dueDate) return;
+      const current = reminders.get(normalized.id);
+      if (!current || stamp(normalized) >= stamp(current))
+        reminders.set(normalized.id, normalized);
+    });
+    return [...reminders.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    );
   }
 
   function normalizeDeleted(list) {
@@ -80,6 +107,7 @@
         .filter((item) => !deletedAt.get(item.id) || stamp(item) > deletedAt.get(item.id))
         .sort((left, right) => left.id.localeCompare(right.id)),
       deleted,
+      reminders: normalizeReminders(source.reminders),
     };
   }
 
@@ -92,6 +120,85 @@
       updatedAt: [left.updatedAt, right.updatedAt].sort().pop(),
       records: [...left.records, ...right.records],
       deleted: [...left.deleted, ...right.deleted],
+      reminders: [...left.reminders, ...right.reminders],
+    });
+  }
+
+  function localISODate(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function nextDayISO(value) {
+    const [year, month, day] = String(value).split("-").map(Number);
+    if (![year, month, day].every(Number.isFinite)) return "";
+    const date = new Date(year, month - 1, day + 1, 12);
+    return localISODate(date);
+  }
+
+  function isOverdue(record, referenceDate = new Date()) {
+    const currentDate = localISODate(referenceDate);
+    if (!currentDate || !record?.date || !record?.startTime) return false;
+    if (record.date < currentDate) return true;
+    if (record.date > currentDate || !record.endTime) return false;
+    const current = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+    if (Number.isNaN(current.getTime())) return false;
+    const currentTime = `${String(current.getHours()).padStart(2, "0")}:${String(current.getMinutes()).padStart(2, "0")}`;
+    return record.endTime <= currentTime;
+  }
+
+  function ensureReminders(raw, referenceDate = new Date()) {
+    const data = normalize(raw);
+    const reference = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+    const updatedAt = Number.isNaN(reference.getTime()) ? new Date().toISOString() : reference.toISOString();
+    const reminders = new Map(data.reminders.map((item) => [item.id, item]));
+    let changed = false;
+
+    data.records.forEach((record) => {
+      const reminder = [...reminders.values()].find((item) => item.appointmentId === record.id);
+      const dueDate = nextDayISO(record.date);
+      if (record.status === "done" || record.status === "cancelled") {
+        if (reminder?.status === "pending") {
+          reminders.set(reminder.id, {
+            ...reminder,
+            status: "resolved",
+            resolvedAt: updatedAt,
+            updatedAt,
+          });
+          changed = true;
+        }
+        return;
+      }
+      if (!dueDate || !isOverdue(record, reference)) {
+        if (reminder?.status === "pending" && reminder.dueDate !== dueDate) {
+          reminders.set(reminder.id, { ...reminder, dueDate, updatedAt });
+          changed = true;
+        }
+        return;
+      }
+      if (!reminder) {
+        const id = `lembrete-${record.id}`;
+        reminders.set(id, {
+          id,
+          appointmentId: record.id,
+          dueDate,
+          status: "pending",
+          createdAt: updatedAt,
+          updatedAt,
+          resolvedAt: "",
+        });
+        changed = true;
+      } else if (reminder.status === "pending" && reminder.dueDate !== dueDate) {
+        reminders.set(reminder.id, { ...reminder, dueDate, updatedAt });
+        changed = true;
+      }
+    });
+
+    return normalize({
+      ...data,
+      reminders: [...reminders.values()],
+      updatedAt: changed ? updatedAt : data.updatedAt,
     });
   }
 
@@ -112,6 +219,7 @@
       version: data.version,
       records: data.records,
       deleted: data.deleted,
+      reminders: data.reminders,
     }));
   }
 
@@ -168,6 +276,10 @@
     merge,
     normalize,
     normalizeRecord,
+    normalizeReminder,
+    ensureReminders,
+    isOverdue,
+    nextDayISO,
     save,
     signature,
     validateRecord,
