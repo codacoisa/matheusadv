@@ -45,6 +45,37 @@ async function prepareCalculationPage(page, path = 'calculos/') {
   await page.goto(path, { waitUntil: 'networkidle' });
 }
 
+async function prepareAgendaPage(page) {
+  await page.goto('financeiro/', { waitUntil: 'networkidle' });
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open('officejur-financeiro', 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction('domains-v2', 'readwrite');
+      const now = new Date().toISOString();
+      transaction.objectStore('domains-v2').put({ name: 'people', value: {
+        schema: 'officejur/financeiro-pessoas-data', version: 1, updatedAt: now,
+        records: [
+          { id: 'person-client', name: 'Cliente de teste', cpf: '529.982.247-25', updatedAt: now },
+          { id: 'person-contact', name: 'Pessoa sem cliente', cpf: '111.444.777-35', updatedAt: now },
+        ], deleted: [],
+      } });
+      transaction.objectStore('domains-v2').put({ name: 'clients', value: {
+        schema: 'officejur/financeiro-clientes-data', version: 2, updatedAt: now,
+        records: [{ id: 'client-test', type: 'pf', personId: 'person-client', updatedAt: now }], deleted: [],
+      } });
+      transaction.objectStore('domains-v2').put({ name: 'team', value: {
+        schema: 'officejur/financeiro-equipe-data', version: 1, updatedAt: now,
+        records: [{ id: 'team-test', name: 'Advogada de teste', role: 'lawyer', status: 'active', updatedAt: now }], deleted: [],
+      } });
+      transaction.oncomplete = () => { database.close(); resolve(); };
+      transaction.onerror = () => reject(transaction.error);
+    };
+  }));
+  await page.goto('agenda/', { waitUntil: 'networkidle' });
+}
+
 async function configureDataJudWorker(page) {
   await page.evaluate(() => {
     localStorage.setItem('officejur-worker-settings', JSON.stringify({ version: 1, apiUrl: 'https://worker.example', apiKey: 'chave-do-servico' }));
@@ -129,6 +160,21 @@ test('cálculos usam cliente, caso e partes do mesmo contexto', async ({ page })
   await expect(page.getByText('Parte contrária — Exequente / Credor')).toBeVisible();
 });
 
+test('agenda exige cadastros financeiros e grava atendimento por horário', async ({ page }) => {
+  await prepareAgendaPage(page);
+  await expect(page.getByRole('button', { name: 'Novo atendimento' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Novo atendimento' }).click();
+  await page.getByLabel('Data', { exact: true }).fill('2026-08-18');
+  await page.getByLabel('Horário inicial', { exact: true }).fill('09:00');
+  await page.getByLabel('Horário final', { exact: false }).fill('10:00');
+  await page.getByLabel('Cliente ou pessoa atendida', { exact: true }).selectOption('client:client-test');
+  await page.locator('#team-options input[type="checkbox"]').first().check();
+  await page.getByRole('button', { name: 'Salvar atendimento' }).click();
+  await expect(page.getByRole('heading', { name: 'Cliente de teste' })).toBeVisible();
+  await expect(page.locator('.appointment-time')).toContainText('09:00');
+  await expect(page.locator('#app').getByText('Advogada de teste')).toBeVisible();
+});
+
 const pages = [
   '',
   'configuracoes/',
@@ -143,6 +189,7 @@ const pages = [
   'documentos/honorarios/',
   'documentos/ciencia-audiencia/',
   'financeiro/',
+  'agenda/',
   'configuracoes/ajuda-cloudflare-workers.html',
   'validador-projudi/',
   'lab/',
@@ -176,6 +223,7 @@ for (const appPath of pages) {
 test('módulos sincronizáveis usam o mesmo estado de nuvem no cabeçalho', async ({ page }) => {
   const routes = [
     'financeiro/',
+    'agenda/',
     'calculos/',
     'calculos/facil/',
     'calculos/completo/',
@@ -228,6 +276,7 @@ test('headers com sincronização automática não exibem ação manual', async 
     'calculos/pensao/',
     'calculos/trabalhista/',
     'financeiro/',
+    'agenda/',
     'lab/controle-pagamentos/',
   ];
   for (const route of synchronizedRoutes) {
@@ -262,6 +311,7 @@ const localAccessBlockedRoutes = [
   'calculos/pensao/',
   'calculos/trabalhista/',
   'financeiro/',
+  'agenda/',
   'lab/controle-pagamentos/',
 ];
 const blockedDescription = 'Os dados sincronizados estão protegidos e aguardam a revalidação autenticada da nuvem. Eles não serão exibidos até a confirmação do acesso.';
@@ -1457,6 +1507,7 @@ test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ pag
   const appNames = await switcher.locator('.name').allTextContents();
   expect(appNames).toEqual([
     'Início',
+    'Agenda',
     'Arquivos',
     'Cálculos',
     'Ciência',
@@ -1478,6 +1529,7 @@ test('seletor e portal exibem os aplicativos em ordem alfabética', async ({ pag
     'Procuração',
   ]);
   await expect(sections.nth(1).locator('.label strong')).toHaveText([
+    'Agenda de atendimentos',
     'Cálculos Jurídicos',
     'Financeiro Jurídico',
     'Lab',

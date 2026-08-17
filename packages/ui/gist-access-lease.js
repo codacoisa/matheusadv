@@ -17,6 +17,8 @@
     "officejur-calculos-juridicos-data",
     "officejur-calculos-juridicos-sync-state",
     "officejur-financeiro-sync-state",
+    "officejur-agendamentos-data",
+    "officejur-agendamentos-sync-state",
     "officejur-documentos-sync-state",
     "officejur-controle-pagamentos-data",
     "officejur-controle-pagamentos-sync-state",

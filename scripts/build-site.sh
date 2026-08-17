@@ -12,6 +12,7 @@ mkdir -p "$SITE_DIR/arquivos/assets"
 mkdir -p "$SITE_DIR/configuracoes"
 mkdir -p "$SITE_DIR/calculos"
 mkdir -p "$SITE_DIR/financeiro"
+mkdir -p "$SITE_DIR/agenda"
 mkdir -p "$SITE_DIR/lab/assets"
 mkdir -p "$SITE_DIR/validador-projudi"
 mkdir -p "$SITE_DIR/assets"
@@ -135,6 +136,8 @@ copy_static_app "$ROOT_DIR/apps/validador-projudi" "$SITE_DIR/validador-projudi"
 
 cp "$ROOT_DIR/apps/financeiro/"*.html "$SITE_DIR/financeiro/"
 cp -R "$ROOT_DIR/apps/financeiro/assets" "$SITE_DIR/financeiro/assets"
+copy_static_app "$ROOT_DIR/apps/agenda" "$SITE_DIR/agenda"
+cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/agenda/assets/fontawesome-7.3.0.min.js"
 cp "$ROOT_DIR/packages/ui/help.css" "$SITE_DIR/configuracoes/assets/help.css"
 cp "$ROOT_DIR/packages/ui/help.css" "$SITE_DIR/financeiro/assets/help.css"
 cp "$ROOT_DIR/apps/financeiro/assets/fontawesome-7.3.0.min.js" "$SITE_DIR/configuracoes/assets/fontawesome-7.3.0.min.js"
@@ -161,6 +164,7 @@ for assets in \
   "$SITE_DIR/documentos/assets" \
   "$SITE_DIR/arquivos/assets" \
   "$SITE_DIR/financeiro/assets" \
+  "$SITE_DIR/agenda/assets" \
   "$SITE_DIR/lab/assets" \
   "$SITE_DIR/validador-projudi/assets"
 do

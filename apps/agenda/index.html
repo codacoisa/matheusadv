@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#17213a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17213a" media="(prefers-color-scheme: dark)">
+  <meta name="msapplication-TileColor" content="#17213a">
+  <meta name="application-name" content="OfficeJur">
+  <meta name="apple-mobile-web-app-title" content="OfficeJur">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Agenda de atendimentos | OfficeJur</title>
+  <link rel="icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl" type="image/png">
+  <link rel="apple-touch-icon" href="../assets/app-icon.png" data-officejur-href="office.appIconUrl">
+  <script src="../assets/office-config.js"></script>
+  <script src="../assets/office-context.js" defer></script>
+  <script src="./assets/fontawesome-7.3.0.min.js" data-auto-replace-svg="nest" data-observe-mutations="true" defer></script>
+  <script src="./assets/app-switcher.js?v=6" defer></script>
+  <script src="./assets/gist-settings.js?v=3" defer></script>
+  <script src="./assets/gist-client.js?v=3" defer></script>
+  <script src="./assets/gist-access-lease.js?v=5" defer></script>
+  <script src="./assets/cloud-status.js?v=1" defer></script>
+  <script src="./assets/local-access-blocked.js?v=3" defer></script>
+  <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
+  <script src="./assets/site-footer.js?v=5" defer></script>
+  <script src="../financeiro/assets/storage.js?v=2" defer></script>
+  <script src="../financeiro/assets/data-store.js?v=2" defer></script>
+  <script src="./assets/storage.js?v=1" defer></script>
+  <script src="./assets/sync.js?v=1" defer></script>
+  <script src="./assets/app.js?v=1" defer></script>
+  <link rel="stylesheet" href="./assets/styles.css?v=1">
+  <link rel="stylesheet" href="./assets/site-header.css?v=2">
+  <link rel="stylesheet" href="./assets/local-access-blocked.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="Voltar ao início do OfficeJur">
+      <img src="../assets/logo-white.png" data-officejur-src="office.logoWhiteUrl" alt="">
+      <span><strong>OfficeJur</strong><small>Agenda de atendimentos</small></span>
+    </a>
+    <div class="top-actions">
+      <office-cloud-status id="sync-status"></office-cloud-status>
+      <office-app-switcher current="agenda"></office-app-switcher>
+    </div>
+  </header>
+  <main id="app" tabindex="-1"><section class="loading">Preparando a agenda…</section></main>
+  <dialog id="appointment-dialog" aria-labelledby="appointment-dialog-title" aria-describedby="appointment-dialog-description">
+    <div class="modal-head">
+      <div><p class="eyebrow">AGENDA</p><h2 id="appointment-dialog-title">Novo atendimento</h2><p id="appointment-dialog-description">Informe quem será atendido e a equipe responsável.</p></div>
+      <button class="icon-button close-dialog" type="button" id="close-appointment-dialog" aria-label="Fechar formulário"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <form id="appointment-form" class="appointment-form">
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <div class="field"><label class="required" for="appointment-date">Data</label><input id="appointment-date" name="date" type="date" required></div>
+        <div class="field"><label class="required" for="appointment-start">Horário inicial</label><input id="appointment-start" name="startTime" type="time" required></div>
+        <div class="field"><label for="appointment-end">Horário final <span class="field-help">(opcional)</span></label><input id="appointment-end" name="endTime" type="time"></div>
+        <div class="field"><label class="required" for="appointment-kind">Tipo</label><select id="appointment-kind" name="kind" required><option value="atendimento">Atendimento</option><option value="consulta">Consulta</option><option value="retorno">Retorno</option><option value="reuniao">Reunião</option><option value="audiencia">Audiência</option><option value="outro">Outro</option></select></div>
+        <div class="field full"><label class="required" for="appointment-subject">Cliente ou pessoa atendida</label><select id="appointment-subject" name="subject" required><option value="">Carregando cadastros…</option></select><small class="field-help">A lista vem de Financeiro → Clientes e de Pessoas sem cadastro de cliente.</small></div>
+        <fieldset class="team-field"><legend>Equipe responsável <span class="required"></span></legend><div id="team-options" class="team-options"></div><small class="field-help">Selecione um ou mais integrantes cadastrados em Financeiro → Equipe.</small></fieldset>
+        <div class="field"><label for="appointment-channel">Modalidade</label><select id="appointment-channel" name="channel"><option value="presencial">Presencial</option><option value="video">Videochamada</option><option value="telefone">Telefone</option><option value="mensagem">Mensagem</option><option value="outro">Outra</option></select></div>
+        <div class="field"><label for="appointment-status">Situação</label><select id="appointment-status" name="status"><option value="scheduled">Agendado</option><option value="confirmed">Confirmado</option><option value="done">Realizado</option><option value="cancelled">Cancelado</option></select></div>
+        <div class="field full"><label for="appointment-notes">Observações</label><textarea id="appointment-notes" name="notes" placeholder="Pauta, instruções ou informações úteis para o atendimento."></textarea></div>
+      </div>
+      <div class="modal-actions"><button class="secondary" type="button" id="cancel-appointment">Cancelar</button><button class="primary" type="submit">Salvar atendimento</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <office-site-footer repository="officejur"></office-site-footer>
+</body>
+</html>

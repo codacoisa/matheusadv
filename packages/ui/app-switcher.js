@@ -36,6 +36,14 @@
       icon: '<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/>'
     },
     {
+      id: 'agenda',
+      name: 'Agenda',
+      description: 'Atendimentos do escritório',
+      url: `${BASE_URL}agenda/`,
+      color: '#3568b8',
+      icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>'
+    },
+    {
       id: 'calculos',
       name: 'Cálculos',
       description: 'Memórias jurídicas',

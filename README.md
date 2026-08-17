@@ -14,6 +14,7 @@ O OfficeJur reúne, em um único monorepo, o portal interno, os geradores de doc
 - **Portal** — acesso centralizado às ferramentas.
 - **Documentos** — procuração, declaração de hipossuficiência, contrato de honorários e ciência de audiência.
 - **Financeiro Jurídico** — clientes, casos, equipe, honorários, receitas, despesas, cobranças e relatórios.
+- **Agenda de atendimentos** — calendário mensal e agenda diária vinculados a clientes, pessoas e equipe do Financeiro.
 - **Validador Projudi** — conferência local de PDFs e assinaturas P7S antes do protocolo.
 - **Lab** — ferramentas temporárias e experimentais, atualmente Controle de Pagamentos e Central de Guias.
 
@@ -105,6 +106,7 @@ O workflow `Publicar OfficeJur` monta todas as aplicações em um único artefat
 - `/officejur/configuracoes/` — conexões globais da instalação;
 - `/officejur/documentos/<modulo>/` — geradores de documentos;
 - `/officejur/financeiro/` — financeiro;
+- `/officejur/agenda/` — agenda de atendimentos;
 - `/officejur/validador-projudi/` — validação de PDFs e assinaturas P7S;
 - `/officejur/lab/` — catálogo do Laboratório;
 - `/officejur/lab/controle-pagamentos/` — controle simplificado em avaliação;

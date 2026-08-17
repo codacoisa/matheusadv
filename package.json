@@ -11,7 +11,8 @@
     "test:documentos": "node --test apps/documentos/tests/*.test.cjs",
     "test:arquivos": "node --test apps/arquivos/tests/*.test.cjs",
     "test:browser": "playwright test",
-    "test:browser:headed": "playwright test --headed"
+    "test:browser:headed": "playwright test --headed",
+    "test:agenda": "npm --prefix apps/agenda test"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",

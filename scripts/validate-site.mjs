@@ -205,6 +205,7 @@ const sharedHeaderPages = [
   "apps/configuracoes/index.html",
   "apps/configuracoes/ajuda.html",
   "apps/financeiro/index.html",
+  "apps/agenda/index.html",
   "apps/configuracoes/ajuda-cloudflare-workers.html",
   "apps/lab/index.html",
   "apps/lab/tools/central-guias/index.html",
@@ -219,6 +220,7 @@ const sharedHeaderPages = [
 
 const cloudStatusPages = [
   "apps/financeiro/index.html",
+  "apps/agenda/index.html",
   "apps/calculos/index.html",
   "apps/calculos/facil/index.html",
   "apps/calculos/completo/index.html",
@@ -236,6 +238,7 @@ const localAccessBlockedPages = [
   "apps/calculos/pensao/index.html",
   "apps/calculos/trabalhista/index.html",
   "apps/financeiro/index.html",
+  "apps/agenda/index.html",
   "apps/lab/tools/controle-pagamentos/index.html",
 ];
 
@@ -246,6 +249,7 @@ const localAccessBlockedReferences = new Map([
   ["apps/calculos/pensao/index.html", "../assets/"],
   ["apps/calculos/trabalhista/index.html", "../assets/"],
   ["apps/financeiro/index.html", "./assets/"],
+  ["apps/agenda/index.html", "./assets/"],
   ["apps/lab/tools/controle-pagamentos/index.html", "./assets/"],
 ]);
 
@@ -255,6 +259,7 @@ const localAccessBlockedSourceCopies = [
   "apps/calculos/pensao/assets/app.js",
   "apps/calculos/trabalhista/assets/labor-app.js",
   "apps/financeiro/assets/app.js",
+  "apps/agenda/assets/app.js",
   "apps/lab/tools/controle-pagamentos/assets/app.js",
 ];
 
