@@ -796,6 +796,58 @@ test('Financeiro consulta DataJud, libera o judicial e exibe movimentações', a
   await expect(page.locator('[data-case-panel="movements"]')).toContainText('podem estar atrasadas');
 });
 
+test('Financeiro sugere título de processo com IA sem enviar identificadores', async ({ page }) => {
+  const processNumber = '00008323520184013202';
+  let aiRequest;
+  await page.route('https://worker.example/datajud/search', async route => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        hits: {
+          hits: [{
+            _source: {
+              numeroProcesso: processNumber,
+              tribunal: 'TRF1',
+              classe: { codigo: 436, nome: 'Ação Penal - Procedimento Ordinário' },
+              assuntos: [{ codigo: 6177, nome: 'Crimes de Trânsito' }],
+            },
+          }],
+        },
+      }),
+    });
+  });
+  await page.route('https://api.llm7.io/v1/chat/completions', async route => {
+    const request = route.request();
+    aiRequest = {
+      authorization: request.headers().authorization,
+      body: request.postDataJSON(),
+    };
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [{ message: { content: 'Ação Penal por crime de trânsito' } }],
+      }),
+    });
+  });
+  await prepareCalculationPage(page, 'financeiro/');
+  await configureDataJudWorker(page);
+  await page.locator('[data-view="cases"]').click();
+  await page.locator('#new-case').click();
+  const form = page.locator('#case-form');
+  await form.locator('[name="clientId"]').selectOption('client-test');
+  await form.locator('[name="number"]').fill(processNumber);
+  await expect(form.locator('[data-case-datajud-status]')).toContainText('Dados públicos carregados', { timeout: 10_000 });
+  await form.getByRole('button', { name: 'Sugerir com IA' }).click();
+  await expect(form.locator('[name="title"]')).toHaveValue('Ação Penal por crime de trânsito');
+  await expect(form.locator('[data-case-title-ai-status]')).toContainText('Sugestão aplicada');
+  expect(aiRequest.authorization).toBeUndefined();
+  expect(aiRequest.body.model).toBe('default');
+  expect(aiRequest.body.messages[1].content).toContain('Ação Penal - Procedimento Ordinário');
+  expect(aiRequest.body.messages[1].content).toContain('Crimes de Trânsito');
+  expect(aiRequest.body.messages[1].content).not.toContain(processNumber);
+  expect(aiRequest.body.messages[1].content).not.toContain('Cliente de teste');
+});
+
 test('Financeiro libera edição manual quando o Worker não está configurado', async ({ page }) => {
   await prepareCalculationPage(page, 'financeiro/');
   await page.locator('[data-view="cases"]').click();

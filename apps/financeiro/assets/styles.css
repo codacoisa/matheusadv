@@ -955,6 +955,37 @@ dialog form {
   color: #475467;
 }
 .form-grid label > small { color: var(--muted); font-size: 10px; font-weight: 600; line-height: 1.4; }
+.case-title-field {
+  display: grid;
+  gap: 5px;
+}
+.case-title-field > label {
+  font-size: 11px;
+  font-weight: 750;
+  color: #475467;
+}
+.case-title-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.case-title-input-row input {
+  min-width: 0;
+}
+.case-title-input-row .btn {
+  white-space: nowrap;
+}
+.case-title-ai-status {
+  min-height: 15px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.case-title-ai-status[data-kind="success"] { color: var(--success); }
+.case-title-ai-status[data-kind="error"] { color: var(--danger); }
+.case-title-ai-status:empty { min-height: 0; }
 .form-grid .field-warning { color: var(--danger); }
 .form-grid .address-status {
   min-height: 15px;
@@ -1534,6 +1565,9 @@ dialog form {
   color: var(--bad);
 }
 @media (max-width: 720px) {
+  .case-title-input-row {
+    grid-template-columns: 1fr;
+  }
   .team-grid {
     grid-template-columns: 1fr;
   }

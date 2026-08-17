@@ -95,6 +95,28 @@ incorporado.
   [exemplo por número de processo](https://datajud-wiki.cnj.jus.br/api-publica/exemplos/exemplo1/)
   e [glossário de dados](https://datajud-wiki.cnj.jus.br/api-publica/glossario/).
 
+### LLM7.io
+
+- **Uso:** sugestão opcional de título interno para processos judiciais, após a
+  consulta do DataJud.
+- **Endpoint:** `https://api.llm7.io/v1/chat/completions`, compatível com o
+  formato de chat da OpenAI e acessado diretamente pelo navegador.
+- **Autenticação:** o modo anônimo não usa conta, token ou chave no OfficeJur.
+  O limite público é aplicado pelo provedor e pode mudar; um token gratuito do
+  provedor não é armazenado nem solicitado pelo módulo.
+- **Dados enviados:** somente área, nome da classe processual e até seis
+  assuntos normalizados. O módulo não envia cliente, CPF/CNPJ, número CNJ,
+  partes, observações, movimentações ou o retorno bruto do DataJud.
+- **Persistência e revisão:** somente o título aceito pela pessoa usuária é
+  salvo no caso; a resposta da IA não é registrada separadamente. A sugestão é
+  opcional, sempre editável e nunca substitui a revisão profissional.
+- **Privacidade:** não use a sugestão anônima para informações que o escritório
+  não possa compartilhar com um serviço externo. Consulte os termos e a política
+  do provedor antes de uso em produção.
+- **Referências:** [site oficial](https://llm7.io/),
+  [documentação de início rápido](https://docs.llm7.io/quickstart) e
+  [limites](https://docs.llm7.io/limits).
+
 ### Mercado Pago
 
 - **Checkout Pro:** criação dos links de pagamento exibidos no módulo de

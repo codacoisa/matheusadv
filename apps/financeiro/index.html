@@ -51,6 +51,7 @@
     <script src="./assets/address-assistant.js?v=1" defer></script>
     <script src="./assets/cnpj-assistant.js?v=1" defer></script>
     <script src="./assets/datajud-assistant.js?v=2" defer></script>
+    <script src="./assets/title-assistant.js?v=1" defer></script>
     <script src="./assets/app.js?v=46" defer></script>
     <script src="./assets/app-switcher.js?v=5" defer></script>
     <script src="./assets/modal-scroll-lock.js?v=1" defer></script>
@@ -997,12 +998,26 @@
             >Número ou referência<input
               name="number"
               placeholder="Número CNJ ou identificação interna" /><small id="case-number-help">Para processos judiciais, informe a numeração única CNJ com 20 dígitos.</small><span class="case-datajud-status" id="case-datajud-status" data-case-datajud-status role="status" aria-live="polite"></span></label
-          ><label class="span-2"
-            >Título / objeto *<input
-              name="title"
-              required
-              placeholder="Ex.: Ação de cobrança contra Empresa X" /></label
-          ><section class="case-datajud-panel span-2" id="case-datajud-panel" hidden aria-labelledby="case-datajud-title">
+          ><div class="span-2 case-title-field">
+            <label for="case-title">Título / objeto *</label>
+            <div class="case-title-input-row">
+              <input
+                id="case-title"
+                name="title"
+                required
+                placeholder="Ex.: Ação de cobrança contra Empresa X" />
+              <button
+                class="btn ghost compact"
+                type="button"
+                id="suggest-case-title"
+                title="Sugerir título com IA"
+                disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Sugerir com IA
+              </button>
+            </div>
+            <small id="case-title-ai-status" data-case-title-ai-status class="case-title-ai-status" role="status" aria-live="polite" hidden>A sugestão usa somente classe, assuntos e área, e deve ser conferida antes de salvar.</small>
+          </div>
+          <section class="case-datajud-panel span-2" id="case-datajud-panel" hidden aria-labelledby="case-datajud-title">
             <div class="section-heading compact">
               <div>
                 <strong id="case-datajud-title">Dados públicos do DataJud</strong>

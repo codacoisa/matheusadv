@@ -14,6 +14,7 @@
   const addressAssistant = window.OfficeJurAddressAssistant;
   const cnpjAssistant = window.OfficeJurCnpjAssistant;
   const dataJudAssistant = window.OfficeJurDataJud;
+  const titleAssistant = window.OfficeJurTitleAssistant;
   const SYNC_STATE_KEY = "officejur-financeiro-sync-state",
     MP_SETTINGS_KEY = "officejur-financeiro-mercado-pago-settings",
     MP_REQUEST_PREFIX = "officejur-financeiro-mercado-pago-request-",
@@ -1063,6 +1064,7 @@
     clientCnpjLookupRequest = 0,
     caseDataJudLookupTimer = 0,
     caseDataJudLookupRequest = 0,
+    caseTitleAiRequest = 0,
     caseDataJudDraft = null,
     dataJudMovementsSession = new Map(),
     caseTeamFilterId = "",
@@ -2964,6 +2966,76 @@
     status.textContent = message;
     status.dataset.kind = kind;
   }
+  function setCaseTitleAiStatus(form, message = "", kind = "") {
+    const status = form.querySelector("[data-case-title-ai-status]");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.kind = kind;
+    status.hidden = !message;
+  }
+  function caseTitleAiInput(form) {
+    const info = caseDataJudDraft;
+    return {
+      area: form.elements.area.value,
+      className: info?.processClass?.name || "",
+      subjects: info?.subjects || [],
+    };
+  }
+  function updateCaseTitleAi(form) {
+    const button = form.querySelector("#suggest-case-title"),
+      status = form.querySelector("[data-case-title-ai-status]"),
+      input = caseTitleAiInput(form),
+      ready = Boolean(
+        titleAssistant?.generateTitle &&
+          (input.className || input.subjects.length) &&
+          form.dataset.datajudGate !== "locked",
+      );
+    if (!button) return;
+    button.disabled = !ready || button.dataset.busy === "true";
+    button.title = ready
+      ? "Sugerir título com IA"
+      : "Disponível depois que a classe ou os assuntos do DataJud forem carregados";
+    if (ready && status && !status.textContent && button.dataset.busy !== "true")
+      status.textContent = "A sugestão usa somente classe, assuntos e área, e deve ser conferida antes de salvar.";
+    if (ready && status && status.textContent) status.hidden = false;
+  }
+  async function suggestCaseTitle() {
+    const form = $("#case-form"),
+      button = form?.querySelector("#suggest-case-title");
+    if (!form || !button || button.disabled || !titleAssistant?.generateTitle) return;
+    const request = ++caseTitleAiRequest,
+      currentTitle = form.elements.title.value,
+      input = caseTitleAiInput(form);
+    button.dataset.busy = "true";
+    updateCaseTitleAi(form);
+    setCaseTitleAiStatus(form, "Gerando uma sugestão curta…", "loading");
+    try {
+      const result = await titleAssistant.generateTitle(input);
+      if (request !== caseTitleAiRequest) return;
+      if (form.elements.title.value !== currentTitle) {
+        setCaseTitleAiStatus(
+          form,
+          "A sugestão chegou, mas o título foi alterado durante a consulta; nada foi substituído.",
+          "success",
+        );
+        return;
+      }
+      form.elements.title.value = result.title;
+      setCaseTitleAiStatus(form, "Sugestão aplicada. Confira e ajuste antes de salvar.", "success");
+    } catch (error) {
+      if (request !== caseTitleAiRequest) return;
+      setCaseTitleAiStatus(
+        form,
+        `${error.message || "Não foi possível gerar a sugestão."} O título atual foi mantido.`,
+        "error",
+      );
+    } finally {
+      if (request === caseTitleAiRequest) {
+        delete button.dataset.busy;
+        updateCaseTitleAi(form);
+      }
+    }
+  }
   function dataJudProxyReady() {
     return Boolean(resolveProxyUrl(worker.apiUrl) && String(worker.apiKey || "").trim());
   }
@@ -2995,6 +3067,7 @@
       control.disabled = locked;
     });
     form.dataset.datajudGate = locked ? "locked" : "ready";
+    updateCaseTitleAi(form);
   }
   function renderCaseDataJud(info = null) {
     const panel = $("#case-datajud-panel");
@@ -3029,13 +3102,18 @@
       "success",
     );
     setCaseDataJudGate(form, false);
+    updateCaseTitleAi(form);
   }
   function scheduleCaseDataJudLookup(form) {
     clearTimeout(caseDataJudLookupTimer);
     const request = ++caseDataJudLookupRequest,
       normalized = normalizeCnj(form.elements.number.value);
+    caseTitleAiRequest += 1;
+    delete form.querySelector("#suggest-case-title")?.dataset.busy;
     caseDataJudDraft = null;
     renderCaseDataJud();
+    setCaseTitleAiStatus(form);
+    updateCaseTitleAi(form);
     if (form.elements.type.value !== "judicial") return;
     if (!validCnj(normalized)) {
       setCaseDataJudGate(form, true);
@@ -3105,12 +3183,14 @@
       renderCaseDataJud();
       setCaseDataJudGate(form, false);
       setCaseDataJudStatus(form);
+      updateCaseTitleAi(form);
       return;
     }
     const saved = Boolean(form.elements.id.value && caseDataJudDraft);
     if (saved) {
       setCaseDataJudGate(form, false);
       setCaseDataJudStatus(form, "Dados DataJud já consultados neste cadastro. Consulte novamente se o número for alterado.", "success");
+      updateCaseTitleAi(form);
       return;
     }
     scheduleCaseDataJudLookup(form);
@@ -3125,8 +3205,10 @@
     const f = $("#case-form");
     clearTimeout(caseDataJudLookupTimer);
     caseDataJudLookupRequest += 1;
+    caseTitleAiRequest += 1;
     caseDataJudDraft = null;
     f.reset();
+    delete f.querySelector("#suggest-case-title")?.dataset.busy;
     f.elements.id.value = caseId;
     f.elements.clientId.innerHTML =
       '<option value="">Selecione o cliente</option>' +
@@ -3164,6 +3246,7 @@
     updateCaseContractFields();
     renderCaseDataJud(caseDataJudDraft);
     syncCaseType();
+    updateCaseTitleAi(f);
     $("#case-modal-title").textContent = item
       ? "Editar processo ou caso"
       : "Novo processo ou caso";
@@ -4819,6 +4902,7 @@
   $("#case-form [name=title]").addEventListener("input", (event) => {
     normalizeCaseTitleSeparators(event.currentTarget);
   });
+  $("#suggest-case-title").onclick = suggestCaseTitle;
   $("#case-form [name=number]").addEventListener("input", (event) => {
     if (event.target.form.elements.type.value === "judicial") {
       event.target.value = maskCnj(event.target.value);
